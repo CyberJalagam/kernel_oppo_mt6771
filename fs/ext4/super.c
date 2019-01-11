@@ -2925,8 +2925,8 @@ static ext4_group_t ext4_has_uninit_itable(struct super_block *sb)
 			continue;
 		if (group != 0)
 			break;
-		ext4_error(sb, "Inode table for bg 0 marked as "
-			   "needing zeroing");
+		ext4_error(sb,
+			"Inode table for bg 0 marked as needing zeroing");
 		if (sb->s_flags & MS_RDONLY)
 			return ngroups;
 	}
