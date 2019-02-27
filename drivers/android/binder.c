@@ -3143,7 +3143,6 @@ static void binder_transaction(struct binder_proc *proc,
 		t->buffer = NULL;
 		goto err_binder_alloc_buf_failed;
 	}
-	t->buffer->allow_user_free = 0;
 	t->buffer->debug_id = t->debug_id;
 	t->buffer->transaction = t;
 	t->buffer->target_node = target_node;
@@ -3640,12 +3639,16 @@ static int binder_thread_write(struct binder_proc *proc,
 			buffer = binder_alloc_prepare_to_free(&proc->alloc,
 							      data_ptr);
 			if (IS_ERR_OR_NULL(buffer)) {
-				if(PTR_ERR(buffer) == -EPERM){
-					binder_user_error("%d:%d BC_FREE_BUFFER u%016llx no match or currently freeing buffer\n",
-						proc->pid, thread->pid, (u64)data_ptr);
-				}else{
-					binder_user_error("%d:%d BC_FREE_BUFFER u%016llx no matched \n",
-					proc->pid, thread->pid, (u64)data_ptr);
+				if (PTR_ERR(buffer) == -EPERM) {
+					binder_user_error(
+						"%d:%d BC_FREE_BUFFER u%016llx matched unreturned or currently freeing buffer\n",
+						proc->pid, thread->pid,
+						(u64)data_ptr);
+				} else {
+					binder_user_error(
+						"%d:%d BC_FREE_BUFFER u%016llx no match\n",
+						proc->pid, thread->pid,
+						(u64)data_ptr);
 				}
 				break;
 			}

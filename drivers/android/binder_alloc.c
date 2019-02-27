@@ -152,7 +152,7 @@ static struct binder_buffer *binder_alloc_prepare_to_free_locked(
 			 * free the buffer when in use by kernel or
 			 * after it's already been freed.
 			 */
-			if(!buffer->allow_user_free)
+			if (!buffer->allow_user_free)
 				return ERR_PTR(-EPERM);
 			buffer->allow_user_free = 0;
 			return buffer;
