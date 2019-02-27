@@ -300,3 +300,10 @@ void connectivity_export_dump_gpio_info(int start, int end)
 }
 EXPORT_SYMBOL(connectivity_export_dump_gpio_info);
 #endif
+
+int connectivity_export_gpio_get_tristate_input(unsigned int pin)
+{
+	/* Kernel-4.4 does not support tri-state gpio */
+	return -1;
+}
+EXPORT_SYMBOL(connectivity_export_gpio_get_tristate_input);
