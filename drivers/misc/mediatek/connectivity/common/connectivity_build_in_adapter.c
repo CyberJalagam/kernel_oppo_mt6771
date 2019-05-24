@@ -53,7 +53,9 @@
 #include <sdio_ops.h>
 
 #include "mtk_spm_resource_req.h"
+#ifndef CONFIG_MACH_MT8167
 #include <mtk_sleep.h>
+#endif
 
 #ifdef CONFIG_ARCH_MT6570
 #define CPU_BOOST y
@@ -105,6 +107,7 @@ void connectivity_export_tracing_record_cmdline(struct task_struct *tsk)
 }
 EXPORT_SYMBOL(connectivity_export_tracing_record_cmdline);
 
+#ifndef CONFIG_MACH_MT8167
 unsigned int connectivity_export_slp_get_wake_reason(void)
 {
 	return slp_get_wake_reason();
@@ -116,6 +119,7 @@ unsigned int connectivity_export_spm_get_last_wakeup_src(void)
 	return spm_get_last_wakeup_src();
 }
 EXPORT_SYMBOL(connectivity_export_spm_get_last_wakeup_src);
+#endif
 
 #ifdef CPU_BOOST
 bool connectivity_export_spm_resource_req(unsigned int user, unsigned int req_mask)
