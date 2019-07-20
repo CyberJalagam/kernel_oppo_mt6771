@@ -16,6 +16,9 @@
 
 #include <mtk_wcn_cmb_stub.h>
 
+#define KERNEL_mtk_wcn_cmb_sdio_request_eirq \
+		mtk_wcn_cmb_sdio_request_eirq_by_wmt
+void mtk_wcn_cmb_sdio_request_eirq_by_wmt(void);
 
 /*******************************************************************************
  * Bridging from platform -> wmt_drv.ko
@@ -45,3 +48,4 @@ void wmt_export_mtk_wcn_cmb_sdio_disable_eirq(void);
 int wmt_export_mtk_wcn_sdio_irq_flag_set(int flag);
 
 #endif /* WMT_BUILD_IN_ADAPTER_H */
+
