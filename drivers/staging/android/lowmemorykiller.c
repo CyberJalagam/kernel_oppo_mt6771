@@ -1,3 +1,4 @@
+
 /* drivers/misc/lowmemorykiller.c
  *
  * The lowmemorykiller driver lets user-space specify a set of memory thresholds
@@ -94,8 +95,9 @@ static DEFINE_SPINLOCK(lowmem_shrink_lock);
 
 #include "internal.h"
 
-static u32 lowmem_debug_level = 1;
+static u32 lowmem_debug_level = 0;
 static short lowmem_adj[9] = {
+
 	0,
 	1,
 	6,
