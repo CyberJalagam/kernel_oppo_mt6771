@@ -30,7 +30,7 @@
 #elif CONFIG_OPPO_BSP_SECCOM_PLATFORM == 855
 #include <linux/soc/qcom/smem.h>
 #else
-#include <soc/qcom/smem.h>
+#include <linux/soc/qcom/smem.h>
 #endif
 
 #include <linux/slab.h>
