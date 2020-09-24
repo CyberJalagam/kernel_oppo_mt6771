@@ -17,6 +17,9 @@
 **  Hongdao.yu   2017/03/22           remake ID match code
 **  Ziqing.guo   2017/04/29           add for displaying secure boot switch
 **  Bin.Li       2017/12/12           remove secure part
+**  Ping.Liu     2018/06/01           modify for 1023_glass(1023+2060)
+**  Shupeng.Zhou  2018/08/21          add for 1028 coating
+**  Shupeng.Zhou  2018/08/21          add for 1511 coating
 **  Ziqing.guo   2019/02/12           modify FP_ID_MAX_LENGTH (20 -> 60)
 ************************************************************************************/
 
@@ -35,7 +38,6 @@ typedef enum {
         FP_FPC_1140,
         FP_FPC_1260,
         FP_FPC_1270,
-        FP_GOODIX_5658,
         FP_FPC_1511,
         FP_GOODIX_3268,
         FP_GOODIX_5288,
@@ -45,6 +47,8 @@ typedef enum {
         FP_GOODIX_5298_GLASS,
         FP_SILEAD_OPTICAL_70,
         FP_FPC_1023_GLASS,
+        FP_EGIS_520,
+        FP_SILEAD_6150,
         FP_FPC_1028_COATING,
         FP_FPC_1511_COATING,
         FP_UNKNOWN,
