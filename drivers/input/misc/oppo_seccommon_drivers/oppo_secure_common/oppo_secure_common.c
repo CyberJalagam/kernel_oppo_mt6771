@@ -17,18 +17,13 @@
  **  Ziqing.guo     2018/03/12     fix the problem for coverity CID 16731
  **  Hongdao.yu     2018/05/01     remove fp engineering mode
  **  Ping.Liu       2018/06/22     compatible with SDM670/SDM710.
- **  Long.Liu       2018/11/23     compatible with P80
- **  oujinrong      2018/12/29     compatible with SDM855
- **  oujinrong      2018/01/08     fix stage 1 machine with apdp boot failed
  ************************************************************************************/
 
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 
-#if CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6763 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6771 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6779
+#if CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6763 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6771
 #include <sec_boot_lib.h>
-#elif CONFIG_OPPO_BSP_SECCOM_PLATFORM == 855
-#include <linux/soc/qcom/smem.h>
 #else
 #include <linux/soc/qcom/smem.h>
 #endif
@@ -37,13 +32,7 @@
 #include <linux/seq_file.h>
 #include <linux/fs.h>
 #include <linux/of_gpio.h>
-
-#if CONFIG_OPPO_BSP_SECCOM_PLATFORM == 855
-#include <linux/uaccess.h>
-#else
 #include <asm/uaccess.h>
-#endif
-
 #include <linux/delay.h>
 #include <linux/string.h>
 #include "../include/oppo_secure_common.h"
@@ -59,13 +48,6 @@
 #define OEM_SEC_ENABLE_ANTIROLLBACK_REG 0x78019c
 #define OEM_SEC_OVERRIDE_1_REG 0x7860C4
 #define OEM_OVERRIDE_1_ENABLED_VALUE 0xffffffff
-
-#elif CONFIG_OPPO_BSP_SECCOM_PLATFORM == 855
-#define OEM_SEC_BOOT_REG 0x7804D0
-#define OEM_SEC_ENABLE_ANTIROLLBACK_REG 0x78019C
-#define OEM_SEC_OVERRIDE_1_REG 0x7860C0
-#define OEM_OVERRIDE_1_ENABLED_VALUE 0x1
-
 #elif CONFIG_OPPO_BSP_SECCOM_PLATFORM == 8953 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 8976  /* msm8953, 8976pro */
 #define OEM_SEC_BOOT_REG 0xA0154
 #endif
@@ -80,8 +62,7 @@ static secure_type_t get_secureType(void)
         secure_type_t secureType = SECURE_BOOT_UNKNOWN;
 
 #if CONFIG_OPPO_BSP_SECCOM_PLATFORM == 660 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 845 \
-|| CONFIG_OPPO_BSP_SECCOM_PLATFORM == 670 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 710 \
-|| CONFIG_OPPO_BSP_SECCOM_PLATFORM == 855 /* sdm660, sdm845, sdm670, sdm710, sdm855 */
+|| CONFIG_OPPO_BSP_SECCOM_PLATFORM == 670 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 710  /* sdm660, sdm845, sdm670, sdm710 */
 
         void __iomem *oem_config_base;
         uint32_t secure_oem_config1 = 0;
@@ -154,14 +135,6 @@ static secure_type_t get_secureType(void)
                 secureType = SECURE_BOOT_ON;
         }
 
-#elif  CONFIG_OPPO_BSP_SECCOM_PLATFORM == 6779
-
-        if (g_hw_sbcen == 0) {
-                secureType = SECURE_BOOT_OFF;
-        } else {
-                secureType = SECURE_BOOT_ON;
-        }
-
 #endif
 
         return secureType;
@@ -221,7 +194,7 @@ static ssize_t secureSNBound_read_proc(struct file *file, char __user *buf,
         secure_device_sn_bound_state_t secureSNBound_state = SECURE_DEVICE_SN_BOUND_UNKNOWN;
 
 #if CONFIG_OPPO_BSP_SECCOM_PLATFORM == 660 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 845 \
-|| CONFIG_OPPO_BSP_SECCOM_PLATFORM == 670 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 710 /* sdm660, sdm845, sdm670, sdm710 */
+|| CONFIG_OPPO_BSP_SECCOM_PLATFORM == 670 || CONFIG_OPPO_BSP_SECCOM_PLATFORM == 710  /* sdm660, sdm845, sdm670, sdm710 */
 
         void __iomem *oem_config_base;
         uint32_t secure_override1_config = 0;
