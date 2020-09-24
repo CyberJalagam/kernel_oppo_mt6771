@@ -23,21 +23,8 @@ DEFS_PLATFORM = -DCONFIG_OPPO_FINGERPRINT_PLATFORM=6771
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_export_inc
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/module
-else ifeq ($(shell echo $(TARGET_PRODUCT) | sed -e 's/_1.*//g'),full_oppo6779)
-DEFS_PLATFORM = -DCONFIG_OPPO_FINGERPRINT_PLATFORM=6779
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_export_inc
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/masp/asfv2/module
-DEFS_IRQ = -DCONFIG_OPTICAL_IRQ_HANDLER_SILEAD
-ccflags-y += $(DEFS_IRQ)
 else ifeq ($(TARGET_PRODUCT),sdm710)
 DEFS_PLATFORM = -DCONFIG_OPPO_FINGERPRINT_PLATFORM=710
-DEFS_IRQ = -DCONFIG_OPTICAL_IRQ_HANDLER
-ccflags-y += $(DEFS_IRQ)
-else ifeq ($(TARGET_PRODUCT),msmnile)
-DEFS_PLATFORM = -DCONFIG_OPPO_FINGERPRINT_PLATFORM=855
-DEFS_IRQ = -DCONFIG_OPTICAL_IRQ_HANDLER
-ccflags-y += $(DEFS_IRQ)
 else
 DEFS_PLATFORM = -DCONFIG_OPPO_FINGERPRINT_PLATFORM=0
 endif
