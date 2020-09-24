@@ -112,24 +112,15 @@ struct vreg_config {
         int ua_load;
 };
 
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18151
-static const struct vreg_config const vreg_conf[] = {
-        { "vdd_io", 3000000UL, 3000000UL, 6000, },
-};
-#else
 static const struct vreg_config const vreg_conf[] = {
         { "vdd_io", 1800000UL, 1800000UL, 6000, },
 };
-#endif
 
 struct fpc1020_data {
         struct device *dev;
         struct platform_device *pldev;
         int irq_gpio;
         int rst_gpio;
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18531 || CONFIG_OPPO_FINGERPRINT_PROJCT == 18161
-    int vdd_en_gpio;
-#endif
         struct input_dev *idev;
         int irq_num;
         struct mutex lock;
@@ -446,23 +437,6 @@ static ssize_t wakelock_enable_set(struct device *dev,
         return count;
 }
 
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18531 || CONFIG_OPPO_FINGERPRINT_PROJCT == 18161
-static ssize_t hardware_reset(struct device *dev, struct device_attribute *attribute, const char *buffer, size_t count)
-{
-    struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
-    printk("fpc_interrupt: %s enter\n", __func__);
-    gpio_direction_output(fpc1020->vdd_en_gpio, 0);
-    gpio_set_value(fpc1020->rst_gpio, 0);
-    udelay(FPC1020_RESET_LOW_US);
-    gpio_set_value(fpc1020->rst_gpio, 1);
-    gpio_direction_output(fpc1020->vdd_en_gpio, 1);
-    printk("fpc_interrupt: %s exit\n", __func__);
-    return count;
-}
-
-static DEVICE_ATTR(irq_unexpected, S_IWUSR, NULL, hardware_reset);
-#endif
-
 static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
 static DEVICE_ATTR(regulator_enable, S_IWUSR, NULL, regulator_enable_set);
 static DEVICE_ATTR(irq_enable, S_IRUSR | S_IWUSR, irq_enable_get, irq_enable_set);
@@ -478,9 +452,6 @@ static struct attribute *attributes[] = {
         &dev_attr_irq_enable.attr,
         &dev_attr_wakelock_enable.attr,
         &dev_attr_clk_enable.attr,
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18531 || CONFIG_OPPO_FINGERPRINT_PROJCT == 18161
-        &dev_attr_irq_unexpected.attr,
-#endif
         NULL
 };
 
@@ -619,19 +590,6 @@ static int fpc1020_irq_probe(struct platform_device *pldev)
                 goto ERR_AFTER_WAKELOCK;
         }
 
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18531 || CONFIG_OPPO_FINGERPRINT_PROJCT == 18161
-        /*get ldo resource*/
-        rc = fpc1020_request_named_gpio(fpc1020, "fpc,vdd-en",
-                    &fpc1020->vdd_en_gpio);
-        if (rc) {
-                goto ERR_AFTER_WAKELOCK;
-        }
-        rc = gpio_direction_output(fpc1020->vdd_en_gpio, 1);
-        if (rc < 0) {
-                dev_err(fpc1020->dev, "gpio_direction_output (vdd_en) failed.\n");
-                goto ERR_AFTER_WAKELOCK;
-        }
-#else
         rc = vreg_setup(fpc1020, "vdd_io", true);
 
         if (rc) {
@@ -639,7 +597,6 @@ static int fpc1020_irq_probe(struct platform_device *pldev)
                                 "vreg_setup failed.\n");
                 goto ERR_AFTER_WAKELOCK;
         }
-#endif
         mdelay(2);
         gpio_set_value(fpc1020->rst_gpio, 1);
         udelay(FPC1020_RESET_HIGH2_US);
@@ -792,11 +749,7 @@ static void __exit fpc1020_exit(void)
         //platform_device_unregister(fpc_irq_platform_device);
 }
 
-#if CONFIG_OPPO_FINGERPRINT_PROJCT == 18151
-late_initcall(fpc1020_init);
-#else
 module_init(fpc1020_init);
-#endif
 
 module_exit(fpc1020_exit);
 
