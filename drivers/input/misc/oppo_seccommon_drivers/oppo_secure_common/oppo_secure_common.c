@@ -22,7 +22,7 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 
-#include <sec_boot_lib.h>
+#include "../drivers/input/oppo_fp_drivers/oppo_fp_common/sec_boot_lib.h"
 
 #include <linux/slab.h>
 #include <linux/seq_file.h>
