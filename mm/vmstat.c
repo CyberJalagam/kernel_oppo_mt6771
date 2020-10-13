@@ -460,7 +460,7 @@ static int fold_diff(int *diff)
  *
  * The function returns the number of global counters updated.
  */
-static int refresh_cpu_vm_stats(void)
+static int refresh_cpu_vm_stats(bool do_pagesets)
 {
 	struct zone *zone;
 	int i;
@@ -1394,7 +1394,7 @@ static cpumask_var_t cpu_stat_off;
 
 static void vmstat_update(struct work_struct *w)
 {
-	if (refresh_cpu_vm_stats()) {
+	if (refresh_cpu_vm_stats(true)) {
 		/*
 		 * Counters were updated so we expect more updates
 		 * to occur in the future. Keep on running the

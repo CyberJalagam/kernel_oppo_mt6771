@@ -87,6 +87,7 @@ static DEFINE_SPINLOCK(lowmem_shrink_lock);
 #include <linux/circ_buf.h>
 #include <linux/proc_fs.h>
 #include <linux/slab.h>
+#include <linux/poll.h>
 
 #define CREATE_TRACE_POINTS
 #include "trace/lowmemorykiller.h"
@@ -149,12 +150,24 @@ void handle_lmk_event(struct task_struct *selected, short min_score_adj)
 	struct lmk_event *event;
 	int res;
 	long rss_in_pages = -1;
+	char taskname[MAX_TASKNAME];
 	struct mm_struct *mm = get_task_mm(selected);
 
 	if (mm) {
 		rss_in_pages = get_mm_rss(mm);
 		mmput(mm);
 	}
+
+	res = get_cmdline(selected, taskname, MAX_TASKNAME - 1);
+
+	/* No valid process name means this is definitely not associated with a
+	 * userspace activity.
+	 */
+
+	if (res <= 0 || res >= MAX_TASKNAME)
+		return;
+
+	taskname[res] = '\0';
 
 	spin_lock(&lmk_event_lock);
 
@@ -170,18 +183,8 @@ void handle_lmk_event(struct task_struct *selected, short min_score_adj)
 	events = (struct lmk_event *) event_buffer.buf;
 	event = &events[head];
 
-	res = get_cmdline(selected, event->taskname, MAX_TASKNAME - 1);
+	memcpy(event->taskname, taskname, res + 1);
 
-	/* No valid process name means this is definitely not associated with a
-	 * userspace activity.
-	 */
-
-	if (res <= 0 || res >= MAX_TASKNAME) {
-		spin_unlock(&lmk_event_lock);
-		return;
-	}
-
-	event->taskname[res] = '\0';
 	event->pid = selected->pid;
 	event->uid = from_kuid_munged(current_user_ns(), task_uid(selected));
 	if (selected->group_leader)
@@ -784,6 +787,7 @@ log_again:
 
 		rem += selected_tasksize;
 		handle_lmk_event(selected, min_score_adj);
+		lowmem_deathpending_timeout = jiffies + HZ;
 	} else {
 		if (p_state_is_found & LOWMEM_P_STATE_D)
 			lowmem_print(2, "No selected (full of D-state processes at %d)\n", (int)min_score_adj);
@@ -808,6 +812,9 @@ log_again:
 	if (mtklmk_initialized && current_is_kswapd() && mtklmk_uevent_timeout)
 		mtklmk_uevent(min_score_adj, minfree);
 #endif
+
+	if (selected)
+		handle_lmk_event(selected, min_score_adj);
 
 	return rem;
 
