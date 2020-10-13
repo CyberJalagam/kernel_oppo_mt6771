@@ -3241,6 +3241,11 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 	unsigned long offset;
 	unsigned long local_size;
 	unsigned long gwt_mask = ~0;
+        unsigned int flags_n = 0;
+
+        if (reg->flags & KBASE_REG_GPU_WR)
+                flags_n |= FOLL_WRITE;
+
 
 	alloc = reg->gpu_alloc;
 	pa = kbase_get_gpu_phy_pages(reg);
@@ -3255,8 +3260,7 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 	pinned_pages = get_user_pages(NULL, mm,
 			address,
 			alloc->imported.user_buf.nr_pages,
-			reg->flags & KBASE_REG_GPU_WR,
-			0, pages, NULL);
+			flags_n, pages, NULL);
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 	pinned_pages = get_user_pages_remote(NULL, mm,
 			address,

@@ -595,8 +595,8 @@ static int usb_audio_probe(struct usb_interface *intf,
  __error:
 	if (chip) {
 		/* chip->active is inside the chip->card object,
-		* decrement before memory is possibly returned.
-		*/
+		 * decrement before memory is possibly returned.
+		 */
 		atomic_dec(&chip->active);
 		if (!chip->num_interfaces)
 			snd_card_free(chip->card);

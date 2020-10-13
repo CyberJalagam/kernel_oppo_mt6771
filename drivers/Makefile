@@ -4,7 +4,7 @@
 # 15 Sep 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
-subdir-ccflags-y += -Werror
+#subdir-ccflags-y += -Werror
 
 obj-y				+= irqchip/
 obj-y				+= bus/
@@ -182,4 +182,3 @@ obj-$(CONFIG_TEE)		+= tee/
 #ifdef VENDOR_EDIT /*ChenYong@Plf.Framework, 2018/11/27, add for kernel hotfix*/
 obj-$(CONFIG_QIHOO)             += qihoo/
 #endif /* VENDOR_EDIT */
-
