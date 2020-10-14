@@ -560,6 +560,7 @@ config DEBUG_KMEMLEAK_EARLY_LOG_SIZE
 	range 200 40000
 	#default 400
 	#endif
+	default 16000
 	help
 	  Kmemleak must track all the memory allocations to avoid
 	  reporting false positives. Since memory may be allocated or

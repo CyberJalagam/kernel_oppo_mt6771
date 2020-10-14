@@ -6593,6 +6593,9 @@ int ufshcd_shutdown(struct ufs_hba *hba)
 	struct scsi_device *scsi_d;
 	int i;
 
+	if (!hba->is_powered)
+		goto out;
+
 	if (ufshcd_is_ufs_dev_poweroff(hba) && ufshcd_is_link_off(hba))
 		goto out;
 
