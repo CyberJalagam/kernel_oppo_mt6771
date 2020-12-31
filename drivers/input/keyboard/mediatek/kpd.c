@@ -22,6 +22,11 @@
 #include <linux/of_irq.h>
 #include <linux/clk.h>
 #include <linux/debugfs.h>
+#ifdef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic 2017/12/10 add for key
+#include <linux/of_gpio.h>
+#include <soc/oppo/oppo_project.h>
+#endif /*VENDOR_EDIT*/
 
 #define KPD_NAME	"mtk-kpd"
 #define MTK_KP_WAKESOURCE	/* this is for auto set wake up source */
@@ -29,6 +34,134 @@
 static struct dentry *kpd_droot;
 static struct dentry *kpd_dklog;
 int kpd_klog_en;
+
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Add for keypad volume up and volume down */
+//#define KPD_HOME_NAME 		"mtk-kpd-home"
+#define KPD_VOL_UP_NAME		"mtk-kpd-vol-up"
+#define KPD_VOL_DOWN_NAME	"mtk-kpd-vol-down"
+
+#define KEY_LEVEL_DEFAULT				1
+
+struct vol_info {
+	unsigned int vol_up_irq;
+	unsigned int vol_down_irq;
+	unsigned int vol_up_gpio;
+	unsigned int vol_down_gpio;
+	int vol_up_val;
+	int vol_down_val;
+	int vol_up_irq_enabled;
+	int vol_down_irq_enabled;
+	int vol_up_irq_type;
+	int vol_down_irq_type;
+	struct device *dev;
+	struct platform_device *pdev;
+	bool homekey_as_vol_up;
+}vol_key_info;
+
+static irqreturn_t kpd_volumeup_irq_handler(int irq, void *dev_id);
+static void kpd_volumeup_task_process(unsigned long data);
+static DECLARE_TASKLET(kpd_volumekey_up_tasklet, kpd_volumeup_task_process, 0);
+static irqreturn_t kpd_volumedown_irq_handler(int irq, void *dev_id);
+static void kpd_volumedown_task_process(unsigned long data);
+static DECLARE_TASKLET(kpd_volumekey_down_tasklet, kpd_volumedown_task_process, 0);
+
+
+static void kpd_volumeup_task_process(unsigned long data)
+{
+	pr_err("%s vol_up_val: %d\n", __func__, vol_key_info.vol_up_val);
+	input_report_key(kpd_input_dev, KEY_VOLUMEUP, !vol_key_info.vol_up_val);
+	input_sync(kpd_input_dev);
+	enable_irq(vol_key_info.vol_up_irq);
+
+}
+
+static irqreturn_t kpd_volumeup_irq_handler(int irq, void *dev_id)
+{
+#if 0
+	if (vol_key_info.vol_up_irq_type == IRQ_TYPE_EDGE_FALLING) {
+		mdelay(5);
+		vol_key_info.vol_up_val = gpio_get_value(vol_key_info.vol_up_gpio);
+		if(vol_key_info.vol_up_val) {
+			pr_err("%s irq_type falling, vol_up_val: 1, return\n", __func__);
+			return IRQ_HANDLED;
+		}
+	} else if(vol_key_info.vol_up_irq_type == IRQ_TYPE_EDGE_RISING) {
+		mdelay(5);
+		vol_key_info.vol_up_val = gpio_get_value(vol_key_info.vol_up_gpio);
+		if(!vol_key_info.vol_up_val) {
+			pr_err("%s irq_type rising, vol_up_val: 0, return\n", __func__);
+			return IRQ_HANDLED;
+		}
+	} else {
+		return IRQ_HANDLED;
+	}
+#endif
+	disable_irq_nosync(vol_key_info.vol_up_irq);
+
+#if 1
+	vol_key_info.vol_up_val = gpio_get_value(vol_key_info.vol_up_gpio);
+#endif
+	if (vol_key_info.vol_up_val) {
+		irq_set_irq_type(vol_key_info.vol_up_irq, IRQ_TYPE_EDGE_FALLING);
+		vol_key_info.vol_up_irq_type = IRQ_TYPE_EDGE_FALLING;
+	} else {
+		irq_set_irq_type(vol_key_info.vol_up_irq, IRQ_TYPE_EDGE_RISING);
+		vol_key_info.vol_up_irq_type = IRQ_TYPE_EDGE_RISING;
+	}
+	pr_err("%s irq_type:%d, val:%d\n", __func__, 
+		vol_key_info.vol_up_irq_type, vol_key_info.vol_up_val);
+	tasklet_schedule(&kpd_volumekey_up_tasklet);
+	return IRQ_HANDLED;
+}
+
+static void kpd_volumedown_task_process(unsigned long data)
+{
+	pr_err("%s vol_down val:%d\n", __func__, vol_key_info.vol_down_val);
+	input_report_key(kpd_input_dev, KEY_VOLUMEDOWN, !vol_key_info.vol_down_val);
+	input_sync(kpd_input_dev);
+	enable_irq(vol_key_info.vol_down_irq);
+	
+}
+
+static irqreturn_t kpd_volumedown_irq_handler(int irq, void *dev_id)
+{
+#if 0
+	if (vol_key_info.vol_down_irq_type == IRQ_TYPE_EDGE_FALLING) {
+		mdelay(5);
+		vol_key_info.vol_down_val = gpio_get_value(vol_key_info.vol_down_gpio);
+		if(vol_key_info.vol_down_val) {
+			pr_err("%s irq_type falling, vol_down_val: 1, return\n", __func__);
+			return IRQ_HANDLED;
+		}
+	} else if(vol_key_info.vol_down_irq_type == IRQ_TYPE_EDGE_RISING) {
+		mdelay(5);
+		vol_key_info.vol_down_val = gpio_get_value(vol_key_info.vol_down_gpio);
+		if(!vol_key_info.vol_down_val) {
+			pr_err("%s irq_type rising, vol_down_val: 0, return\n", __func__);
+			return IRQ_HANDLED;
+		}
+	} else {
+		return IRQ_HANDLED;
+	}
+#endif
+	disable_irq_nosync(vol_key_info.vol_down_irq);
+#if 1
+	vol_key_info.vol_down_val = gpio_get_value(vol_key_info.vol_down_gpio);
+#endif
+	if (vol_key_info.vol_down_val) {
+		irq_set_irq_type(vol_key_info.vol_down_irq, IRQ_TYPE_EDGE_FALLING);
+		vol_key_info.vol_down_irq_type = IRQ_TYPE_EDGE_FALLING;
+	} else {
+		irq_set_irq_type(vol_key_info.vol_down_irq, IRQ_TYPE_EDGE_RISING);
+		vol_key_info.vol_down_irq_type = IRQ_TYPE_EDGE_RISING;
+	}
+	pr_err("%s irq_type:%d, val:%d\n", __func__, 
+		vol_key_info.vol_down_irq_type, vol_key_info.vol_down_val);
+	tasklet_schedule(&kpd_volumekey_down_tasklet);	
+	return IRQ_HANDLED;
+}
+#endif /*VENDOR_EDIT*/
 
 void __iomem *kp_base;
 static unsigned int kp_irqnr;
@@ -301,6 +434,7 @@ static enum hrtimer_restart aee_timer_func(struct hrtimer *timer)
 	/* aee_kernel_reminding("manual dump ", "Triggered by press KEY_VOLUMEUP+KEY_VOLUMEDOWN"); */
 	/*ZH CHEN*/
 	/*aee_trigger_kdb();*/
+
 	return HRTIMER_NORESTART;
 }
 
@@ -386,6 +520,7 @@ void kpd_pmic_rstkey_handler(unsigned long pressed)
 #ifdef KPD_PMIC_RSTKEY_MAP
 	kpd_aee_handler(KPD_PMIC_RSTKEY_MAP, pressed);
 #endif
+
 }
 
 /*********************************************************************/
@@ -794,15 +929,147 @@ void kpd_get_dts_info(struct device_node *node)
 		  kpd_dts_data.kpd_key_debounce, kpd_dts_data.kpd_sw_pwrkey, kpd_dts_data.kpd_hw_pwrkey,
 		  kpd_dts_data.kpd_hw_rstkey, kpd_dts_data.kpd_sw_rstkey);
 }
+
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Add for keypad volume up and volume down */
+static int kpd_request_named_gpio(struct vol_info *kpd,
+		const char *label, int *gpio)
+{
+	struct device *dev = kpd->dev;
+	struct device_node *np = dev->of_node;
+	int rc = of_get_named_gpio(np, label, 0);
+	if (rc < 0) {
+		dev_err(dev, "failed to get '%s'\n", label);
+		return rc;
+	}
+
+	*gpio = rc;
+	rc = devm_gpio_request(dev, *gpio, label);
+	if (rc) {
+		dev_err(dev, "failed to request gpio %d\n", *gpio);
+		return rc;
+	}
+
+	//dev_info(dev, "%s - gpio: %d\n", label, *gpio);
+	return 0;
+}
+
+
+static int init_custom_gpio_state(struct platform_device *client) {
+	struct pinctrl *pinctrl1;
+	struct pinctrl_state *volume_up_as_int, *volume_down_as_int;
+	struct device_node *node = NULL;
+	u32 intr[4] = {0};
+	int ret;
+	u32 debounce_time = 0;
+
+	pinctrl1 = devm_pinctrl_get(&client->dev);
+	if (IS_ERR(pinctrl1)) {
+		ret = PTR_ERR(pinctrl1);
+		kpd_print("can not find keypad pintrl1");
+		return ret;
+	}
+
+	/*for key volume up*/
+	if (!vol_key_info.homekey_as_vol_up) {
+		volume_up_as_int = pinctrl_lookup_state(pinctrl1, "volume_up_as_int");
+		if (IS_ERR(volume_up_as_int)) {
+			ret = PTR_ERR(volume_up_as_int);
+			kpd_print("can not find gpio of volume up\n");
+			return ret;
+		} else {
+			ret = pinctrl_select_state(pinctrl1, volume_up_as_int);
+			if (ret < 0){
+				kpd_print("error to set gpio state\n");
+				return ret;
+			}
+
+			node = of_find_compatible_node(NULL, NULL, "mediatek, VOLUME_UP-eint");
+			if (node) {
+				of_property_read_u32_array(node , "interrupts", intr, ARRAY_SIZE(intr));
+				pr_info("volume up intr[0-3]  = %d %d %d %d\r\n", intr[0] ,intr[1], intr[2] ,intr[3]);
+				//vol_key_info.vol_up_gpio = intr[0];
+				vol_key_info.vol_up_irq = irq_of_parse_and_map(node, 0);
+				ret = of_property_read_u32(node, "debounce", &debounce_time);
+				if (ret) {
+					pr_err("%s get debounce_time fail\n", __func__);
+				}
+				pr_err("%s debounce_time:%d\n", __func__, debounce_time);
+			} else {
+				pr_err("%d volume up irp node not exist\n", __LINE__);
+				return -1;
+			}
+			vol_key_info.vol_up_irq_type = IRQ_TYPE_EDGE_FALLING;
+			ret = request_irq(vol_key_info.vol_up_irq, (irq_handler_t)kpd_volumeup_irq_handler, IRQF_TRIGGER_FALLING, KPD_VOL_UP_NAME, NULL);
+			if(ret){
+				pr_err("%d request irq failed\n", __LINE__);
+				return -1;
+			}
+			if (vol_key_info.vol_up_gpio > 0 && debounce_time)
+				gpio_set_debounce(vol_key_info.vol_up_gpio, debounce_time);
+		}
+	}
+
+	/*for key of volume down*/
+	volume_down_as_int = pinctrl_lookup_state(pinctrl1, "volume_down_as_int");
+	if (IS_ERR(volume_down_as_int)) {
+		ret = PTR_ERR(volume_down_as_int);
+		kpd_print("can not find gpio of  volume down\n");
+		return ret;
+	} else {
+		ret = pinctrl_select_state(pinctrl1, volume_down_as_int);
+		if (ret < 0){
+			kpd_print("error to set gpio state\n");
+			return ret;
+		}
+
+		node = of_find_compatible_node(NULL, NULL, "mediatek, VOLUME_DOWN-eint");
+		if (node) {
+			of_property_read_u32_array(node , "interrupts", intr, ARRAY_SIZE(intr));
+			pr_info("volume down intr[0-3] = %d %d %d %d\r\n", intr[0] ,intr[1], intr[2], intr[3]);
+			//vol_key_info.vol_down_gpio = intr[0];
+			vol_key_info.vol_down_irq = irq_of_parse_and_map(node, 0);
+		} else {
+			pr_err("%d volume down irp node not exist\n", __LINE__);
+			return -1;
+		}
+		ret = of_property_read_u32(node, "debounce", &debounce_time);
+		if (ret) {
+			pr_err("%s vol_down get debounce_time fail\n", __func__);
+		}
+		pr_err("%s vol_down debounce_time:%d\n", __func__, debounce_time);
+		vol_key_info.vol_down_irq_type = IRQ_TYPE_EDGE_FALLING;
+		ret = request_irq(vol_key_info.vol_down_irq, (irq_handler_t)kpd_volumedown_irq_handler, IRQF_TRIGGER_FALLING, KPD_VOL_DOWN_NAME, NULL);
+		if(ret){
+			pr_err("%d request irq failed\n", __LINE__);
+			return -1;
+		}
+		if (vol_key_info.vol_down_gpio > 0 && debounce_time)
+			gpio_set_debounce(vol_key_info.vol_down_gpio, debounce_time);
+	}
+
+	kpd_print(" init_custom_gpio_state End\n");
+    return 0;
+
+}
+#endif /*VENDOR_EDIT*/
+
+
 static int kpd_pdrv_probe(struct platform_device *pdev)
 {
 
 	int i, r;
 	int err = 0;
 	struct clk *kpd_clk = NULL;
-
+	#ifndef VENDOR_EDIT
+	/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Add for keypad volume up and volume down */
 	call_status = 0;
+	#else /*VENDOR_EDIT*/
+	struct device *dev = &pdev->dev;
+	struct vol_info *kpd_oppo;
 
+	kpd_oppo = devm_kzalloc(dev, sizeof(*kpd_oppo), GFP_KERNEL);
+	#endif /*VENDOR_EDIT*/
 	kpd_info("Keypad probe start!!!\n");
 
 	/*kpd-clk should be control by kpd driver, not depend on default clock state*/
@@ -943,6 +1210,68 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 		kpd_delete_attr(&kpd_pdrv.driver);
 		return err;
 	}
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Add for keypad volume up and volume down */
+	kpd_oppo->dev = dev;
+	dev_set_drvdata(dev, kpd_oppo);
+	kpd_oppo->pdev = pdev;
+
+	if ((kpd_dts_data.kpd_sw_rstkey == KEY_VOLUMEUP) && is_project(OPPO_18611)) {
+		vol_key_info.homekey_as_vol_up = true;
+	} else {
+		vol_key_info.homekey_as_vol_up = false;
+	}
+
+	if (!vol_key_info.homekey_as_vol_up) {  // means not home key as volume up, defined on dws
+		err = kpd_request_named_gpio(kpd_oppo, "keypad,volume-up",
+				&vol_key_info.vol_up_gpio);
+
+		if (err) {
+			pr_err("%s lfc request keypad,volume-up fail\n", __func__);
+			return -1;
+		}
+		err = gpio_direction_input(vol_key_info.vol_up_gpio);
+
+		if (err < 0) {
+			dev_err(&kpd_oppo->pdev->dev,
+				"gpio_direction_input failed for vol_up INT.\n");
+			return -1;
+		}
+	}
+
+	err = kpd_request_named_gpio(kpd_oppo, "keypad,volume-down",
+			&vol_key_info.vol_down_gpio);
+	if (err) {
+		pr_err("%s request keypad,volume-down fail\n", __func__);
+		return -1;
+	}
+	err = gpio_direction_input(vol_key_info.vol_down_gpio);
+
+	if (err < 0) {
+		dev_err(&kpd_oppo->pdev->dev,
+			"gpio_direction_input failed for vol_down INT.\n");
+		return -1;
+	}
+
+	if (init_custom_gpio_state(pdev) < 0) {
+		pr_err("init gpio state failed\n");
+		return -1;
+	}
+
+	//disable keypad scan function
+	kpd_wakeup_src_setting(0);
+
+	//enable_irq(vol_key_info.vol_up_irq);
+	vol_key_info.vol_up_irq_enabled = 1;
+	//enable_irq(vol_key_info.vol_down_irq);
+	vol_key_info.vol_down_irq_enabled = 1;
+
+	__set_bit(KEY_VOLUMEDOWN, kpd_input_dev->keybit);
+	__set_bit(KEY_VOLUMEUP, kpd_input_dev->keybit);
+	__set_bit(KEY_POWER, kpd_input_dev->keybit);
+#endif /*VENDOR_EDIT*/
+
+
 	kpd_info("%s Done\n", __func__);
 	return 0;
 }
@@ -957,6 +1286,8 @@ static int kpd_pdrv_remove(struct platform_device *pdev)
 static int kpd_pdrv_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	kpd_suspend = true;
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Remove for we use seperated interrupts for volume up and down */
 #ifdef MTK_KP_WAKESOURCE
 	if (call_status == 2) {
 		kpd_print("kpd_early_suspend wake up source enable!! (%d)\n", kpd_suspend);
@@ -965,6 +1296,7 @@ static int kpd_pdrv_suspend(struct platform_device *pdev, pm_message_t state)
 		kpd_print("kpd_early_suspend wake up source disable!! (%d)\n", kpd_suspend);
 	}
 #endif
+#endif
 	kpd_print("suspend!! (%d)\n", kpd_suspend);
 	return 0;
 }
@@ -972,6 +1304,8 @@ static int kpd_pdrv_suspend(struct platform_device *pdev, pm_message_t state)
 static int kpd_pdrv_resume(struct platform_device *pdev)
 {
 	kpd_suspend = false;
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Remove for we use seperated interrupts for volume up and down */
 #ifdef MTK_KP_WAKESOURCE
 	if (call_status == 2) {
 		kpd_print("kpd_early_suspend wake up source enable!! (%d)\n", kpd_suspend);
@@ -979,6 +1313,7 @@ static int kpd_pdrv_resume(struct platform_device *pdev)
 		kpd_print("kpd_early_suspend wake up source resume!! (%d)\n", kpd_suspend);
 		kpd_wakeup_src_setting(1);
 	}
+#endif
 #endif
 	kpd_print("resume!! (%d)\n", kpd_suspend);
 	return 0;

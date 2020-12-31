@@ -238,7 +238,8 @@ void long_press_reboot_function_setting(void)
 #ifdef CONFIG_MTK_PMIC_NEW_ARCH /*for pmic not ready*/
 	if (kpd_enable_lprst && get_boot_mode() == NORMAL_BOOT) {
 		kpd_info("Normal Boot long press reboot selection\n");
-#ifdef CONFIG_KPD_PMIC_LPRST_TD
+#if defined(CONFIG_KPD_PMIC_LPRST_SUPPORT) && defined(CONFIG_KPD_PMIC_LPRST_TD)
+/*xing.xiong@BSP.Kernel.Debug, 2018/10/15, Modify for disable long press reset in normal mode*/
 		kpd_info("Enable normal mode LPRST\n");
 #ifdef CONFIG_ONEKEY_REBOOT_NORMAL_MODE
 		pmic_set_register_value(PMIC_RG_PWRKEY_RST_EN, 0x01);
@@ -259,7 +260,8 @@ void long_press_reboot_function_setting(void)
 #endif
 	} else {
 		kpd_info("Other Boot Mode long press reboot selection\n");
-#ifdef CONFIG_KPD_PMIC_LPRST_TD
+#if defined(CONFIG_KPD_PMIC_LPRST_SUPPORT) && defined(CONFIG_KPD_PMIC_LPRST_TD)
+/*xing.xiong@BSP.Kernel.Debug, 2018/10/15, Modify for disable long press reset in recovery mode*/
 		kpd_info("Enable other mode LPRST\n");
 #ifdef CONFIG_ONEKEY_REBOOT_OTHER_MODE
 		pmic_set_register_value(PMIC_RG_PWRKEY_RST_EN, 0x01);
@@ -290,6 +292,8 @@ bool __attribute__ ((weak)) ConditionEnterSuspend(void)
 /********************************************************************/
 void kpd_wakeup_src_setting(int enable)
 {
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Remove for keypad volume up and volume down */
 	int is_fm_radio_playing = 0;
 
 	/* If FM is playing, keep keypad as wakeup source */
@@ -307,6 +311,16 @@ void kpd_wakeup_src_setting(int enable)
 			enable_kpd(0);
 		}
 	}
+#else
+	if (enable == 1) {
+		kpd_print("enable kpd work!\n");
+		enable_kpd(1);
+	} else {
+		kpd_print("disable kpd work!\n");
+		enable_kpd(0);
+	}
+#endif	/* VENDOR_EDIT */
+
 }
 
 /********************************************************************/

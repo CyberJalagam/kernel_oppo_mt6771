@@ -92,4 +92,10 @@ obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
 obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
 obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
 obj-$(CONFIG_TOUCHSCREEN_ROHM_BU21023)	+= rohm_bu21023.o
-obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_TD4322) += synaptics_dsx_td4322/
+#ifndef VENDOR_EDIT
+#Mingqiang.guo@EXP.BSP.TP, 2017-01-04, Add for common touchpanel driver
+#obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_TD4322) += synaptics_dsx_td4322/
+#else
+obj-$(CONFIG_TOUCHPANEL_OPPO) += oppo_touchscreen/
+obj-$(CONFIG_TOUCHPANEL_OPPO) += touch.o
+#endif /* VENDOR_EDIT */

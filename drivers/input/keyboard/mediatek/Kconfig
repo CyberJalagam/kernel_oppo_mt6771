@@ -69,6 +69,15 @@ config KPD_PMIC_LPRST_TD
 	---help---
 	  0->8s, 1->11s, 2->14s, 3->5s
 
+#ifdef VENDOR_EDIT
+#xing.xiong@BSP.Kernel.Debug, 2019/01/12, Add for long power key press support
+config KPD_PMIC_LPRST_SUPPORT
+	bool "support long press reboot by Powerkey + other key"
+	default n
+	---help---
+	  Say Y here if you want to support long powerkey + other key reset
+#endif
+
 config KPD_PWRKEY_USE_EINT
 	bool "power key use keypad key"
 	default n
