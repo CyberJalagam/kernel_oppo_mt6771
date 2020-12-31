@@ -98,6 +98,13 @@ enum audio_system_gpio_type {
 	GPIO_HPDEPOP_LOW,
 	GPIO_AUD_CLK_MOSI_HIGH,
 	GPIO_AUD_CLK_MOSI_LOW,
+#ifdef VENDOR_EDIT
+	/* Xiaojun.Lv@PSW.MM.AudioDriver.Machine, 2018/7/13, add for smartPa. */
+	GPIO_I2S0_MODE0,
+	GPIO_I2S0_MODE1,
+	GPIO_I2S1_MODE0,
+	GPIO_I2S1_MODE1,
+#endif /* VENDOR_EDIT */
 	GPIO_NUM
 };
 
@@ -147,6 +154,13 @@ static struct audio_gpio_attr aud_gpios[GPIO_NUM] = {
 	[GPIO_HPDEPOP_LOW] = {"hpdepop-pulllow", false, NULL},
 	[GPIO_AUD_CLK_MOSI_HIGH] = {"aud_clk_mosi_pull_high", false, NULL},
 	[GPIO_AUD_CLK_MOSI_LOW] = {"aud_clk_mosi_pull_low", false, NULL},
+#ifdef VENDOR_EDIT
+	/* Xiaojun.Lv@PSW.MM.AudioDriver.Machine, 2018/7/13, Add for smartPa. */
+	[GPIO_I2S0_MODE0] = {"audi2s0-mode0", false, NULL},
+	[GPIO_I2S0_MODE1] = {"audi2s0-mode1", false, NULL},
+	[GPIO_I2S1_MODE0] = {"audi2s1-mode0", false, NULL},
+	[GPIO_I2S1_MODE1] = {"audi2s1-mode1", false, NULL},
+#endif /* VENDOR_EDIT */
 };
 #endif
 
@@ -225,6 +239,65 @@ static int AudDrv_GPIO_Select(enum audio_system_gpio_type _type)
 	return 0;
 #endif
 }
+
+#ifdef VENDOR_EDIT
+/* Xiaojun.Lv@PSW.MM.AudioDriver.Machine, 2018/7/13, Add for smartPa */
+int auddrv_gpio_i2s0_select(int b_enable)
+{
+	int retval = 0;
+
+	pr_info("%s: i2s0 set %d\n", __func__, b_enable);
+	if (b_enable == 1) {
+		if (aud_gpios[GPIO_I2S0_MODE1].gpio_prepare) {
+			retval = pinctrl_select_state(pinctrlaud,
+					aud_gpios[GPIO_I2S0_MODE1].gpioctrl);
+			if (retval) {
+				pr_err("%s: could not set aud_gpios[GPIO_I2S0_MODE1] pins\n",
+					__func__);
+			}
+		}
+	} else {
+		if (aud_gpios[GPIO_I2S0_MODE0].gpio_prepare) {
+			retval = pinctrl_select_state(pinctrlaud,
+					aud_gpios[GPIO_I2S0_MODE0].gpioctrl);
+			if (retval) {
+				pr_err("%s: could not set aud_gpios[GPIO_I2S0_MODE0] pins\n",
+					__func__);
+			}
+		}
+
+	}
+	return retval;
+}
+
+int auddrv_gpio_i2s1_select(int bEnable)
+{
+	int retval = 0;
+
+	pr_info("%s: i2s1 set %d\n", __func__, bEnable);
+	if (bEnable == 1) {
+		if (aud_gpios[GPIO_I2S1_MODE1].gpio_prepare) {
+			retval = pinctrl_select_state(pinctrlaud,
+				aud_gpios[GPIO_I2S1_MODE1].gpioctrl);
+			if (retval) {
+				pr_err("%s: could not set aud_gpios[GPIO_I2S1_MODE1] pins\n",
+					__func__);
+			}
+		}
+	} else {
+		if (aud_gpios[GPIO_I2S1_MODE0].gpio_prepare) {
+			retval = pinctrl_select_state(pinctrlaud,
+				aud_gpios[GPIO_I2S1_MODE0].gpioctrl);
+			if (retval) {
+				pr_err("%s: could not set aud_gpios[GPIO_I2S1_MODE0] pins\n",
+					__func__);
+			}
+		}
+
+	}
+	return retval;
+}
+#endif /* VENDOR_EDIT */
 
 static bool AudDrv_GPIO_IsValid(enum audio_system_gpio_type _type)
 {

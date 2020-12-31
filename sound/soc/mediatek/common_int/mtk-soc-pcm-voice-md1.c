@@ -126,7 +126,6 @@ static const struct soc_enum Audio_Speech_Enum[] = {
 /* speech mixctrl instead property usage */
 static int speech_a2m_msg_id;
 static int speech_md_status;
-static int speech_mic_mute;
 
 static int Audio_Speech_MD_Status_Get(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
@@ -160,28 +159,6 @@ static int Audio_Speech_Msg_ID_Set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int Audio_Speech_Mic_Mute_Get(struct snd_kcontrol *kcontrol,
-				     struct snd_ctl_elem_value *ucontrol)
-{
-	ucontrol->value.integer.value[0] = speech_mic_mute;
-	return 0;
-}
-
-static int Audio_Speech_Mic_Mute_Set(struct snd_kcontrol *kcontrol,
-				     struct snd_ctl_elem_value *ucontrol)
-{
-	if (ucontrol->value.integer.value[0] > 1 ||
-	    ucontrol->value.integer.value[0] < 0) {
-		pr_debug("%s() wrong mute value=%ld\n", __func__,
-			 ucontrol->value.integer.value[0]);
-		return -EINVAL;
-	}
-	speech_mic_mute = ucontrol->value.integer.value[0];
-	pr_debug("%s(), speech_mic_mute=%d\n", __func__,
-		 speech_mic_mute);
-	return 0;
-}
-
 static int Audio_Speech_MD_Control_Get(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
@@ -207,8 +184,6 @@ static const struct snd_kcontrol_new Audio_snd_speech_controls[] = {
 		       Audio_Speech_Msg_ID_Get, Audio_Speech_Msg_ID_Set),
 	SOC_SINGLE_EXT("Speech_MD_Status", SND_SOC_NOPM, 0, 0xFFFFFFFF, 0,
 		       Audio_Speech_MD_Status_Get, Audio_Speech_MD_Status_Set),
-	SOC_SINGLE_EXT("Speech_MIC_MUTE", SND_SOC_NOPM, 0, 0x1, 0,
-		       Audio_Speech_Mic_Mute_Get, Audio_Speech_Mic_Mute_Set),
 };
 
 static int mtk_voice_pcm_open(struct snd_pcm_substream *substream)
@@ -355,7 +330,14 @@ static int mtk_voice1_prepare(struct snd_pcm_substream *substream)
 			Soc_Aud_AFE_IO_Block_MODEM_PCM_2_I_CH1, Soc_Aud_AFE_IO_Block_I2S1_DAC_2);
 
 	/* start I2S DAC out */
+#ifdef VENDOR_EDIT
+	/* Yongpei.Yao@PSW.MM.AudioDriver.Machine, 2018/09/17,
+	 * modify for enable low-jitter mode of I2S1 for smartpa */
+	SetI2SDacOut(substream->runtime->rate, true, Soc_Aud_I2S_WLEN_WLEN_16BITS);
+#else /* VENDOR_EDIT */
 	SetI2SDacOut(substream->runtime->rate, false, Soc_Aud_I2S_WLEN_WLEN_16BITS);
+#endif /* VENDOR_EDIT */
+
 	SetMemoryPathEnable(Soc_Aud_Digital_Block_I2S_OUT_DAC, true);
 	SetI2SDacEnable(true);
 

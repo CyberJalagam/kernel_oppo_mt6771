@@ -248,3 +248,12 @@ config MT8183_QUERY_PCB_ID_METHOD
 	  STM1 is 0v which is DCC mode,SMT2 is about 0.9v which is ACC mode
 	  If you say Y, enable MT8183_QUERY_PCB_ID_METHOD
 
+#ifdef VENDOR_EDIT
+#Yongzhi.Zhang@PSW.MM.AudioDriver.feature.1209435, 2017/08/01, add for KTV
+config OPPO_KTV_DEV
+    bool "KTV feature"
+	default n
+	help
+	    This will enable KTV feature
+#endif /*VENDOR_EDIT*/
+

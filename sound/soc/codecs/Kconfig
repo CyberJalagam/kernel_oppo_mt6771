@@ -940,3 +940,9 @@ config SND_SOC_MAX98926
 	  for max98926 codec,enable this config will
 	  add max98926 codec driver.
 
+#ifdef VENDOR_EDIT
+# Xiaojun.Lv@PSW.MM.AudioDriver.Machine, 2018/7/13, add smartPa
+config SND_SOC_ALSACODEC_TFA9890
+	bool "Use TFA9890 As ALSACODEC"
+	default n
+#endif /* VENDOR_EDIT */

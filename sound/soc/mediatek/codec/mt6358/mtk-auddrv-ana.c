@@ -87,9 +87,15 @@ void Ana_Set_Reg(unsigned int offset, unsigned int value, unsigned int mask)
 	int ret = 0;
 	unsigned int Reg_Value;
 	unsigned long flags = 0;
-
+#ifndef VENDOR_EDIT
+	/* Xiaojun.Lv@PSW.MM.AudioDriver.Machine, 2018/7/13,
+	 * add log for debug */
+	pr_info("Ana_Set_Reg offset= 0x%x , value = 0x%x mask = 0x%x\n", offset, value,
+		       mask);
+#else /* VENDOR_EDIT */
 	PRINTK_ANA_REG("Ana_Set_Reg offset= 0x%x , value = 0x%x mask = 0x%x\n", offset, value,
 		       mask);
+#endif /* VENDOR_EDIT */
 	spin_lock_irqsave(&ana_set_reg_lock, flags);
 	Reg_Value = Ana_Get_Reg(offset);
 	Reg_Value &= (~mask);
