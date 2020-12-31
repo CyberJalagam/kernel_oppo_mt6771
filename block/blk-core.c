@@ -663,6 +663,7 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
 	wake_up_all(&q->mq_freeze_wq);
 }
 
+
 struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 {
 	struct request_queue *q;
@@ -2137,7 +2138,6 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
 				count);
 		}
 	}
-
 	return generic_make_request(bio);
 }
 EXPORT_SYMBOL(submit_bio);
@@ -2442,7 +2442,6 @@ struct request *blk_peek_request(struct request_queue *q)
 {
 	struct request *rq;
 	int ret;
-
 	while ((rq = __elv_next_request(q)) != NULL) {
 
 		rq = blk_pm_peek_request(q, rq);
