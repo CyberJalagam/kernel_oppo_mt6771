@@ -867,6 +867,18 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 		},
+    #ifdef VENDOR_EDIT
+    //Ming.Liu@PSW.CN.WiFi.Network.quality.1065762, 2016/10/09,
+    //add for: [monitor tcp info]
+	{
+		.procname	= "tcp_info_print",
+		.data		= &sysctl_tcp_info_print,
+		.maxlen		= sizeof(int),
+		.mode		= 0664,
+		.proc_handler	= proc_do_print_tcpinfo
+	},
+    #endif /* VENDOR_EDIT */
+
 	{ }
 };
 
