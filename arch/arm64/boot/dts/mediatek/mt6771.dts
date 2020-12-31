@@ -1394,6 +1394,10 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 		camsys1_base = <0x180a0000 28 0xffff0000>;
 		camsys2_base = <0x180b0000 29 0xffff0000>;
 		pwm_sw_base = <0x11000000 99 0xffff0000>;
+		//#ifdef VENDOR_EDIT
+		/*Guoqiang.jiang@PSW.MM.Display.LCD.Stability, 2018/05/11, add for mipi clk change*/
+		mipitx0_base = <0x11e50000 99 0xffff0000>;
+		//#endif /* VENDOR_EDIT */
 		disp_rdma0_sof = <0>;
 		disp_rdma1_sof = <1>;
 		mdp_rdma0_sof = <2>;
@@ -1601,9 +1605,6 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>; /* UART IRQ */
 		clocks =  <&clk26m>, <&infracfg_ao INFRACFG_AO_UART1_CG>;
 		clock-names = "baud", "bus";
-		dmas = <&apdma 2
-				&apdma 3>;
-		dma-names = "tx", "rx";
 	};
 
 	apuart2: serial@11004000 {
@@ -1612,9 +1613,6 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;/* UART IRQ */
 		clocks = <&clk26m>, <&infracfg_ao INFRACFG_AO_UART2_CG>;
 		clock-names = "baud", "bus";
-		dmas = <&apdma 4
-				&apdma 5>;
-		dma-names = "tx", "rx";
 	};
 
 	i2c6@11005000 {
@@ -2020,13 +2018,19 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 		compatible = "mediatek,gauge_timer_service";
 	};
 
-#if (CONFIG_MTK_GAUGE_VERSION == 30)
-	#if (CONFIG_MTK_ADDITIONAL_BATTERY_TABLE == 1)
-		#include "bat_setting/mt6771_battery_prop_ext.dtsi"
-	#else
-		#include "bat_setting/mt6771_battery_prop.dtsi"
-	#endif
-#endif
+//#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2017/09/07, add for compatabling two fuelgauge.
+	fuelgauge: fuelgauge {
+		compatible = "mediatek, fuelgauge";
+	};
+//#endif
+//#if (CONFIG_MTK_GAUGE_VERSION == 30)
+//	#if (CONFIG_MTK_ADDITIONAL_BATTERY_TABLE == 1)
+//		#include "bat_setting/mt6771_battery_prop_ext.dtsi"
+//	#else
+//		#include "bat_setting/mt6771_battery_prop.dtsi"
+//	#endif
+//#endif
 
 	mdp_rdma0: mdp_rdma0@14001000 {
 		compatible = "mediatek,mdp_rdma0";
@@ -2174,7 +2178,14 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 
 	dsi_te: dsi_te {
 		compatible = "mediatek, DSI_TE-eint";
-		status = "disabled";
+		/* #ifndef VENDOR_EDIT */
+		/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/01/25, modify te esd check */
+		/* status = "disabled"; */
+		/* #else */
+		interrupt-parent = <&pio>;
+		interrupts = <44 IRQ_TYPE_LEVEL_HIGH 44 1>;
+		status = "okay";
+		/* #endif VENDOR_EDIT*/
 	};
 
 	mhl:mhl@0 {
@@ -2991,26 +3002,6 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 		compatible = "mediatek,flashlight_core";
 	};
 
-	flashlights_lm3642: flashlights_lm3642 {
-		compatible = "mediatek,flashlights_lm3642";
-		decouple = <1>;
-		channel@1 {
-			type = <1>;
-			ct = <0>;
-			part = <0>;
-		};
-	};
-
-	flashlights_ha7109: flashlights_ha7109 {
-		compatible = "mediatek,flashlights_ha7109";
-		decouple = <1>;
-		channel@1 {
-			type = <1>;
-			ct = <1>;
-			part = <0>;
-		};
-	};
-
 	flashlights_mt6370: flashlights_mt6370 {
 		compatible = "mediatek,flashlights_mt6370";
 		decouple = <0>;
@@ -3024,22 +3015,6 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 			ct = <1>;
 			part = <0>;
 		};
-	};
-
-	flashlights_rt4509: flashlights_rt4509 {
-		compatible = "mediatek,flashlights_rt4509";
-		decouple = <1>;
-		channel@1 {
-			type = <1>;
-			ct = <0>;
-			part = <0>;
-		};
-		channel@2 {
-			type = <1>;
-			ct = <1>;
-			part = <0>;
-		};
-
 	};
 
 	ccu@1a0a0000 {
@@ -3971,7 +3946,12 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 					compatible = "android,system";
 					dev = "/dev/block/platform/bootdevice/by-name/system";
 					type = "ext4";
-					mnt_flags = "ro";
+//#if defined(VENDOR_EDIT) && defined(CONFIG_EXT4_ASYNC_DISCARD_SUPPORT)
+//yh@PSW.BSP.Storage.EXT4, 2018-11-26 add for ext4 async discard suppot
+					mnt_flags = "ro,async_discard";
+//#else
+					//*mnt_flags = "ro";
+//#endif
 					#ifndef CONFIG_MTK_DM_VERITY_OFF
 					fsmgr_flags = "wait,verify";
 					#else
@@ -3984,7 +3964,12 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 					compatible = "android,vendor";
 					dev = "/dev/block/platform/bootdevice/by-name/vendor";
 					type = "ext4";
-					mnt_flags = "ro";
+//#if defined(VENDOR_EDIT) && defined(CONFIG_EXT4_ASYNC_DISCARD_SUPPORT)
+//yh@PSW.BSP.Storage.EXT4, 2018-11-26 add for ext4 async discard suppot
+					mnt_flags = "ro,async_discard";
+//#else
+					//*mnt_flags = "ro";
+//#endif
 #ifndef CONFIG_MTK_AB_OTA_UPDATER
 					#ifndef CONFIG_MTK_DM_VERITY_OFF
 					fsmgr_flags = "wait,verify";
@@ -4005,7 +3990,12 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 					compatible = "android,odm";
 					dev = "/dev/block/platform/bootdevice/by-name/odm";
 					type = "ext4";
-					mnt_flags = "ro";
+//#if defined(VENDOR_EDIT) && defined(CONFIG_EXT4_ASYNC_DISCARD_SUPPORT)
+//yh@PSW.BSP.Storage.EXT4, 2018-11-26 add for ext4 async discard suppot
+					mnt_flags = "ro,async_discard";
+//#else
+					//*mnt_flags = "ro";
+//#endif
 #ifndef CONFIG_MTK_AB_OTA_UPDATER
 					fsmgr_flags = "wait";
 #else
@@ -4154,10 +4144,6 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 	subpmic_pmu_eint: mt6370_pmu_eint {
 	};
 
-	goodix_fp: fingerprint {
-		compatible = "mediatek,goodix-fp";
-	};
-
 	tcpc_pd: mt6370_pd_eint {
 	};
 
@@ -4184,6 +4170,26 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 			"clk_pll_6";
 	};
 
+//#ifdef VENDOR_EDIT
+//Anhui.Sun@PSW.NW.RF, 2018/12/19, Add for SWTP - RF cable detection
+	swtp: swtp {
+	};
+//#endif  /*VENDOR_EDIT*/
+
+//#ifdef VENDOR_EDIT
+/******************************** Qingwen.Liu@RM.BSP.Fingerprint.Basic 2019/1/26 add for fpc fingerprint driver start ********************************/
+	fpc_interrupt:fpc_interrupt {
+		compatible    = "fpc,fpc_irq";
+	};
+	oppo_fp_common:oppo_fp_common {
+		compatible = "oppo,fp_common";
+	};
+	oppo_secure_common:oppo_secure_common {
+		compatible = "oppo,secure_common";
+	};
+/******************************** Qingwen.Liu@RM.BSP.Fingerprint.Basic 2019/1/26 add for fpc fingerprint driver end ********************************/
+//#endif  /*VENDOR_EDIT*/
+
 	rt5081_pmu_eint: rt5081_pmu_eint {
 	};
 
@@ -4207,6 +4213,13 @@ firmware_class.path=/vendor/firmware loop.max_part=7";
 	};
 
 	als: als {
+	};
+
+	motor_pl: motor_pl {
+	};
+
+	motor_drv: motor_drv {
+		compatible = "motor_drv-8834";
 	};
 
 	otg_iddig: otg_iddig {
