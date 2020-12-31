@@ -1772,8 +1772,15 @@ config VM_EVENT_COUNTERS
 	  on EXPERT systems.  /proc/vmstat will only show page counts
 	  if VM event counters are disabled.
 
+
 config SLUB_DEBUG
-	default y
+	#ifdef VENDOR_EDIT
+	#Wen.Luo@Bsp.Kernel.Stability, 2018/12/05, Add for aging test, slub debug config
+	default y if OPPO_SLUB_TEST = "true"
+	default n
+	#else
+	#default y
+	#endif
 	bool "Enable SLUB debugging support" if EXPERT
 	depends on SLUB && SYSFS
 	depends on !MTK_ENABLE_AGO
@@ -1782,6 +1789,7 @@ config SLUB_DEBUG
 	  result in significant savings in code size. This also disables
 	  SLUB sysfs support. /sys/slab will not exist and there will be
 	  no support for cache validation etc.
+
 
 config COMPAT_BRK
 	bool "Disable heap randomization"
@@ -1906,7 +1914,8 @@ config SLABINFO
 	bool
 	depends on PROC_FS
 	depends on !MTK_ENABLE_GMO
-	depends on SLAB || SLUB_DEBUG
+	depends on SLAB || SLUB_DEBUG || SLUB_STAT_DEBUG
+
 	default y
 
 config RT_MUTEXES
