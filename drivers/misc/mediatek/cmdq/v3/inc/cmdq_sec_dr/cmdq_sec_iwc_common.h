@@ -35,13 +35,13 @@
 #define CMDQ_SEC_DISPATCH_LEN (8)
 
 #define CMDQ_SEC_ISP_CQ_SIZE	(0x1000)	/* 4k */
-#define CMDQ_SEC_ISP_VIRT_SIZE	(0x6000)	/* 24k */
+#define CMDQ_SEC_ISP_VIRT_SIZE	(0xC000)	/* 24k */
 #define CMDQ_SEC_ISP_TILE_SIZE	(0x10000)	/* 64k */
 #define CMDQ_SEC_ISP_BPCI_SIZE	(64)		/* 64 byte */
 #define CMDQ_SEC_ISP_LSCI_SIZE	(24576)		/* 24576 byte */
-#define CMDQ_SEC_ISP_LCEI_SIZE	(294912)	/* 384x384x2 byte */
-#define CMDQ_SEC_ISP_DEPI_SIZE	(294912)	/* 384x384x2 byte */
-#define CMDQ_SEC_ISP_DMGI_SIZE	(130560)	/* For Bokeh 480x272 byte */
+#define CMDQ_SEC_ISP_LCEI_SIZE	(520200)	/* MAX: 510x510x2 byte */
+#define CMDQ_SEC_ISP_DEPI_SIZE	(520200)	/* MAX: 510x510x2 byte */
+#define CMDQ_SEC_ISP_DMGI_SIZE	(130560)	/* MAX: 480x272 byte */
 #define CMDQ_IWC_ISP_META_CNT	8
 
 enum CMDQ_IWC_ADDR_METADATA_TYPE {
@@ -222,6 +222,14 @@ struct iwcCmdqCommand_t {
 	struct iwcCmdqSecIspMeta isp_metadata;
 
 	/* ISP share memory buffer */
+	uint32_t isp_lcei[CMDQ_SEC_ISP_LCEI_SIZE / sizeof(uint32_t)];
+	uint32_t isp_lcei_size;
+
+	/* debug */
+	uint64_t hNormalTask; /* handle to reference task in normal world*/
+};
+
+struct iwcIspMessage {
 	uint32_t isp_cq_desc[CMDQ_SEC_ISP_CQ_SIZE / sizeof(uint32_t)];
 	uint32_t isp_cq_desc_size;
 	uint32_t isp_cq_virt[CMDQ_SEC_ISP_VIRT_SIZE / sizeof(uint32_t)];
@@ -232,15 +240,10 @@ struct iwcCmdqCommand_t {
 	uint32_t isp_bpci_size;
 	uint32_t isp_lsci[CMDQ_SEC_ISP_LSCI_SIZE / sizeof(uint32_t)];
 	uint32_t isp_lsci_size;
-	uint32_t isp_lcei[CMDQ_SEC_ISP_LCEI_SIZE / sizeof(uint32_t)];
-	uint32_t isp_lcei_size;
 	uint32_t isp_depi[CMDQ_SEC_ISP_DEPI_SIZE / sizeof(uint32_t)];
 	uint32_t isp_depi_size;
 	uint32_t isp_dmgi[CMDQ_SEC_ISP_DMGI_SIZE / sizeof(uint32_t)];
 	uint32_t isp_dmgi_size;
-
-	/* debug */
-	uint64_t hNormalTask; /* handle to reference task in normal world*/
 };
 
 /* linex kernel and mobicore has their own MMU tables,
@@ -268,6 +271,12 @@ struct iwcCmdqMessage_t {
 
 	struct iwcCmdqDebugConfig_t debug;
 	struct iwcCmdqSecStatus_t secStatus;
+
+	bool iwcMegExAvailable;
+};
+
+struct iwcCmdqMessageEx_t {
+	struct iwcIspMessage isp;
 };
 
 /*  */

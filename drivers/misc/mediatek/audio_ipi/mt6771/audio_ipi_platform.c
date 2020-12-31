@@ -17,9 +17,15 @@
 
 
 
+bool audio_opendsp_id_ready(const uint8_t opendsp_id)
+{
+	return is_scp_ready(opendsp_id);
+}
+
+
 bool audio_opendsp_ready(const uint8_t task)
 {
-	return is_scp_ready(audio_get_opendsp_id(task));
+	return audio_opendsp_id_ready(audio_get_opendsp_id(task));
 }
 
 

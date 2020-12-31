@@ -70,7 +70,6 @@
 #define TIME_1S  1000000000ULL
 #define TARGET_UNLIMITED_FPS 60
 #define FBTCPU_SEC_DIVIDER 1000000000
-#define RESET_TOLERENCE 3
 #define NSEC_PER_HUSEC 100000
 #define BIG_CAP 95
 
@@ -1167,7 +1166,7 @@ static int fbt_boost_policy(
 
 	if (target_fps != TARGET_UNLIMITED_FPS) {
 		target_time = (unsigned long long)FBTCPU_SEC_DIVIDER;
-		target_time = div64_u64(target_time, (unsigned long long)(target_fps + RESET_TOLERENCE));
+		target_time = div64_u64(target_time, (unsigned long long)(target_fps));
 	}
 
 	mutex_lock(&fbt_mlock);

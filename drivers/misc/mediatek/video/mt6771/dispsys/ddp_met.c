@@ -26,6 +26,9 @@
 #include "ddp_ovl.h"
 #include "ddp_rdma.h"
 #include "DpDataType.h"
+#include "display_recorder.h"
+#include <linux/trace_events.h>
+
 
 #define DDP_IRQ_EER_ID				(0xFFFF0000)
 #define DDP_IRQ_FPS_ID				(DDP_IRQ_EER_ID + 1)
@@ -38,8 +41,9 @@
 #define MAX_OVL_LAYERS (4)
 #define OVL_LAYER_NUM_PER_OVL (4)
 
-
 static unsigned int met_tag_on;
+static unsigned int systrace_met_mode;
+
 
 #if defined(CONFIG_MTK_MET)
 static struct ovl_info_s {
@@ -124,7 +128,11 @@ static void ddp_disp_refresh_tag_start(unsigned int index)
 		if (rdmaInfo.addr == 0 || (rdmaInfo.addr != 0 && sBufAddr[index] != rdmaInfo.addr)) {
 			sBufAddr[index] = rdmaInfo.addr;
 			sprintf(tag_name, index ? "ExtDispRefresh" : "PrimDispRefresh");
-			met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 1);
+			if (systrace_met_mode)
+				event_trace_printk(disp_get_tracing_mark(), "C|%d|%s|%d\n", DDP_IRQ_FPS_ID,
+							tag_name, 1);
+			else
+				met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 1);
 		}
 
 	} else {
@@ -164,7 +172,12 @@ static void ddp_disp_refresh_tag_start(unsigned int index)
 
 		if (b_layer_changed) {
 			sprintf(tag_name, index ? "ExtDispRefresh" : "PrimDispRefresh");
-			met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 1);
+
+			if (systrace_met_mode)
+				event_trace_printk(disp_get_tracing_mark(), "C|%d|%s|%d\n", DDP_IRQ_FPS_ID,
+							tag_name, 1);
+			else
+				met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 1);
 		}
 
 	}
@@ -175,9 +188,12 @@ static void ddp_disp_refresh_tag_end(unsigned int index)
 {
 #if defined(CONFIG_MTK_MET)
 	char tag_name[30] = { '\0' };
-
 	sprintf(tag_name, index ? "ExtDispRefresh" : "PrimDispRefresh");
-	met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 0);
+	if (systrace_met_mode)
+		event_trace_printk(disp_get_tracing_mark(), "C|%d|%s|%d\n", DDP_IRQ_FPS_ID,
+							tag_name, 0);
+	else
+		met_tag_oneshot(DDP_IRQ_FPS_ID, tag_name, 0);
 #endif
 }
 
@@ -292,7 +308,15 @@ static void ddp_inout_info_tag(unsigned int index)
 static void ddp_err_irq_met_tag(const char *name)
 {
 #if defined(CONFIG_MTK_MET)
-	met_tag_oneshot(DDP_IRQ_EER_ID, name, 0);
+	if (systrace_met_mode) {
+		event_trace_printk(disp_get_tracing_mark(), "C|%d|%s|%d\n", DDP_IRQ_EER_ID,
+							name, 1);
+		event_trace_printk(disp_get_tracing_mark(), "C|%d|%s|%d\n", DDP_IRQ_EER_ID,
+							name, 0);
+	} else {
+		met_tag_oneshot(DDP_IRQ_EER_ID, name, 1);
+		met_tag_oneshot(DDP_IRQ_EER_ID, name, 0);
+	}
 #endif
 }
 
@@ -355,14 +379,16 @@ static void met_irq_handler(enum DISP_MODULE_ENUM module, unsigned int reg_val)
 	}
 }
 
-void ddp_init_met_tag(int state, int rdma0_mode, int rdma1_mode)
+void ddp_init_met_tag(int state, int systrace_mode, int rdma0_mode, int rdma1_mode)
 {
 	if ((!met_tag_on) && state) {
 		met_tag_on = state;
+		systrace_met_mode = systrace_mode;
 		disp_register_irq_callback(met_irq_handler);
 	}
 	if (met_tag_on && (!state)) {
 		met_tag_on = state;
+		systrace_met_mode = systrace_mode;
 		disp_unregister_irq_callback(met_irq_handler);
 	}
 }

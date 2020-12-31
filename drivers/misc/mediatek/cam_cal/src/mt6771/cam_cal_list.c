@@ -16,14 +16,34 @@
 #include "eeprom_i2c_custom_driver.h"
 #include "kd_imgsensor.h"
 
+#ifndef VENDOR_EDIT
+#define VENDOR_EDIT
+#endif
+
 struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	/*Below is commom sensor */
+        #ifdef VENDOR_EDIT
+        /*Xi.Chen@RM.Camera 20190309 modify for sensor eeprom*/
+        {OV13855_SENSOR_ID, 0xA0, Common_read_region},
+        {S5K4H7_SENSOR_ID, 0x20, Common_read_region},
+        {IMX576_SENSOR_ID, 0xA8, Common_read_region},
+        {S5K3L6_SENSOR_ID, 0xA0, Common_read_region},
+	/*Longyuan.Yang@Camera.Driver 20190111 modify for sensor eeprom*/
+	{IMX398_SENSOR_ID, 0xA0, Common_read_region},
+	{GC2375H_SENSOR_ID, 0xA0, Common_read_region},
+	/*Caohua.Lin@Camera.Driver 20181023 modify for sensor eeprom*/
+	{IMX476_SENSOR_ID, 0xA2, Common_read_region},
+	{IMX519_SENSOR_ID, 0xA0, Common_read_region},
+	{IMX519_SENSOR_ID, 0xA0, Common_read_region},
+	{S5KGM1SP_SENSOR_ID, 0xA0, Common_read_region},
+	{S5K3P9SP_SENSOR_ID, 0xA8, Common_read_region},
+	{GC5035_SENSOR_ID, 0xA0, Common_read_region},
+	#else
 	{IMX338_SENSOR_ID, 0xA0, Common_read_region},
 	{S5K4E6_SENSOR_ID, 0xA8, Common_read_region},
 	{IMX386_SENSOR_ID, 0xA0, Common_read_region},
 	{S5K3M3_SENSOR_ID, 0xA0, Common_read_region},
 	{S5K2L7_SENSOR_ID, 0xA0, Common_read_region},
-	{IMX398_SENSOR_ID, 0xA0, Common_read_region},
 	{IMX318_SENSOR_ID, 0xA0, Common_read_region},
 	{OV8858_SENSOR_ID, 0xA8, Common_read_region},
 	{IMX350_SENSOR_ID, 0xA0, Common_read_region},
@@ -49,6 +69,7 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{IMX376_SENSOR_ID, 0xA2, Common_read_region},
 	{IMX214_SENSOR_ID, 0xA0, Common_read_region},
 	{IMX214_MONO_SENSOR_ID, 0xA0, Common_read_region},
+	#endif
 	/*  ADD before this line */
 	{0, 0, 0}	/*end of list */
 };

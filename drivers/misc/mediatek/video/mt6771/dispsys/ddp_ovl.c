@@ -27,7 +27,13 @@
 #include "debug.h"
 #include "disp_drv_platform.h"
 #include "mtk_dramc.h"
-
+#ifdef VENDOR_EDIT
+/*
+ * Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/01/09
+ * Add for MATE mode switch RGB display
+ */
+#include "mtk_boot_common.h"
+#endif
 #define OVL_REG_BACK_MAX	(40)
 #define OVL_LAYER_OFFSET	(0x20)
 #define OVL_RDMA_DEBUG_OFFSET	(0x4)
@@ -460,6 +466,14 @@ static void _get_roi(enum DISP_MODULE_ENUM module,
 	*bg_h = ovl_bg_h[idx];
 }
 
+#ifdef VENDOR_EDIT
+/*
+ * Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/01/09
+ * Add for MATE mode switch RGB display
+ */
+static int meta_mode_set_once = 0;
+#endif
+
 int ovl_roi(enum DISP_MODULE_ENUM module, unsigned int bg_w, unsigned int bg_h,
 	    unsigned int bg_color, void *handle)
 {
@@ -471,9 +485,22 @@ int ovl_roi(enum DISP_MODULE_ENUM module, unsigned int bg_w, unsigned int bg_h,
 	}
 
 	DISP_REG_SET(handle, ovl_base + DISP_REG_OVL_ROI_SIZE, bg_h << 16 | bg_w);
-
+#ifndef VENDOR_EDIT
+/*
+ * Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/01/09
+ * Add for MATE mode switch RGB display
+*/
 	DISP_REG_SET(handle, ovl_base + DISP_REG_OVL_ROI_BGCLR, bg_color);
-
+#else /* VENDOR_EDIT */
+	if (get_boot_mode() == META_BOOT) {
+		if (meta_mode_set_once == 0) {
+			DISP_REG_SET(handle, ovl_base + DISP_REG_OVL_ROI_BGCLR, bg_color);
+			meta_mode_set_once = 1;
+		}
+	} else {
+		DISP_REG_SET(handle, ovl_base + DISP_REG_OVL_ROI_BGCLR, bg_color);
+	}
+#endif /* VENDOR_EDIT */
 	DISP_REG_SET_FIELD(handle, FLD_OVL_LC_SRC_W,
 			ovl_base + DISP_REG_OVL_LC_SRC_SIZE, bg_w);
 	DISP_REG_SET_FIELD(handle, FLD_OVL_LC_SRC_H,
@@ -538,6 +565,11 @@ static int _ovl_lc_config(enum DISP_MODULE_ENUM module,
 	unsigned long ovl_base = ovl_base_addr(module);
 	struct disp_rect rsz_dst_roi = pconfig->rsz_dst_roi;
 	u32 lc_x, lc_y, lc_w, lc_h;
+	int rotate = 0;
+
+#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW
+	rotate = 1;
+#endif
 
 	if (pconfig->rsz_enable) {
 		lc_x = rsz_dst_roi.x;
@@ -549,6 +581,14 @@ static int _ovl_lc_config(enum DISP_MODULE_ENUM module,
 		lc_y = 0;
 		lc_w = pconfig->dst_w;
 		lc_h = pconfig->dst_h;
+	}
+
+	if (rotate) {
+		unsigned int bg_w = 0, bg_h = 0;
+
+		_get_roi(module, &bg_w, &bg_h);
+		lc_y = bg_h - lc_h - lc_y;
+		lc_x = bg_w - lc_w - lc_x;
 	}
 
 	DISP_REG_SET_FIELD(handle, FLD_OVL_LC_XOFF,
@@ -1344,6 +1384,15 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 	unsigned int bb = 0;
 #endif
 
+#ifdef VENDOR_EDIT
+/*
+* LiPing-m@PSW.MM.Display.LCD.Feature, 2018/01/09
+* Add for MATE mode switch RGB display
+*/
+	if (get_boot_mode() == META_BOOT) {
+		gOVL_bg_color = 0xFF00FF00;
+	}
+#endif /* VENDOR_EDIT */
 	if (pConfig->dst_dirty)
 		ovl_roi(module, pConfig->dst_w, pConfig->dst_h, gOVL_bg_color, handle);
 

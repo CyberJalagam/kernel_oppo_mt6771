@@ -19,17 +19,32 @@ ccflags-y += \
 	-I$(srctree)/drivers/misc/mediatek/performance/eas_controller/include/ \
 
 ifeq ($(CONFIG_MTK_FPSGO), y)
-     ifeq ($(CONFIG_MACH_MT6739), y)
-             obj-y += src/platform/mt6739/eas_ctrl.o
-             ccflags-y += -DCPI_THRES=250
-             ccflags-y += -DFPSGO_CPI
-     endif
+        ifneq ($(CONFIG_MTK_CM_MGR), y)
+                ifeq ($(CONFIG_MACH_MT6739), y)
+                        obj-y += src/platform/mt6739/eas_ctrl.o
+                        ccflags-y += -DCPI_THRES=250
+                endif
 
-     ifeq ($(CONFIG_MACH_MT6763), y)
-             obj-y += src/platform/mt6763/eas_ctrl.o
-             ccflags-y += -DCPI_THRES=250
-             ccflags-y += -DFPSGO_CPI
-     endif
+                ifeq ($(CONFIG_MACH_MT6763), y)
+                        obj-y += src/platform/mt6763/eas_ctrl.o
+                        ccflags-y += -DCPI_THRES=250
+                endif
+
+                ifeq ($(CONFIG_MACH_MT6758), y)
+                        obj-y += src/platform/mt6758/eas_ctrl.o
+                        ccflags-y += -DCPI_THRES=250
+                endif
+
+                ifeq ($(CONFIG_MACH_MT6771), y)
+                        obj-y += src/platform/mt6771/eas_ctrl.o
+                        ccflags-y += -DCPI_THRES=250
+                endif
+
+                ifeq ($(CONFIG_MACH_MT6775), y)
+                        obj-y += src/platform/mt6775/eas_ctrl.o
+                        ccflags-y += -DCPI_THRES=250
+                endif
+        endif
 endif
 
 ifeq ($(CONFIG_MACH_MT6771), y)

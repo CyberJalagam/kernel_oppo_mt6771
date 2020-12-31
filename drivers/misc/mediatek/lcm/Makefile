@@ -36,4 +36,8 @@ DEFINES += $(foreach LCM,$(LCM_DEFINES),$(LCM))
 DEFINES += MTK_LCM_PHYSICAL_ROTATION=\"$(MTK_LCM_PHYSICAL_ROTATION)\"
 ccflags-$(CONFIG_MTK_LCM) += $(addprefix -D, $(DEFINES))
 ccflags-$(CONFIG_MTK_LCM_DEVICE_TREE_SUPPORT) += -DMTK_LCM_DEVICE_TREE_SUPPORT
-
+#ifdef VENDOR_EDIT
+#YongPeng.Yi@SWP.MM.Display.LCD.Machine, 2017/11/03, Add for porting lcd driver
+obj-$(CONFIG_MTK_LCM) += power/
+obj-$(CONFIG_MTK_LCM) += backlight/
+#endif /* VENDOR_EDIT */

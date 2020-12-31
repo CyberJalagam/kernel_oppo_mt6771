@@ -157,10 +157,51 @@ uint16_t get_message_buf_size(const struct ipi_msg_t *p_ipi_msg);
 
 int check_msg_format(const struct ipi_msg_t *p_ipi_msg, unsigned int len);
 
-void print_msg_info(
-	const char *func_name,
-	const char *description,
-	const struct ipi_msg_t *p_ipi_msg);
+bool check_print_msg_info(const struct ipi_msg_t *p_ipi_msg);
+
+
+#define DUMP_IPI_MSG(description, p_ipi_msg) \
+	do { \
+		if (description == NULL || (p_ipi_msg) == NULL) \
+			break; \
+		if ((p_ipi_msg)->magic != IPI_MSG_MAGIC_NUMBER) { \
+			pr_info("%s, but magic 0x%x fail", \
+				description, (p_ipi_msg)->magic); \
+			break; \
+		} \
+		if ((p_ipi_msg)->data_type == AUDIO_IPI_MSG_ONLY) { \
+			pr_info("%s, task: %d, msg_id: 0x%x, ack_type: %d, " \
+				"p1: 0x%x, p2: 0x%x", \
+				description, \
+				(p_ipi_msg)->task_scene, \
+				(p_ipi_msg)->msg_id, \
+				(p_ipi_msg)->ack_type, \
+				(p_ipi_msg)->param1, \
+				(p_ipi_msg)->param2); \
+		} else if ((p_ipi_msg)->data_type == AUDIO_IPI_PAYLOAD) { \
+			pr_info("%s, task: %d, msg_id: 0x%x, ack_type: %d, " \
+				"payload_size: 0x%x, p2: 0x%x", \
+				description, \
+				(p_ipi_msg)->task_scene, \
+				(p_ipi_msg)->msg_id, \
+				(p_ipi_msg)->ack_type, \
+				(p_ipi_msg)->payload_size, \
+				(p_ipi_msg)->param2); \
+		} else if ((p_ipi_msg)->data_type == AUDIO_IPI_DMA) { \
+			pr_info("%s, task: %d, msg_id: 0x%x, ack_type: %d, " \
+				"p1: 0x%x, p2: 0x%x, dma sz: %u, idx: %u, " \
+				"hal sz: %u", \
+				description, \
+				(p_ipi_msg)->task_scene, \
+				(p_ipi_msg)->msg_id, \
+				(p_ipi_msg)->ack_type, \
+				(p_ipi_msg)->param1, \
+				(p_ipi_msg)->param2, \
+				(p_ipi_msg)->dma_info.data_size, \
+				(p_ipi_msg)->dma_info.rw_idx, \
+				(p_ipi_msg)->dma_info.hal_buf.data_size); \
+		} \
+	} while (0)
 
 
 /*

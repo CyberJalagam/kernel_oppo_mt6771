@@ -609,8 +609,7 @@ int ccu_force_powerdown(void)
 
 	if (ccuInfo.IsCcuPoweredOn == 1) {
 		LOG_WARN("CCU kernel drv released on CCU running, try to force shutdown\n");
-		LOG_WARN("dump cam_mtcmos_check\n");
-		cam_mtcmos_check();
+
 		/*Set special isr task to MSG_TO_CCU_SHUTDOWN*/
 		ccu_write_reg(ccu_base, CCU_INFO29, MSG_TO_CCU_SHUTDOWN);
 		/*Interrupt to CCU*/
@@ -618,11 +617,11 @@ int ccu_force_powerdown(void)
 		ccu_write_reg_bit(ccu_base, CTL_CCU_INT, INT_CTL_CCU, 1);
 
 		ret = _ccu_powerdown();
+		mdelay(60);
 
 		if (ret < 0)
 			return ret;
 
-		mdelay(60);
 		LOG_WARN("CCU force shutdown success\n");
 	}
 

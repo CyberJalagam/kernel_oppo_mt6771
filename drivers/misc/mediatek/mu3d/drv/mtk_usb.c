@@ -402,6 +402,18 @@ void mt_usb_connect_test(int start)
 	}
 }
 
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+extern int oppo_get_usb_enum_type(void);
+enum {
+	USB_ENUM_DISABLE = 0,
+	USB_ENUM_DEFAULT,
+	USB_ENUM_DETECTED,
+	USB_ENUM_TIMEOUT,
+	USB_ENUM_USB_TYPE,
+};
+#endif /*VENDOR_EDIT*/
+
 bool usb_cable_connected(void)
 {
 	return __usb_cable_connected(CONNECTION_OPS_CHECK);
@@ -426,8 +438,23 @@ static bool __usb_cable_connected(int ops)
 			chg_type = CHARGING_HOST;
 		}
 
-		if (chg_type == STANDARD_HOST || chg_type == CHARGING_HOST)
+		#ifndef VENDOR_EDIT
+		//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+		if (chg_type == STANDARD_HOST || chg_type == CHARGING_HOST){
+			os_printk(K_INFO, "%s, chg_type:%d\n", __func__, chg_type);
 			connected = true;
+		}
+		#else
+		if(oppo_get_usb_enum_type() == USB_ENUM_TIMEOUT || oppo_get_usb_enum_type() == USB_ENUM_DISABLE){
+			if(chg_type == STANDARD_HOST || chg_type == CHARGING_HOST){
+				os_printk(K_INFO, "%s, chg_type:%d, usb_enum time out\n", __func__, chg_type);
+				connected = true;
+			}
+		} else if(chg_type != CHARGER_UNKNOWN ){
+			os_printk(K_INFO, "%s, chg_type:%d, usb_enum not timeout \n", __func__, chg_type);
+			connected = true;
+		}
+		#endif /*VENDOR_EDIT*/
 
 		/* VBUS CHECK to avoid type miss-judge */
 		vbus_exist = mu3d_hal_is_vbus_exist();

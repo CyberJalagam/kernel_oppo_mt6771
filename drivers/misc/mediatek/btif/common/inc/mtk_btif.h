@@ -181,7 +181,8 @@ typedef struct _mtk_btif_dma_ {
 #if (defined(CONFIG_MTK_GMO_RAM_OPTIMIZE) && !defined(CONFIG_MTK_ENG_BUILD))
 #define BTIF_LOG_ENTRY_NUM 10
 #else
-#define BTIF_LOG_ENTRY_NUM 30
+/* modify from 30 to 80, for customer debug, will rollback to 30 when official release */
+#define BTIF_LOG_ENTRY_NUM 80 /*30*/
 #endif
 
 #define BTIF_LOG_SZ  16

@@ -81,6 +81,18 @@ static int handle_to_index(int handle)
 	case ID_GYRO_TEMPERATURE:
 		index = ungyro_temperature;
 		break;
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/10/15, Add for oppo algo*/
+	case ID_FFD:
+		index = ffd;
+		break;
+	case ID_FREE_FALL:
+		index = free_fall;
+		break;
+	case ID_PICKUP_MOTION:
+		index = pickup_motion;
+		break;
+#endif /*VENDOR_EDIT*/
 	default:
 		index = -1;
 		FUSION_PR_ERR("handle_to_index invalid handle:%d, index:%d\n", handle, index);
@@ -436,6 +448,8 @@ int fusion_register_control_path(struct fusion_control_path *ctl, int handle)
 		return -1;
 	}
 
+	FUSION_PR_ERR("[%s] handle = %d, index = %d\n", __func__, handle, index);
+
 	cxt = fusion_context_obj;
 	cxt->fusion_context[index].fusion_ctl.set_delay = ctl->set_delay;
 	cxt->fusion_context[index].fusion_ctl.open_report_data = ctl->open_report_data;
@@ -603,6 +617,38 @@ int uncali_mag_flush_report(void)
 {
 	return uncali_sensor_flush_report(ID_MAGNETIC_UNCALIBRATED);
 }
+
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/10/15, Add for oppo algo*/
+int ffd_data_report(int x, int y, int64_t nt)
+{
+	return fusion_data_report(x, y, 0, 0, 0, nt, ID_FFD);
+}
+int ffd_flush_report(void)
+{
+	return fusion_flush_report(ID_FFD);
+}
+
+int free_fall_data_report(int x, int y, int z, int64_t nt)
+{
+	return fusion_data_report(x, y, z, 0, 0, nt, ID_FREE_FALL);
+}
+int free_fall_flush_report(void)
+{
+	return fusion_flush_report(ID_FREE_FALL);
+}
+
+int pickup_motion_data_report(int x, int y, int64_t nt)
+{
+	return fusion_data_report(x, y, 0, 0, 0, nt, ID_PICKUP_MOTION);
+}
+int pickup_motion_flush_report(void)
+{
+	return fusion_flush_report(ID_PICKUP_MOTION);
+}
+
+#endif /*VENDOR_EDIT*/
+
 static int fusion_probe(void)
 {
 

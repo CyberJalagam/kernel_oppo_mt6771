@@ -708,7 +708,7 @@ static int mt_scp_dvfs_create_procfs(void)
 
 	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		if (!proc_create(entries[i].name,
-						0x0664,
+						0664,
 						dir,
 						entries[i].fops)) {
 			pr_err("ERROR: %s: create /proc/scp_dvfs/%s failed\n",

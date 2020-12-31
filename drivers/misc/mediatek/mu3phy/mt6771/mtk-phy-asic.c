@@ -49,7 +49,10 @@ static DEFINE_SPINLOCK(mu3phy_clock_lock);
 bool sib_mode;
 static struct regulator *reg_vusb;
 static struct regulator *reg_va09;
-
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/16, mtk patch for otg eye picture*/
+#define MTK_USB_PHY_TUNING
+#endif /* VENDOR_EDIT */
 enum VA09_OP {
 	VA09_OP_OFF = 0,
 	VA09_OP_ON,

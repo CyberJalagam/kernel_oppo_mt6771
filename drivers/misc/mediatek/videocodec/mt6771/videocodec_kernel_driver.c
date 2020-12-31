@@ -1272,8 +1272,7 @@ static long vcodec_lockhw(unsigned long arg)
 			spin_unlock_irqrestore(&LockDecHWCountLock, ulFlagsLockHW);
 		}
 	} else if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
-		   rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
-		   rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+		   rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
 		while (bLockedHW == VAL_FALSE) {
 			/* Early break for JPEG VENC */
 			if (rHWLock.u4TimeoutMs == 0) {
@@ -1340,8 +1339,7 @@ static long vcodec_lockhw(unsigned long arg)
 			mutex_lock(&VencHWLock);
 			if (grVcodecEncHWLock.pvHandle == 0) { /* No process use HW, so current process can use HW */
 				if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
-					rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
-					rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+					rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
 #ifdef VCODEC_DVFS_V2
 					mutex_lock(&VencDVFSLock);
 					enc_cur_job =
@@ -1553,8 +1551,7 @@ static long vcodec_unlockhw(unsigned long arg)
 		mutex_unlock(&VdecHWLock);
 		eValRet = eVideoSetEvent(&DecHWLockEvent, sizeof(VAL_EVENT_T));
 	} else if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
-			 rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
-			 rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+			 rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
 		mutex_lock(&VencHWLock);
 		/* Current owner give up hw lock */
 		if (grVcodecEncHWLock.pvHandle == (VAL_VOID_T *)pmem_user_v2p_video((VAL_ULONG_T)rHWLock.pvHandle)) {

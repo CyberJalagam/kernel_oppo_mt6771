@@ -42,6 +42,15 @@
 #include <mt-plat/aee.h>
 #endif
 
+#include <audio_messenger_ipi.h>
+
+
+
+/*
+ * =============================================================================
+ *                     log
+ * =============================================================================
+ */
 
 #ifdef scp_debug
 #undef scp_debug
@@ -52,6 +61,11 @@
 #define scp_debug(x...)
 #endif
 
+#ifdef pr_fmt
+#undef pr_fmt
+#endif
+#define pr_fmt(fmt) "[IPI][DSP_Q] %s(), " fmt "\n", __func__
+
 
 
 /*
@@ -60,7 +74,7 @@
  * =============================================================================
  */
 
-#define MAX_SCP_MSG_NUM_IN_QUEUE (16)
+#define MAX_SCP_MSG_NUM_IN_QUEUE (32)
 #define SCP_MSG_BUFFER_SIZE ((SHARE_BUF_SIZE) - 16)
 
 
@@ -174,7 +188,7 @@ inline uint32_t scp_get_num_messages_in_queue(
 #define IPI_ASSERT(exp) \
 	do { \
 		if (!(exp)) { \
-			pr_notice("ASSERT("#exp")!! \""  __FILE__ "\", %uL\n", \
+			pr_notice("ASSERT("#exp")!! \""  __FILE__ "\", %uL", \
 				  __LINE__); \
 		} \
 	} while (0)
@@ -243,7 +257,7 @@ inline bool scp_check_idx_msg_valid(
 	const uint32_t idx_msg)
 {
 	if (msg_queue == NULL) {
-		pr_info("%s(), msg_queue == NULL!! return\n", __func__);
+		pr_info("msg_queue == NULL!! return");
 		return false;
 	}
 
@@ -254,7 +268,7 @@ inline bool scp_check_idx_msg_valid(
 inline bool scp_check_queue_empty(const struct scp_msg_queue_t *msg_queue)
 {
 	if (msg_queue == NULL) {
-		pr_info("%s(), msg_queue == NULL!! return\n", __func__);
+		pr_info("msg_queue == NULL!! return");
 		return false;
 	}
 
@@ -267,7 +281,7 @@ inline bool scp_check_queue_to_be_full(const struct scp_msg_queue_t *msg_queue)
 	uint32_t idx_w_to_be = 0;
 
 	if (msg_queue == NULL) {
-		pr_info("%s(), msg_queue == NULL!! return\n", __func__);
+		pr_info("msg_queue == NULL!! return");
 		return false;
 	}
 
@@ -283,13 +297,28 @@ inline uint32_t scp_get_num_messages_in_queue(
 	const struct scp_msg_queue_t *msg_queue)
 {
 	if (msg_queue == NULL) {
-		pr_info("%s(), msg_queue == NULL!! return\n", __func__);
+		pr_info("msg_queue == NULL!! return");
 		return 0;
 	}
 
 	return (msg_queue->idx_w >= msg_queue->idx_r) ?
 	       (msg_queue->idx_w - msg_queue->idx_r) :
 	       ((msg_queue->size - msg_queue->idx_r) + msg_queue->idx_w);
+}
+
+
+inline void dump_audio_ipi_msg(struct scp_msg_t *p_scp_msg)
+{
+	struct ipi_msg_t *p_ipi_msg = NULL;
+
+	pr_info("ipi_id: %u, buf %p, len: %u",
+		p_scp_msg->ipi_id, p_scp_msg->buf, p_scp_msg->len);
+
+	if (p_scp_msg->len >= IPI_MSG_HEADER_SIZE) {
+		p_ipi_msg = (struct ipi_msg_t *)p_scp_msg->buf;
+		if (p_ipi_msg->magic == IPI_MSG_MAGIC_NUMBER)
+			DUMP_IPI_MSG("dump", p_ipi_msg);
+	}
 }
 
 
@@ -310,7 +339,7 @@ int scp_ipi_queue_init(uint32_t opendsp_id)
 	int ret = 0;
 
 	if (opendsp_id >= NUM_OPENDSP_TYPE) {
-		pr_info("%s(), opendsp_id: %u error!!\n", __func__, opendsp_id);
+		pr_info("opendsp_id: %u error!!", opendsp_id);
 		return -EFAULT;
 	}
 
@@ -334,8 +363,7 @@ int scp_flush_msg_queue(uint32_t opendsp_id)
 	unsigned long flags = 0;
 
 	if (opendsp_id >= NUM_OPENDSP_TYPE) {
-		pr_info("%s(), opendsp_id: %u error!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u error!!", opendsp_id);
 		return -EOVERFLOW;
 	}
 
@@ -345,6 +373,7 @@ int scp_flush_msg_queue(uint32_t opendsp_id)
 	spin_lock_irqsave(&msg_queue->queue_lock, flags);
 
 	while (scp_check_queue_empty(msg_queue) == false) {
+		dsb(SY);
 		wake_up_interruptible(
 			&msg_queue->element[msg_queue->idx_r].element_wq);
 		scp_pop_msg(msg_queue);
@@ -379,37 +408,34 @@ int scp_send_msg_to_queue(
 	unsigned long flags = 0;
 
 	uint32_t try_cnt = 0;
-	const uint32_t k_max_try_cnt = 20;
-	const uint32_t k_restart_sleep_min_us = 20 * 1000;
+	const uint32_t k_max_try_cnt = 300; /* retry 3 sec for -ERESTARTSYS */
+	const uint32_t k_restart_sleep_min_us = 10 * 1000; /* 10 ms */
 	const uint32_t k_restart_sleep_max_us = (k_restart_sleep_min_us + 200);
 
 
-	scp_debug("%s(+), opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, wait_ms: %u\n",
-		  __func__, opendsp_id, ipi_id, buf, len, wait_ms);
+	scp_debug("in, opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, wait_ms: %u",
+		  opendsp_id, ipi_id, buf, len, wait_ms);
 
 	if (opendsp_id >= NUM_OPENDSP_TYPE) {
-		pr_info("%s(), opendsp_id: %u error!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u error!!", opendsp_id);
 		return -EOVERFLOW;
 	}
 	if (buf == NULL || len > SCP_MSG_BUFFER_SIZE) {
-		pr_info("%s(), buf: %p, len: %u!! return\n",
-			__func__, buf, len);
+		pr_info("buf: %p, len: %u!! return", buf, len);
 		return -EFAULT;
 	}
 
 
 	msg_queue = &g_scp_msg_queue[opendsp_id][SCP_PATH_A2S];
 	if (msg_queue->enable == false) {
-		pr_info("%s(), queue disabled!! return\n", __func__);
+		pr_info("queue disabled!! return");
 		return -1;
 	}
 
 
 	/* NEVER sleep in ISR */
 	if (in_interrupt() && wait_ms != 0) {
-		pr_info("%s(), in_interrupt()!! wait_ms %u => 0!!\n",
-			__func__, wait_ms);
+		pr_info("in_interrupt()!! wait_ms %u => 0!!", wait_ms);
 		wait_ms = 0;
 	}
 
@@ -425,17 +451,17 @@ int scp_send_msg_to_queue(
 			      &queue_counter);
 	spin_unlock_irqrestore(&msg_queue->queue_lock, flags);
 	if (retval != 0) {
-		pr_info("%s(), opendsp_id: %u, push fail!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u, push fail!!", opendsp_id);
 		return retval;
 	}
 
 	/* notify queue thread to process it */
+	dsb(SY);
 	wake_up_interruptible(&msg_queue->queue_wq);
 
 	/* no need to wait */
 	if (wait_ms == 0) {
-		scp_debug("%s(-), wait_ms == 0, exit\n", __func__);
+		scp_debug("out, wait_ms == 0, exit");
 		return 0;
 	}
 
@@ -450,26 +476,36 @@ int scp_send_msg_to_queue(
 				 msecs_to_jiffies(wait_ms));
 
 		if (msg_queue->enable == false) {
-			pr_debug("%s(), queue disable\n", __func__);
-			retval = -1;
-			break;
-		}
-		if (retval > 0) {
+			pr_info("queue disable");
 			retval = 0;
 			break;
 		}
-		if (retval == 0) { /* timeout; will still send to scp later */
-			pr_info("%s(), wait timeout, retval: %d, wait_ms: %u\n",
-				__func__, retval, wait_ms);
+		if (p_element->signal_arrival == true) {
+			retval = 0;
+			break;
+		}
+		if (retval > 0) {
+			pr_notice("wait ret %d, sig %d, enable %d",
+				  retval,
+				  p_element->signal_arrival,
+				  msg_queue->enable);
+			retval = 0;
+			break;
+		}
+		if (retval == 0) { /* timeout */
+			pr_info("wait %u ms timeout, will still send to scp later!!",
+				wait_ms);
 			break;
 		}
 		if (retval == -ERESTARTSYS) {
-			pr_info("%s(), -ERESTARTSYS, retval: %d, wait_ms: %u\n",
-				__func__, retval, wait_ms);
+			pr_info("-ERESTARTSYS, #%u, sleep us: %u",
+				try_cnt, k_restart_sleep_min_us);
 			retval = -EINTR;
 			usleep_range(k_restart_sleep_min_us,
 				     k_restart_sleep_max_us);
+			continue;
 		}
+		pr_notice("retval: %d not handle!!", retval);
 	}
 
 	/* get ipc result */
@@ -484,8 +520,8 @@ int scp_send_msg_to_queue(
 
 
 
-	scp_debug("%s(-), opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, wait_ms: %u\n",
-		  __func__, opendsp_id, ipi_id, buf, len, wait_ms);
+	scp_debug("out, opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, wait_ms: %u",
+		  opendsp_id, ipi_id, buf, len, wait_ms);
 
 	return retval;
 }
@@ -507,28 +543,25 @@ int scp_dispatch_ipi_hanlder_to_queue(
 	unsigned long flags = 0;
 
 
-	scp_debug("%s(+), opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, ipi_handler: %p\n",
-		  __func__, opendsp_id, ipi_id, buf, len, ipi_handler);
+	scp_debug("in, opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, ipi_handler: %p",
+		  opendsp_id, ipi_id, buf, len, ipi_handler);
 
 	if (opendsp_id >= NUM_OPENDSP_TYPE) {
-		pr_info("%s(), opendsp_id: %u error!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u error!!", opendsp_id);
 		return -EOVERFLOW;
 	}
 	if (buf == NULL || len > SCP_MSG_BUFFER_SIZE) {
-		pr_info("%s(), buf: %p, len: %u!! return\n",
-			__func__, buf, len);
+		pr_info("buf: %p, len: %u!! return", buf, len);
 		return -EFAULT;
 	}
 	if (ipi_handler == NULL) {
-		pr_info("%s(), NULL!! ipi_handler: %p\n",
-			__func__, ipi_handler);
+		pr_info("NULL!! ipi_handler: %p", ipi_handler);
 		return -EFAULT;
 	}
 
 	msg_queue = &g_scp_msg_queue[opendsp_id][SCP_PATH_S2A];
 	if (msg_queue->enable == false) {
-		pr_info("%s(), queue disabled!! return\n", __func__);
+		pr_info("queue disabled!! return");
 		return -1;
 	}
 
@@ -545,16 +578,16 @@ int scp_dispatch_ipi_hanlder_to_queue(
 			      &queue_counter);
 	spin_unlock_irqrestore(&msg_queue->queue_lock, flags);
 	if (retval != 0) {
-		pr_info("%s(), opendsp_id: %u, push fail!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u, push fail!!", opendsp_id);
 		return retval;
 	}
 
 	/* notify queue thread to process it */
+	dsb(SY);
 	wake_up_interruptible(&msg_queue->queue_wq);
 
-	scp_debug("%s(-), opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, ipi_handler: %p\n",
-		  __func__, opendsp_id, ipi_id, buf, len, ipi_handler);
+	scp_debug("out, opendsp_id: %u, ipi_id: %u, buf: %p, len: %u, ipi_handler: %p",
+		  opendsp_id, ipi_id, buf, len, ipi_handler);
 
 	return 0;
 }
@@ -572,8 +605,7 @@ static void scp_dump_msg_in_queue(struct scp_msg_queue_t *msg_queue)
 	struct scp_msg_t *p_scp_msg = NULL;
 	uint32_t idx_dump = msg_queue->idx_r;
 
-	pr_info("%s(), opendsp_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u)\n",
-		__func__,
+	pr_info("opendsp_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u)",
 		msg_queue->opendsp_id,
 		msg_queue->idx_r,
 		msg_queue->idx_w,
@@ -584,8 +616,8 @@ static void scp_dump_msg_in_queue(struct scp_msg_queue_t *msg_queue)
 		/* get head msg */
 		p_scp_msg = &msg_queue->element[idx_dump].msg;
 
-		pr_info("element[%u], ipi_id: %u, len: %u\n",
-			idx_dump, p_scp_msg->ipi_id, p_scp_msg->len);
+		pr_info("#element[%u]", idx_dump);
+		dump_audio_ipi_msg(p_scp_msg);
 
 		/* update dump index */
 		idx_dump++;
@@ -612,14 +644,14 @@ static int scp_push_msg(
 
 	if (msg_queue == NULL || buf == NULL ||
 	    p_idx_msg == NULL || p_queue_counter == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p, buf: %p, p_idx_msg: %p, p_queue_counter: %p\n",
-			__func__, msg_queue, buf, p_idx_msg, p_queue_counter);
+		pr_info("NULL!! msg_queue: %p, buf: %p, p_idx_msg: %p, p_queue_counter: %p",
+			msg_queue, buf, p_idx_msg, p_queue_counter);
 		return -EFAULT;
 	}
 
 	/* check queue full */
 	if (scp_check_queue_to_be_full(msg_queue) == true) {
-		pr_info("opendsp_id: %u, ipi_id: %u, queue overflow, idx_r: %u, idx_w: %u, drop it\n",
+		pr_info("opendsp_id: %u, ipi_id: %u, queue overflow, idx_r: %u, idx_w: %u, drop it",
 			msg_queue->opendsp_id,
 			ipi_id, msg_queue->idx_r,
 			msg_queue->idx_w);
@@ -629,8 +661,7 @@ static int scp_push_msg(
 	}
 
 	if (scp_check_idx_msg_valid(msg_queue, msg_queue->idx_w) == false) {
-		pr_info("%s(), idx_w %u is invalid!! return\n",
-			__func__, msg_queue->idx_w);
+		pr_info("idx_w %u is invalid!! return", msg_queue->idx_w);
 		return -1;
 	}
 
@@ -662,8 +693,7 @@ static int scp_push_msg(
 		msg_queue->queue_counter++;
 	spin_unlock_irqrestore(&p_element->element_lock, flags);
 
-	scp_debug("%s(), opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u), *p_idx_msg: %u\n",
-		  __func__,
+	scp_debug("opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u), *p_idx_msg: %u",
 		  msg_queue->opendsp_id,
 		  msg_queue->scp_path,
 		  p_scp_msg->ipi_id,
@@ -682,14 +712,13 @@ static int scp_pop_msg(struct scp_msg_queue_t *msg_queue)
 	struct scp_msg_t *p_scp_msg = NULL;
 
 	if (msg_queue == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p\n", __func__, msg_queue);
+		pr_info("NULL!! msg_queue: %p", msg_queue);
 		return -EFAULT;
 	}
 
 	/* check queue empty */
 	if (scp_check_queue_empty(msg_queue) == true) {
-		pr_info("%s(), opendsp_id: %u, queue is empty, idx_r: %u, idx_w: %u\n",
-			__func__,
+		pr_info("opendsp_id: %u, queue is empty, idx_r: %u, idx_w: %u",
 			msg_queue->opendsp_id,
 			msg_queue->idx_r,
 			msg_queue->idx_w);
@@ -703,8 +732,7 @@ static int scp_pop_msg(struct scp_msg_queue_t *msg_queue)
 		msg_queue->idx_r = 0;
 
 
-	scp_debug("%s(), opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u)\n",
-		  __func__,
+	scp_debug("opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u)",
 		  msg_queue->opendsp_id,
 		  msg_queue->scp_path,
 		  p_scp_msg->ipi_id,
@@ -723,8 +751,8 @@ static int scp_front_msg(
 	uint32_t *p_idx_msg)
 {
 	if (msg_queue == NULL || pp_scp_msg == NULL || p_idx_msg == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p, pp_scp_msg: %p, p_idx_msg: %p\n",
-			__func__, msg_queue, pp_scp_msg, p_idx_msg);
+		pr_info("NULL!! msg_queue: %p, pp_scp_msg: %p, p_idx_msg: %p",
+			msg_queue, pp_scp_msg, p_idx_msg);
 		return -EFAULT;
 	}
 
@@ -733,23 +761,23 @@ static int scp_front_msg(
 
 	/* check queue empty */
 	if (scp_check_queue_empty(msg_queue) == true) {
-		pr_info("%s(), opendsp_id: %u, queue empty, idx_r: %u, idx_w: %u\n",
-			__func__, msg_queue->opendsp_id,
+		pr_info("opendsp_id: %u, queue empty, idx_r: %u, idx_w: %u",
+			msg_queue->opendsp_id,
 			msg_queue->idx_r, msg_queue->idx_w);
 		return -ENOMEM;
 	}
 
 	/* front */
 	if (scp_check_idx_msg_valid(msg_queue, msg_queue->idx_r) == false) {
-		pr_info("%s(), idx_r %u is invalid!! return\n",
-			__func__, msg_queue->idx_r);
+		pr_info("idx_r %u is invalid!! return",
+			msg_queue->idx_r);
 		return -1;
 	}
 	*p_idx_msg = msg_queue->idx_r;
 	*pp_scp_msg = &msg_queue->element[*p_idx_msg].msg;
 
 #if 0
-	scp_debug("%s(), opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u), *p_idx_msg: %u\n",
+	scp_debug("%s(), opendsp_id: %u, scp_path: %u, ipi_id: %u, idx_r: %u, idx_w: %u, queue(%u/%u), *p_idx_msg: %u",
 		  __func__,
 		  msg_queue->opendsp_id,
 		  msg_queue->scp_path,
@@ -776,8 +804,8 @@ static int scp_get_queue_element(
 	int retval = 0;
 
 	uint32_t try_cnt = 0;
-	const uint32_t k_max_try_cnt = 20;
-	const uint32_t k_restart_sleep_min_us = 1000;
+	const uint32_t k_max_try_cnt = 300; /* retry 3 sec for -ERESTARTSYS */
+	const uint32_t k_restart_sleep_min_us = 10 * 1000; /* 10 ms */
 	const uint32_t k_restart_sleep_max_us = (k_restart_sleep_min_us + 200);
 
 	spin_lock_irqsave(&msg_queue->queue_lock, flags);
@@ -792,23 +820,33 @@ static int scp_get_queue_element(
 					 (!scp_check_queue_empty(msg_queue) ||
 					  !msg_queue->thread_enable));
 			if (msg_queue->thread_enable == false) {
-				pr_debug("%s(), thread disable\n", __func__);
+				pr_info("thread disable");
 				retval = -1;
 				break;
 			}
-			if (retval == 0) /* got msg in queue */
+			if (scp_check_queue_empty(msg_queue) == false) {
+				retval = 0;
 				break;
+			}
+			if (retval == 0) { /* got msg in queue */
+				pr_notice("wait ret 0, empty %d, enable %d",
+					  scp_check_queue_empty(msg_queue),
+					  msg_queue->enable);
+				break;
+			}
 			if (retval == -ERESTARTSYS) {
-				pr_info("%s(), -ERESTARTSYS, retval: %d\n",
-					__func__, retval);
+				pr_info("-ERESTARTSYS, #%u, sleep us: %u",
+					try_cnt, k_restart_sleep_min_us);
 				retval = -EINTR;
 				usleep_range(k_restart_sleep_min_us,
 					     k_restart_sleep_max_us);
+				continue;
 			}
+			pr_notice("retval: %d not handle!!", retval);
 		}
 	}
 
-	if (retval == 0) {
+	if (scp_check_queue_empty(msg_queue) == false) {
 		spin_lock_irqsave(&msg_queue->queue_lock, flags);
 		retval = scp_front_msg(msg_queue, pp_scp_msg, p_idx_msg);
 		spin_unlock_irqrestore(&msg_queue->queue_lock, flags);
@@ -831,20 +869,19 @@ static int scp_init_single_msg_queue(
 	int i = 0;
 
 	if (msg_queue == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p\n", __func__, msg_queue);
+		pr_info("NULL!! msg_queue: %p", msg_queue);
 		return -EFAULT;
 	}
 	if (opendsp_id >= NUM_OPENDSP_TYPE || scp_path >= SCP_NUM_PATH) {
-		pr_info("%s(), opendsp_id: %u, scp_path: %u error!!\n",
-			__func__, opendsp_id, scp_path);
+		pr_info("opendsp_id: %u, scp_path: %u error!!",
+			opendsp_id, scp_path);
 		return -EFAULT;
 	}
 
 
 	/* check double init */
 	if (msg_queue->init) {
-		pr_info("%s(), opendsp_id: %u already init!!\n",
-			__func__, opendsp_id);
+		pr_info("opendsp_id: %u already init!!", opendsp_id);
 		return 0;
 	}
 	msg_queue->init = true;
@@ -900,11 +937,12 @@ static int scp_init_single_msg_queue(
 					     msg_queue,
 					     thread_name);
 	if (IS_ERR(msg_queue->scp_thread_task)) {
-		pr_info("can not create %s kthread\n", thread_name);
+		pr_info("can not create %s kthread", thread_name);
 		WARN_ON(1);
 		msg_queue->thread_enable = false;
 	} else {
 		msg_queue->thread_enable = true;
+		dsb(SY);
 		wake_up_process(msg_queue->scp_thread_task);
 	}
 
@@ -927,17 +965,17 @@ static int scp_process_msg_thread(void *data)
 	int retval = 0;
 
 	if (msg_queue == NULL) {
-		pr_info("%s(), msg_queue == NULL!! return\n", __func__);
+		pr_info("msg_queue == NULL!! return");
 		return -EFAULT;
 	}
 
+	set_user_nice(current, -20); /* normal thread highest priority */
 
 	while (msg_queue->thread_enable && !kthread_should_stop()) {
 		/* wait until element pushed */
 		retval = scp_get_queue_element(msg_queue, &p_scp_msg, &idx_msg);
 		if (retval != 0) {
-			pr_info("%s(), scp_get_queue_element retval %d\n",
-				__func__, retval);
+			pr_info("scp_get_queue_element retval %d", retval);
 			continue;
 		}
 		p_element = &msg_queue->element[idx_msg];
@@ -952,6 +990,7 @@ static int scp_process_msg_thread(void *data)
 		if (p_element->wait_in_thread == true) {
 			p_element->send_retval = retval;
 			p_element->signal_arrival = true;
+			dsb(SY);
 			wake_up_interruptible(&p_element->element_wq);
 		}
 		spin_unlock_irqrestore(&p_element->element_lock, flags);
@@ -963,6 +1002,11 @@ static int scp_process_msg_thread(void *data)
 		spin_unlock_irqrestore(&msg_queue->queue_lock, flags);
 	}
 
+
+	pr_info("thread exit, opendsp_id %u, scp_path %u, idx_r %d, idx_w %d",
+		msg_queue->opendsp_id, msg_queue->scp_path,
+		msg_queue->idx_r, msg_queue->idx_w);
+
 	return 0;
 }
 
@@ -973,92 +1017,120 @@ static int scp_send_msg_to_scp(
 {
 #if defined(CONFIG_MTK_TINYSYS_SCP_SUPPORT) \
 	|| defined(CONFIG_MTK_AUDIODSP_SUPPORT)
-	const int k_max_try_count = 1500;
-	int try_count = 0;
-	bool send_fail = false;
+	uint32_t try_cnt = 0;
+	const uint32_t k_max_try_cnt = 1000 * 10; /* 1 sec for write ipc */
+	const uint32_t k_restart_sleep_min_us = 100;
+	const uint32_t k_restart_sleep_max_us = (k_restart_sleep_min_us + 200);
+	static bool start_flag[NUM_OPENDSP_TYPE] = {0};
 #endif
+	uint32_t audio_ipi_id = 0xFFFFFFFF;
+	struct ipi_msg_t *p_ipi_msg = NULL;
+	bool send_pass = false;
+
 	int retval = 0;
 
+	uint32_t opendsp_id = 0;
+
 	if (msg_queue == NULL || p_scp_msg == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p, p_scp_msg: %p\n",
-			__func__, msg_queue, p_scp_msg);
+		pr_info("NULL!! msg_queue: %p, p_scp_msg: %p",
+			msg_queue, p_scp_msg);
 		return -EFAULT;
 	}
 
-	switch (msg_queue->opendsp_id) {
+	opendsp_id = msg_queue->opendsp_id;
+
+	switch (opendsp_id) {
 	case AUDIO_OPENDSP_USE_CM4_A:
 	case AUDIO_OPENDSP_USE_CM4_B:
 #ifdef CONFIG_MTK_TINYSYS_SCP_SUPPORT
-		if (msg_queue->opendsp_id >= SCP_CORE_TOTAL) {
-			pr_info("%s(), opendsp_id %u/%u not support!!\n",
-				__func__,
-				msg_queue->opendsp_id, SCP_CORE_TOTAL);
+		if (opendsp_id >= SCP_CORE_TOTAL) {
+			pr_notice("opendsp_id %u/%u not support!!",
+				  opendsp_id, SCP_CORE_TOTAL);
 			retval = -ENODEV;
-			WARN_ON(1);
 			break;
 		}
-		for (try_count = 0; try_count < k_max_try_count; try_count++) {
+		audio_ipi_id = IPI_AUDIO;
+		for (try_cnt = 0; try_cnt < k_max_try_cnt; try_cnt++) {
 			retval = scp_ipi_send(
 					 p_scp_msg->ipi_id,
 					 (void *)p_scp_msg->buf,
 					 p_scp_msg->len,
-					 0, /* default don't wait */
-					 msg_queue->opendsp_id);
+					 0, /* avoid busy waiting */
+					 opendsp_id);
 
-			if (retval == 0)
+			if (retval == 0) {
+				start_flag[opendsp_id] = true;
+				send_pass = true;
 				break;
-			send_fail = true;
-			msleep(20);
-		}
-		if (send_fail) {
-			pr_info("%s(), opendsp_id %u retry #%d, ret %d\n",
-				__func__, msg_queue->opendsp_id,
-				try_count, retval);
+			}
+			if (start_flag[opendsp_id] == true &&
+			    audio_opendsp_id_ready(opendsp_id) == false) {
+				pr_info("cm4 %d dead!!", opendsp_id);
+				retval = 0;
+				break;
+			}
+
+			pr_info("opendsp_id %u retry #%d, ret %d",
+				opendsp_id,
+				try_cnt, retval);
+			dump_audio_ipi_msg(p_scp_msg);
+			usleep_range(k_restart_sleep_min_us,
+				     k_restart_sleep_max_us);
 		}
 #else
-		pr_notice("%s(), opendsp_id %u not build!!\n",
-			  __func__, msg_queue->opendsp_id);
+		pr_notice("opendsp_id %u not build!!", opendsp_id);
 		retval = -ENODEV;
-		WARN_ON(1);
 #endif
 		break;
 	case AUDIO_OPENDSP_USE_HIFI3:
 #ifdef CONFIG_MTK_AUDIODSP_SUPPORT
-		for (try_count = 0; try_count < k_max_try_count; try_count++) {
+		audio_ipi_id = ADSP_IPI_AUDIO;
+		for (try_cnt = 0; try_cnt < k_max_try_cnt; try_cnt++) {
 			retval = adsp_ipi_send_ipc(
 					 p_scp_msg->ipi_id,
 					 p_scp_msg->buf,
 					 p_scp_msg->len,
-					 1, /* wait until pass */
+					 0, /* avoid busy waiting */
 					 ADSP_A_ID);
 
-			if (retval == 0)
+			if (retval == 0) {
+				start_flag[opendsp_id] = true;
+				send_pass = true;
 				break;
-			send_fail = true;
-			msleep(20);
-		}
-		if (send_fail) {
-			pr_info("%s(), opendsp_id %u retry #%d, ret %d\n",
-				__func__, msg_queue->opendsp_id,
-				try_count, retval);
+			}
+			if (start_flag[opendsp_id] == true &&
+			    audio_opendsp_id_ready(opendsp_id) == false) {
+				pr_info("adsp dead!!");
+				retval = 0;
+				break;
+			}
+
+
+			pr_info("opendsp_id %u retry #%d, ret %d",
+				opendsp_id,
+				try_cnt, retval);
+			dump_audio_ipi_msg(p_scp_msg);
+			usleep_range(k_restart_sleep_min_us,
+				     k_restart_sleep_max_us);
 		}
 #else
-		pr_notice("%s(), opendsp_id %u not build!!\n",
-			  __func__, msg_queue->opendsp_id);
+		pr_notice("opendsp_id %u not build!!", opendsp_id);
 		retval = -ENODEV;
-		WARN_ON(1);
 #endif
 		break;
 	default:
-		pr_notice("%s(), opendsp_id %u not support!!\n",
-			  __func__, msg_queue->opendsp_id);
-		WARN_ON(1);
+		pr_notice("opendsp_id %u not support!!", opendsp_id);
 		retval = -ENODEV;
 		break;
 	}
 
 	IPI_ASSERT(retval == 0);
 
+	if (send_pass == true && p_scp_msg->ipi_id == audio_ipi_id) {
+		p_ipi_msg = (struct ipi_msg_t *)p_scp_msg->buf;
+		if (check_print_msg_info(p_ipi_msg) == true)
+			DUMP_IPI_MSG("pass", p_ipi_msg);
+	}
 	return retval;
 }
 
@@ -1068,19 +1140,19 @@ static int scp_process_msg_from_scp(
 	struct scp_msg_t *p_scp_msg)
 {
 	if (msg_queue == NULL || p_scp_msg == NULL) {
-		pr_info("%s(), NULL!! msg_queue: %p, p_scp_msg: %p\n",
-			__func__, msg_queue, p_scp_msg);
+		pr_info("NULL!! msg_queue: %p, p_scp_msg: %p",
+			msg_queue, p_scp_msg);
 		return -EFAULT;
 	}
 
 	if (p_scp_msg->ipi_handler == NULL) {
-		pr_info("%s(), NULL!! p_scp_msg->ipi_handler: %p\n",
-			__func__, p_scp_msg->ipi_handler);
+		pr_info("NULL!! p_scp_msg->ipi_handler: %p",
+			p_scp_msg->ipi_handler);
 		return -EFAULT;
 	}
 
 	if (p_scp_msg->len == 0) {
-		pr_info("%s(), p_scp_msg->len: %u\n", __func__, p_scp_msg->len);
+		pr_info("p_scp_msg->len: %u", p_scp_msg->len);
 		return -EFAULT;
 	}
 

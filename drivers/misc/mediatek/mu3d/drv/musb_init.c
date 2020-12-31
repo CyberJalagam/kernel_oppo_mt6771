@@ -313,6 +313,19 @@ static inline void mtu3d_u3_ltssm_intr_handler(struct musb *musb, u32 dwLtssmVal
 	}
 }
 
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+extern void oppo_usb_enum_detected(void);
+extern int oppo_get_usb_enum_type(void);
+enum {
+	USB_ENUM_DISABLE = 0,
+	USB_ENUM_DEFAULT,
+	USB_ENUM_DETECTED,
+	USB_ENUM_TIMEOUT,
+	USB_ENUM_USB_TYPE,
+};
+#endif /*VENDOR_EDIT*/
+
 static inline void mtu3d_u2_common_intr_handler(u32 dwIntrUsbValue)
 {
 	if (dwIntrUsbValue & DISCONN_INTR) {
@@ -520,6 +533,68 @@ static inline void mtu3d_otg_intr_handler(u32 dwOtgIntValue)
 
 }
 #endif
+
+
+#define MYDBG(fmt, args...) pr_emerg("04404_test, <%s(), %d> " fmt, __func__, __LINE__, ## args)
+void u3d_clear_all_irq(void)
+{
+	u32 val;
+
+	/* check LV1 */
+	val = os_readl(U3D_LV1ISR) & os_readl(U3D_LV1IER);
+	/* no write 1 clear for LV1 IRQ */
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* dwRxEpDataerrVal */
+	val = os_readl(U3D_USB2_RX_EP_DATAERR_INTR);
+	os_writel(U3D_USB2_RX_EP_DATAERR_INTR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* dwLinkIntValue */
+	val = os_readl(U3D_DEV_LINK_INTR) & os_readl(U3D_DEV_LINK_INTR_ENABLE);
+	os_writel(U3D_DEV_LINK_INTR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* dwIntrUsbValue */
+	val =
+		os_readl(U3D_COMMON_USB_INTR) & os_readl(U3D_COMMON_USB_INTR_ENABLE);
+	os_writel(U3D_COMMON_USB_INTR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* dwDmaIntrValue */
+	val = os_readl(U3D_DMAISR) & os_readl(U3D_DMAIER);
+	os_writel(U3D_DMAISR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* dwLtssmValue */
+	val = os_readl(U3D_LTSSM_INTR) & os_readl(U3D_LTSSM_INTR_ENABLE);
+	os_writel(U3D_LTSSM_INTR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* wIntrQMUDoneValue */
+	val = os_readl(U3D_QISAR0) & os_readl(U3D_QIER0);
+	os_writel(U3D_QISAR0, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/*dwIntrEPValue */
+	val = os_readl(U3D_EPISR) & os_readl(U3D_EPIER);
+	os_writel(U3D_EPISR, val);
+	if (val)
+		MYDBG("val<%x>\n", val);
+
+	/* check LV1 again */
+	val = os_readl(U3D_LV1ISR) & os_readl(U3D_LV1IER);
+	/* no write 1 clear for LV1 IRQ */
+	if (val)
+		MYDBG("val<%x>\n", val);
+}
 
 static irqreturn_t generic_interrupt(int irq, void *__hci)
 {

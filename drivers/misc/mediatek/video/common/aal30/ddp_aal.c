@@ -1221,18 +1221,28 @@ static void disp_aal_notify_backlight_log(int bl_1024)
 void disp_aal_notify_backlight_changed(int bl_1024)
 {
 	unsigned long flags;
+	#ifndef VENDOR_EDIT
+	/*
+	Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Machine, 2017/12/08,
+	modify for multibits backlight.
+	*/
 	int max_backlight;
+	#endif
 	unsigned int service_flags;
 
 	/* pr_debug("disp_aal_notify_backlight_changed: %d/1023", bl_1024); */
 	disp_aal_notify_backlight_log(bl_1024);
 
 	disp_aal_exit_idle("disp_aal_notify_backlight_changed", 1);
-
+	#ifndef VENDOR_EDIT
+	/*
+	Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Machine, 2017/12/08,
+	modify for multibits backlight.
+	*/
 	max_backlight = disp_pwm_get_max_backlight(DISP_PWM0);
 	if (bl_1024 > max_backlight)
 		bl_1024 = max_backlight;
-
+	#endif
 	atomic_set(&g_aal_backlight_notified, bl_1024);
 
 	service_flags = 0;
@@ -1429,6 +1439,8 @@ int disp_aal_set_param(struct DISP_AAL_PARAM __user *param, enum DISP_MODULE_ENU
 	/* since only AALService can set AAL parameters. */
 	if (copy_from_user(&g_aal_param, param, sizeof(struct DISP_AAL_PARAM)) == 0) {
 		backlight_value = g_aal_param.FinalBacklight;
+
+
 		/* set cabc gain zero when detect backlight setting equal to zero */
 		if (backlight_value == 0)
 			g_aal_param.cabc_fltgain_force = 0;
@@ -1446,6 +1458,16 @@ int disp_aal_set_param(struct DISP_AAL_PARAM __user *param, enum DISP_MODULE_ENU
 	AAL_DBG("disp_aal_set_param(ESS = %d, DRE[0,8] = %d,%d, latency=%d): ret = %d",
 		g_aal_param.cabc_fltgain_force, g_aal_param.DREGainFltStatus[0],
 		g_aal_param.DREGainFltStatus[8], g_aal_param.refreshLatency, ret);
+
+	#ifdef VENDOR_EDIT
+	/*
+	Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Machine, 2017/12/08,
+	modify for multibits backlight.
+	*/
+	if (backlight_value > LED_FULL) {
+		backlight_value = LED_FULL;
+	}
+	#endif
 
 	backlight_brightness_set(backlight_value);
 

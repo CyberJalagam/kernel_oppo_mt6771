@@ -331,8 +331,11 @@ unsigned int ma_to_mw(unsigned int val)
 
 	bat_vol = get_battery_volt();	/* return mV */
 	ret_val = (bat_vol * val) / 1000;	/* mW = (mV * mA)/1000 */
-	pbm_crit("[%s] %d(mV) * %d(mA) = %d(mW)\n", __func__, bat_vol, val, ret_val);
 
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
+	pbm_crit("[%s] %d(mV) * %d(mA) = %d(mW)\n", __func__, bat_vol, val, ret_val);
+#endif
 	return ret_val;
 }
 

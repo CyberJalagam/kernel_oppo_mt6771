@@ -82,6 +82,12 @@ const struct flashlight_device_id flashlight_id[] = {
 #else
 const struct flashlight_device_id flashlight_id[] = {
 	/* {TYPE, CT, PART, "NAME", CHANNEL, DECOUPLE} */
+	#ifdef VENDOR_EDIT
+	/*Feng.Hu@Camera.Driver 20171121 add for lm3642, mp3331*/
+	{0, 0, 0, "flashlights-lm3642", 0, 0},
+	{0, 0, 1, "flashlights-aw3642", 0, 0},
+	{0, 0, 0, "flashlights-mp3331", 0, 0},
+	#endif
 	{0, 0, 0, "flashlights-none", -1, 0},
 	{0, 1, 0, "flashlights-none", -1, 0},
 	{1, 0, 0, "flashlights-none", -1, 0},

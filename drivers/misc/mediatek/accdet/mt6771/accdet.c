@@ -25,6 +25,11 @@
 
 #include "mtk_auxadc_intf.h"
 
+#ifdef VENDOR_EDIT
+/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet, 2018/09/18, Add for headset */
+#include <soc/oppo/oppo_project.h>
+#endif /* VENDOR_EDIT */
+
 #define ACCDET_DEBUG(format, args...)	pr_debug(format, ##args)
 #define ACCDET_INFO(format, args...)	pr_info(format, ##args)
 #define ACCDET_ERROR(format, args...)	pr_info(format, ##args)
@@ -187,6 +192,19 @@ static int s_dump_register;
 static int s_start_debug_thread;
 static struct task_struct *s_thread;
 #endif
+
+#ifdef VENDOR_EDIT
+/* Yongpei.Zhang@PSW.MM.AudioDriver.HeadsetDet.1222012, 2018/09/18,
+ * add for hp delay detection */
+struct delayed_work hp_detect_work;
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+/* ZhongWenjie@BSP.TP.FUNCTION, 2018/11/19,
+ * add to enable tp headset mode when plug in  */
+void __attribute__((weak)) switch_headset_state(int headset_state) {return;}
+#endif /* VENDOR_EDIT */
+
 
 /* ---------------------------------------------------------------------*/
 static DEFINE_MUTEX(accdet_multikey_mutex);
@@ -560,6 +578,19 @@ static void send_accdet_status_event(int cable, int status)
 
 static void send_key_event(int keycode, int flag)
 {
+#ifdef VENDOR_EDIT
+	/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet.1223267, 2018/09/17,
+	 * add for not sending hook key release when plugging out */
+	ACCDET_INFO("[accdet][send_key_event]s_eint_accdet_sync_flag = %d, g_cur_eint_state = %d\n",
+		s_eint_accdet_sync_flag, g_cur_eint_state);
+	if (((s_eint_accdet_sync_flag && (g_cur_eint_state == EINT_PIN_PLUG_OUT))
+		|| (!s_eint_accdet_sync_flag))
+		&& (keycode == MD_KEY)) {
+		ACCDET_INFO("[accdet][send_key_event]No hook key release when plugging out\n");
+		return;
+	}
+#endif /* VENDOR_EDIT */
+
 	switch (keycode) {
 	case DW_KEY:
 		input_report_key(kpd_accdet_dev, KEY_VOLUMEDOWN, flag);
@@ -920,7 +951,13 @@ static void disable_micbias_callback(struct work_struct *work)
 		pmic_pwrap_write(ACCDET_CON02, reg_val & (~ACCDET_PWM_IDLE_B8_9_10));
 #else
 		/* set PWM IDLE on */
+#ifdef VENDOR_EDIT
+		/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet, 2018/09/10, Modify
+		 * for close idle */
+		pmic_pwrap_write(ACCDET_CON02, reg_val & (~ACCDET_PWM_IDLE_B8_9_10));
+#else /* VENDOR_EDIT */
 		pmic_pwrap_write(ACCDET_CON02, reg_val|(~ACCDET_PWM_IDLE_B8_9_10));
+#endif /* VENDOR_EDIT */
 #endif
 		disable_accdet();
 		ACCDET_DEBUG("[disable_micbias_callback]more than 5s MICBIAS, disable micbias\n");
@@ -964,6 +1001,11 @@ static void accdet_eint_work_callback(struct work_struct *work)
 #elif defined CONFIG_ACCDET_SUPPORT_BI_EINT/* EINT0 & EINT1 */
 		enable_accdet(ACCDET_EINT_PWM_IDLE_B11_12);/* enable ACCDET unit */
 #endif
+#ifdef VENDOR_EDIT
+/* ZhongWenjie@BSP.TP.FUNCTION, 2018/11/19,
+ * add to enable tp headset mode when plug in  */
+		switch_headset_state(1);
+#endif /* VENDOR_EDIT */
 	} else {/* EINT_PIN_PLUG_OUT */
 /* Disable ACCDET */
 		ACCDET_DEBUG("[accdet]DCC EINT:plug-out, cur_eint_state=%d\n", g_cur_eint_state);
@@ -988,6 +1030,11 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		irq_temp = irq_temp & (~ACCDET_EINT_IRQ_CLR_B10_11);/* need think??? */
 		pmic_pwrap_write(ACCDET_CON12, irq_temp);
 		ACCDET_DEBUG("[accdet]plug-out,[0x%x]=0x%x\n", ACCDET_CON12, pmic_pwrap_read(ACCDET_CON12));
+#ifdef VENDOR_EDIT
+/* ZhongWenjie@BSP.TP.FUNCTION, 2018/11/19,
+ * add to enable tp headset mode when plug in  */
+		switch_headset_state(0);
+#endif /* VENDOR_EDIT */
 	}
 #endif
 
@@ -1071,7 +1118,20 @@ static int accdet_eint_func(int eint_id)
 			g_cur_eint_state = EINT_PIN_PLUG_IN;
 			mod_timer(&micbias_timer, jiffies + MICBIAS_DISABLE_TIMER);
 		}
+#ifdef VENDOR_EDIT
+		/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet.1263175, 2018/09/18,
+		 * add for hp delay detection */
+		if (g_cur_eint_state == EINT_PIN_PLUG_IN) {
+			ACCDET_INFO("[accdet_eint_func]delayed work 500ms scheduled when plugging in\n");
+			schedule_delayed_work(&hp_detect_work, msecs_to_jiffies(500));
+		} else {
+			ACCDET_INFO("[accdet_eint_func]delayed work 0ms scheduled when plugging out\n");
+			cancel_delayed_work_sync(&hp_detect_work);
+			schedule_delayed_work(&hp_detect_work, 0);
+		}
+#else /* VENDOR_EDIT */
 		ret = queue_work(accdet_eint_workqueue, &accdet_eint_work);
+#endif /* VENDOR_EDIT */
 	} else {
 		ACCDET_ERROR("[accdet_eint_func]eint_id is not ACCDET_EINT0_IRQ_IN!\n");
 	}
@@ -1809,6 +1869,22 @@ void accdet_init_once(int init_flag)
 		pmic_pwrap_write(AUDENC_ANA_CON10,
 			reg_val|(headset_dts_data.mic_bias_vol<<4)|RG_AUD_MICBIAS1_LOWP_EN);
 
+#ifdef VENDOR_EDIT
+		/* Yongpei.Zhang@PSW.MM.AudioDriver.HeadsetDet, 2018/09/18,
+		 * change VTH to 2V and internal eint resitance to 500k */
+		/* select VTH for 2v, set 239E bit[10] = 1 */
+		pmic_pwrap_write(AUDENC_ANA_CON11, pmic_pwrap_read(AUDENC_ANA_CON11) | 0x0400);
+		/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet, 2019/01/01, Close
+			internal eint resitance for 18561*/
+		if ((is_project(OPPO_18561)) || (is_project(OPPO_18161))) {
+			/* use internal eint resitance 2M,  set 239E bit[11]=1 [12] = 0*/
+			//pmic_pwrap_write(AUDENC_ANA_CON11, pmic_pwrap_read(AUDENC_ANA_CON11) | 0x0800);
+		} else {
+			/* use internal eint resitance 500k,  set 239E bit[11]=1 [12] = 1*/
+			pmic_pwrap_write(AUDENC_ANA_CON11, pmic_pwrap_read(AUDENC_ANA_CON11) | 0x1800);
+		}
+#endif /* VENDOR_EDIT */
+
 		reg_val = pmic_pwrap_read(AUDENC_ANA_CON11);
 		/* ACC mode: 0x239E [0:2] = 111b   [7]=0
 		  * DCC mode: 0x239E [0:2] = 111b  [7]=1
@@ -1817,7 +1893,13 @@ void accdet_init_once(int init_flag)
 		*/
 		if (headset_dts_data.accdet_mic_mode == HEADSET_MODE_1) {
 			reg_val &= 0xFF7F;
+#ifndef VENDOR_EDIT
+			/* Yongzpei.Yao@PSW.MM.AudioDriver.HeadsetDet, 2018/09/18,
+			 * modify for CT Test */
 			pmic_pwrap_write(AUDENC_ANA_CON11, reg_val|RG_ACCDET_MODE_ANA10_MODE1);
+#else /* VENDOR_EDIT */
+			pmic_pwrap_write(AUDENC_ANA_CON11, reg_val|RG_ACCDET_MODE_ANA10_MODE1);
+#endif /* VENDOR_EDIT */
 		} else if (headset_dts_data.accdet_mic_mode == HEADSET_MODE_2) {/* Low cost mode without internal bias*/
 			/* for test discharge quickly */
 			pmic_pwrap_write(AUDENC_ANA_CON11, reg_val|RG_ACCDET_MODE_ANA10_MODE2);
@@ -2525,7 +2607,11 @@ int mt_accdet_probe(struct platform_device *dev)
 	INIT_WORK(&accdet_disable_work, disable_micbias_callback);
 	accdet_eint_workqueue = create_singlethread_workqueue("accdet_eint");
 	INIT_WORK(&accdet_eint_work, accdet_eint_work_callback);
-
+#ifdef VENDOR_EDIT
+	/* Yongpei.Yao@PSW.MM.AudioDriver.HeadsetDet.1222012, 2018/09/18,
+	 * add for hp delay detection */
+	INIT_DELAYED_WORK(&hp_detect_work, accdet_eint_work_callback);
+#endif /* VENDOR_EDIT */
 
 	pmic_register_interrupt_callback(INT_ACCDET, accdet_int_handler);/* accdet int */
 #ifdef CONFIG_ACCDET_EINT_IRQ

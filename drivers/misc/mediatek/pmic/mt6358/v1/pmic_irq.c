@@ -40,10 +40,346 @@
 
 #include <mt-plat/mtk_ccci_common.h>
 
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for charging */
+#include <mt-plat/charger_type.h>
+extern enum charger_type g_chr_type;
+#endif /* VENDOR_EDIT */
+
 /* Global variable */
 int g_pmic_irq;
 
 /* Interrupt Setting */
+
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+unsigned int g_eint_pmic_num = 182;
+
+#define PMIC_INT_REG_WIDTH  16
+#define PMIC_INT_REG_NUMBER  16
+u64 pmic_wakesrc_x_count[PMIC_INT_REG_NUMBER][PMIC_INT_REG_WIDTH] = {
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+};
+
+const char *pmic_interrupt_status_name[PMIC_INT_REG_NUMBER][PMIC_INT_REG_WIDTH] = {
+	{
+	[0] = " INT_VPROC11_OC",
+	[1] = " INT_VPROC12_OC",
+	[2] = " INT_VCORE_OC",
+	[3] = " INT_VGPU_OC",
+	[4] = " INT_VMODEM_OC",
+	[5] = " INT_VDRAM1_OC",
+	[6] = " INT_VS1_OC",
+	[7] = " INT_VS2_OC",
+	[8] = " INT_VPA_OC",
+	[9] = " INT_VCORE_PREOC",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_VFE28_OC",
+	[1] = " INT_VXO22_OC",
+	[2] = " INT_VRF18_OC",
+	[3] = " INT_VRF12_OC",
+	[4] = " INT_VEFUSE_OC",
+	[5] = " INT_VCN33_OC",
+	[6] = " INT_VCN28_OC",
+	[7] = " INT_VCN18_OC",
+	[8] = " INT_VCAMA1_OC",
+	[9] = " INT_VCAMA2_OC",
+	[10] = " INT_VCAMD_OC",
+	[11] = " INT_VCAMIO_OC",
+	[12] = " INT_VLDO28_OC",
+	[13] = " INT_VA12_OC",
+	[14] = " INT_VAUX18_OC",
+	[15] = " INT_VAUD28_OC",
+	},
+	{
+	[0] = " INT_VIO28_OC",
+	[1] = " INT_VIO18_OC",
+	[2] = " INT_VSRAM_PROC11_OC",
+	[3] = " INT_VSRAM_PROC12_OC",
+	[4] = " INT_VSRAM_OTHERS_OC",
+	[5] = " INT_VSRAM_GPU_OC",
+	[6] = " INT_VDRAM2_OC",
+	[7] = " INT_VMC_OC",
+	[8] = " INT_VMCH_OC",
+	[9] = " INT_VEMC_OC",
+	[10] = " INT_VSIM1_OC",
+	[11] = " INT_VSIM2_OC",
+	[12] = " INT_VIBR_OC",
+	[13] = " INT_VUSB_OC",
+	[14] = " INT_VBIF28_OC",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_PWRKEY",
+	[1] = " INT_HOMEKEY",
+	[2] = " INT_PWRKEY_R",
+	[3] = " INT_HOMEKEY_R",
+	[4] = " INT_NI_LBAT_INT",
+	[5] = " INT_CHRDET",
+	[6] = " INT_CHRDET_EDGE",
+	[7] = " INT_VCDT_HV_DET",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_RTC",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_FG_BAT0_H",
+	[1] = " INT_FG_BAT0_L",
+	[2] = " INT_FG_CUR_H",
+	[3] = " INT_FG_CUR_L",
+	[4] = " INT_FG_ZCV",
+	[5] = " INT_FG_BAT1_H",
+	[6] = " INT_FG_BAT1_L",
+	[7] = " INT_FG_N_CHARGE_L",
+	[8] = " INT_FG_IAVG_H",
+	[9] = " INT_FG_IAVG_L",
+	[10] = " INT_FG_TIME_H",
+	[11] = " INT_FG_DISCHARGE",
+	[12] = " INT_FG_CHARGE",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_BATON_LV",
+	[1] = " INT_BATON_HT",
+	[2] = " INT_BATON_BAT_IN",
+	[3] = " INT_BATON_BAT_OUT",
+	[4] = " INT_BIF",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_BAT_H",
+	[1] = " INT_BAT_L",
+	[2] = " INT_BAT2_H",
+	[3] = " INT_BAT2_L",
+	[4] = " INT_BAT_TEMP_H",
+	[5] = " INT_BAT_TEMP_L",
+	[6] = " INT_AUXADC_IMP",
+	[7] = " INT_NAG_C_DLTV",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_AUDIO",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " INT_ACCDET",
+	[6] = " INT_ACCDET_EINT0",
+	[7] = " INT_ACCDET_EINT1",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+		{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " INT_SPI_CMD_ALERT",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+	{
+	[0] = " ",
+	[1] = " ",
+	[2] = " ",
+	[3] = " ",
+	[4] = " ",
+	[5] = " ",
+	[6] = " ",
+	[7] = " ",
+	[8] = " ",
+	[9] = " ",
+	[10] = " ",
+	[11] = " ",
+	[12] = " ",
+	[13] = " ",
+	[14] = " ",
+	[15] = " ",
+	},
+};
+void mt_pmic_clear_wakesrc_count(void)
+{
+	int i = 0;
+	int j = 0;
+
+	for (i = 0; i < PMIC_INT_REG_NUMBER; i++){
+		for (j = 0; j < PMIC_INT_REG_WIDTH; j++){
+			pmic_wakesrc_x_count[i][j] = 0;
+		}
+	}
+}
+EXPORT_SYMBOL(mt_pmic_clear_wakesrc_count);
+#endif /* VENDOR_EDIT */
+
 static struct pmic_sp_irq buck_irqs[][PMIC_INT_WIDTH] = {
 	{
 		PMIC_SP_IRQ_GEN(1, INT_VPROC11_OC),
@@ -261,6 +597,38 @@ struct pmic_sp_interrupt sp_interrupts[] = {
 
 unsigned int sp_interrupt_size = ARRAY_SIZE(sp_interrupts);
 
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+int pmic_int_check(char * wakeup_name)
+{
+	unsigned int spNo, sp_conNo, j;
+	unsigned int status_reg;
+	unsigned int sp_int_status = 0;
+	int ret = -1;
+
+	for (spNo = 0; spNo < ARRAY_SIZE(sp_interrupts); spNo++) {
+		for (sp_conNo = 0; sp_conNo < sp_interrupts[spNo].con_len; sp_conNo++) {
+			status_reg = sp_interrupts[spNo].status + 0x6 * sp_conNo;
+			sp_int_status = upmu_get_reg_value(status_reg);
+			IRQLOG("[PMIC_INT] after, Reg[0x%x]=0x%x\n", status_reg, sp_int_status);
+
+       		for (j = 0; j < PMIC_INT_WIDTH; j++) {
+				if ((sp_int_status) & (1 << j)) {
+					IRQLOG("[PMIC_INT][%s]\n", sp_interrupts[spNo].sp_irqs[sp_conNo][j].name);
+					strcpy(wakeup_name, sp_interrupts[spNo].sp_irqs[sp_conNo][j].name);
+
+					ret = (2*spNo+sp_conNo)*j;
+					pmic_wakesrc_x_count[2*spNo+sp_conNo][j]++;
+				}
+			}
+		}
+	}
+	return ret;
+}
+
+EXPORT_SYMBOL(pmic_int_check);
+#endif /* VENDOR_EDIT */
+
 static unsigned int get_spNo(enum PMIC_IRQ_ENUM intNo)
 {
 	if (intNo >= SP_BUCK_TOP_START && intNo < SP_LDO_TOP_START)
@@ -335,6 +703,105 @@ void homekey_int_handler_r(void)
 	kpd_pmic_rstkey_handler(0x0);
 #endif
 }
+
+#ifndef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic 2018/01/01 modify for oppo chaarger
+/* Chrdet Int Handler */
+#if (CONFIG_MTK_GAUGE_VERSION != 30)
+void chrdet_int_handler(void)
+{
+	IRQLOG("[chrdet_int_handler]CHRDET status = %d....\n",
+		pmic_get_register_value(PMIC_RGS_CHRDET));
+#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
+	if (!upmu_get_rgs_chrdet()) {
+		int boot_mode = 0;
+
+		boot_mode = get_boot_mode();
+
+		if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT
+		|| boot_mode == LOW_POWER_OFF_CHARGING_BOOT) {
+			IRQLOG("[chrdet_int_handler] Unplug Charger/USB\n");
+#ifdef CONFIG_MTK_RTC
+			mt_power_off();
+#endif
+		}
+	}
+#endif
+	/*pmic_set_register_value(PMIC_RG_USBDL_RST, 1); MT6358 not support */
+#if defined(CONFIG_MTK_SMART_BATTERY)
+	do_chrdet_int_task();
+#endif
+}
+#endif /* CONFIG_MTK_GAUGE_VERSION != 30 */
+
+#else	//VENDOR_EDIT
+
+
+extern bool oppo_chg_wake_update_work(void);
+extern bool mt_usb_is_device(void);
+extern bool oppo_vooc_get_fastchg_started(void);
+extern int oppo_vooc_get_adapter_update_status(void);
+extern void oppo_vooc_reset_fastchg_after_usbout(void);
+extern void oppo_chg_clear_chargerid_info(void);
+extern void oppo_chg_set_chargerid_switch_val(int);
+#ifdef VENDOR_EDIT
+//Guohua.Zhong@BSP.TP.Function, 2018/01/04, Add for informing tp driver of usb state
+extern void switch_usb_state(int usb_state);
+#endif /*VENDOR_EDIT*/
+
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+extern void oppo_clear_usb_enum_status(void);
+extern int oppo_cancel_usb_distinguish_timerout_interrupt(void);
+#endif /*VENDOR_EDIT*/
+
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+//extern int get_oppo_short_check_fast_to_normal(void);
+#endif /*VENDOR_EDIT*/
+void chrdet_int_handler(void)
+{
+	pr_err("[chrdet_int_handler]CHRDET status = %d....\n",
+		pmic_get_register_value(PMIC_RGS_CHRDET));
+	if (mt_usb_is_device() == false) {
+		return;
+	}
+#ifdef VENDOR_EDIT
+//ZhongWenjie@BSP.TP.Function, 2019/01/17, Add for informing tp driver of usb state
+	switch_usb_state(upmu_get_rgs_chrdet());
+#endif /*VENDOR_EDIT*/
+	if(oppo_vooc_get_fastchg_started() == true && oppo_vooc_get_adapter_update_status() != 1){
+		pr_err("[do_charger_detect] opchg_get_prop_fast_chg_started = true!\n");
+       // if (get_oppo_short_check_fast_to_normal() == 0) {
+            if (!upmu_get_rgs_chrdet()) {
+                g_chr_type = CHARGER_UNKNOWN;
+            }
+        //}
+		return;
+	}
+	if (upmu_get_rgs_chrdet()){
+		pr_err("[chrdet_int_handler]charger in\n");
+
+		//mt_usb_connect();
+	} else {
+		pr_err("[chrdet_int_handler]charger out\n");
+		oppo_vooc_reset_fastchg_after_usbout();
+		#ifdef VENDOR_EDIT
+		//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+		oppo_clear_usb_enum_status();
+		oppo_cancel_usb_distinguish_timerout_interrupt();
+		#endif /*VENDOR_EDIT*/
+		if(oppo_vooc_get_fastchg_started() == false) {
+				oppo_chg_set_chargerid_switch_val(0);
+				oppo_chg_clear_chargerid_info();
+		}
+		g_chr_type = CHARGER_UNKNOWN;
+		//mt_usb_disconnect();
+	}
+	printk("g_chr_type = %d\n",g_chr_type);
+	oppo_chg_wake_update_work();
+}
+#endif /* VENDOR_EDIT */
 
 #if ENABLE_ALL_OC_IRQ
 static unsigned int vio18_oc_times;
@@ -719,6 +1186,11 @@ static void register_irq_handlers(void)
 	pmic_register_interrupt_callback(INT_HOMEKEY, homekey_int_handler);
 	pmic_register_interrupt_callback(INT_PWRKEY_R, pwrkey_int_handler_r);
 	pmic_register_interrupt_callback(INT_HOMEKEY_R, homekey_int_handler_r);
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/30, modify for charger */
+	pmic_register_interrupt_callback(INT_CHRDET_EDGE, chrdet_int_handler);
+	pmic_enable_interrupt(INT_CHRDET_EDGE, 1, "PMIC");
+#endif
 #if ENABLE_ALL_OC_IRQ
 	register_all_oc_interrupts();
 #endif

@@ -172,6 +172,7 @@ static void sys_msg_handler(struct port_t *port, struct sk_buff *skb)
 		break;
 	};
 	ccci_free_skb(skb);
+	CCCI_NORMAL_LOG(md_id, SYS, "system message handler completed\n");
 }
 
 static int port_sys_init(struct port_t *port)

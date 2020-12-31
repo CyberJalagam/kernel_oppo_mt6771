@@ -109,11 +109,27 @@ void kbase_job_hw_submit(struct kbase_device *kbdev,
 	u32 cfg;
 	u64 jc_head = katom->jc;
 	u64 affinity;
+	bool force_invalidate_flush = false;
+	int slot_nr = 0,i = 0, id = 0;
 
 	KBASE_DEBUG_ASSERT(kbdev);
 	KBASE_DEBUG_ASSERT(katom);
 
 	kctx = katom->kctx;
+
+	/* checked whether cross slot have diferent kctx,
+	 * if yes, force invalid and flush */
+	for (slot_nr = 0; slot_nr < kbdev->gpu_props.num_job_slots; slot_nr++) {
+		for (i = 0; i < SLOT_RB_SIZE; i++) {
+			if (kctx !=  kbdev->force_l2_flush.last_two_context_per_slot[slot_nr][i]) {
+				force_invalidate_flush = true;
+				break;
+			}
+		}
+	}
+	/* update last context */
+	id = (kbdev->force_l2_flush.counter[js]++)& SLOT_RB_MASK;
+	kbdev->force_l2_flush.last_two_context_per_slot[js][id] = kctx;
 
 	/* Command register must be available */
 	KBASE_DEBUG_ASSERT(kbasep_jm_is_js_free(kbdev, js, kctx));
@@ -133,13 +149,15 @@ void kbase_job_hw_submit(struct kbase_device *kbdev,
 			!(kbdev->serialize_jobs & KBASE_SERIALIZE_RESET))
 		cfg |= JS_CONFIG_ENABLE_FLUSH_REDUCTION;
 
-	if (0 != (katom->core_req & BASE_JD_REQ_SKIP_CACHE_START))
+	if ((0 != (katom->core_req & BASE_JD_REQ_SKIP_CACHE_START)) &&
+			!force_invalidate_flush)
 		cfg |= JS_CONFIG_START_FLUSH_NO_ACTION;
 	else
 		cfg |= JS_CONFIG_START_FLUSH_CLEAN_INVALIDATE;
 
 	if (0 != (katom->core_req & BASE_JD_REQ_SKIP_CACHE_END) &&
-			!(kbdev->serialize_jobs & KBASE_SERIALIZE_RESET))
+			!(kbdev->serialize_jobs & KBASE_SERIALIZE_RESET) &&
+			!force_invalidate_flush)
 		cfg |= JS_CONFIG_END_FLUSH_NO_ACTION;
 	else
 		cfg |= JS_CONFIG_END_FLUSH_CLEAN_INVALIDATE;

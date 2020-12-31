@@ -51,6 +51,7 @@ MAIN_CFILES += common/lc898212af/LC898212AF.c
 MAIN_CFILES  += common/lc898212xdaf/LC898212XDAF.c
 MAIN_CFILES  += common/lc898212xdaf/AfSTMV.c
 MAIN_CFILES  += common/lc898212xdaf/AfInter.c
+MAIN_CFILES  += common/lc898229af/LC898229AF.c
 MAIN_CFILES  += common/lc898212xdaf/AfInit.c
 MAIN_CFILES  += common/lc898212xdaf_tvc700/LC898212XDAF_TVC700.c
 MAIN_CFILES  += common/lc898214af/LC898214AF.c
@@ -64,6 +65,7 @@ endif
 MAIN_CFILES  += common/ad5820af/AD5820AF.c
 MAIN_CFILES  += common/wv511aaf/WV511AAF.c
 MAIN_CFILES  += common/ak7371af/AK7371AF.c
+MAIN_CFILES  += common/ak7374af/AK7374AF.c
 ifeq ($(CONFIG_MTK_LENS_DW9800WAF_SUPPORT), y)
 MAIN_CFILES  += common/dw9800waf/DW9800WAF.c
 endif
@@ -93,6 +95,7 @@ obj-y  += common/dw9714af/
 obj-y  += common/dw9814af/
 obj-y  += common/dw9718af/
 obj-y  += common/dw9718saf/
+obj-y  += common/lc898229af/
 obj-y  += common/dw9719taf/
 obj-y  += common/lc898212af/
 obj-y  += common/lc898212xdaf/
@@ -106,6 +109,7 @@ endif
 obj-y  += common/ad5820af/
 obj-y  += common/wv511aaf/
 obj-y  += common/ak7371af/
+obj-y  += common/ak7374af/
 ifeq ($(CONFIG_MTK_LENS_DW9800WAF_SUPPORT), y)
   obj-y  += common/dw9800waf/
 endif

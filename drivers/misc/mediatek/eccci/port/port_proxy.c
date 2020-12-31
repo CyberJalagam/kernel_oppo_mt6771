@@ -532,6 +532,8 @@ int port_recv_skb(struct port_t *port, struct sk_buff *skb)
 			port->skb_handler(port, skb);
 		else
 			__skb_queue_tail(&port->rx_skb_list, skb);
+		if (ccci_h->channel == CCCI_SYSTEM_RX)
+			CCCI_NORMAL_LOG(port->md_id, TAG, "port %s Rx packet\n", port->name);
 		port->rx_pkg_cnt++;
 		spin_unlock_irqrestore(&port->rx_skb_list.lock, flags);
 		wake_lock_timeout(&port->rx_wakelock, HZ / 2);
@@ -569,7 +571,9 @@ int port_kthread_handler(void *arg)
 
 	while (1) {
 		if (skb_queue_empty(&port->rx_skb_list)) {
-			ret = wait_event_interruptible(port->rx_wq, !skb_queue_empty(&port->rx_skb_list));
+			spin_lock_irq(&port->rx_wq.lock);
+			ret = wait_event_interruptible_locked_irq(port->rx_wq, !skb_queue_empty(&port->rx_skb_list));
+			spin_unlock_irq(&port->rx_wq.lock);
 			if (ret == -ERESTARTSYS)
 				continue;	/* FIXME */
 		}

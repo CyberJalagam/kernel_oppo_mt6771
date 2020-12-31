@@ -45,17 +45,16 @@
 #include "scp_excep.h"
 #include "scp_dvfs.h"
 #include "mtk_spm_resource_req.h"
+#include "scp_scpctl.h"
 
 #ifdef CONFIG_OF_RESERVED_MEM
 #include <linux/of_reserved_mem.h>
 #include "scp_reservedmem_define.h"
 #endif
 
-
 #if ENABLE_SCP_EMI_PROTECTION
 #include <mt_emi_api.h>
 #endif
-
 
 /* scp semaphore timout count definition*/
 #define SEMAPHORE_TIMEOUT 5000
@@ -392,6 +391,45 @@ static void scp_timeout_ws(struct work_struct *ws)
 	pr_notice("[SCP] scp_timeout_times=%x\n", scp_timeout_times);
 }
 
+#ifdef SCP_PARAMS_TO_SCP_SUPPORT
+/*
+ * Function/Space for kernel to pass static/initial parameters to scp's driver
+ * @return: 0 for success, positive for info and negtive for error
+ *
+ * Note: The function should be called before disabling 26M & resetting scp.
+ *
+ * An example of function instance of sensor_params_to_scp:
+ * int sensor_params_to_scp(phys_addr_t addr_vir, size_t size)
+ * {
+ *     int *params;
+ *
+ *     params = (int *)addr_vir;
+ *     params[0] = 0xaaaa;
+ *
+ *     return 0;
+ * }
+ */
+static int params_to_scp(void)
+{
+	int ret = 0;
+	struct scp_region_info_st *region_info =
+		(struct scp_region_info_st *)(SCP_TCM + SCP_REGION_INFO_OFFSET);
+
+	/* return success, if sensor_params_to_scp is not defined */
+	if (sensor_params_to_scp == NULL)
+		return 0;
+
+	mt_reg_sync_writel(scp_get_reserve_mem_phys(SCP_DRV_PARAMS_MEM_ID),
+			&(region_info->ap_params_start));
+
+	ret = sensor_params_to_scp(
+		scp_get_reserve_mem_virt(SCP_DRV_PARAMS_MEM_ID),
+		scp_get_reserve_mem_size(SCP_DRV_PARAMS_MEM_ID));
+
+	return ret;
+}
+#endif
+
 /*
  * mark notify flag to 1 to notify apps to start their tasks
  */
@@ -636,7 +674,6 @@ static inline ssize_t scp_A_db_test_show(struct device *kobj
 
 DEVICE_ATTR(scp_A_db_test, 0444, scp_A_db_test_show, NULL);
 
-
 static ssize_t scp_ee_force_ke_show(struct device *kobj, struct device_attribute *attr, char *buf)
 {
 	return scnprintf(buf, PAGE_SIZE, "%d\n", scp_ee_force_ke_enable);
@@ -808,6 +845,40 @@ DEVICE_ATTR(recovery_flag, 0600, scp_recovery_flag_r, scp_recovery_flag_w);
 
 #endif
 
+
+/******************************************************************************
+ *****************************************************************************/
+static ssize_t scp_set_log_filter(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	enum scp_ipi_status ret;
+	uint32_t filter;
+	const unsigned int len = sizeof(filter);
+
+	if (sscanf(buf, "0x%08x", &filter) != 1)
+		return -EINVAL;
+
+	ret = scp_ipi_send(IPI_SCP_LOG_FILTER, &filter, len, 0, SCP_A_ID);
+	switch (ret) {
+	case SCP_IPI_DONE:
+		pr_notice("[SCP] Set log filter to 0x%08x\n", filter);
+		return count;
+
+	case SCP_IPI_BUSY:
+		pr_notice("[SCP] IPI busy. Set log filter failed!\n");
+		return -EBUSY;
+
+	case SCP_IPI_ERROR:
+	default:
+		pr_notice("[SCP] IPI error. Set log filter failed!\n");
+		return -EIO;
+	}
+}
+DEVICE_ATTR(log_filter, 0200, NULL, scp_set_log_filter);
+
+
+/******************************************************************************
+ *****************************************************************************/
 static struct miscdevice scp_device = {
 	.minor = MISC_DYNAMIC_MINOR,
 	.name = "scp",
@@ -926,6 +997,16 @@ static int create_files(void)
 
 #endif
 
+	ret = device_create_file(scp_device.this_device, &dev_attr_log_filter);
+	if (unlikely(ret != 0))
+		return ret;
+
+	ret = device_create_file(scp_device.this_device
+					, &dev_attr_scpctl);
+
+	if (unlikely(ret != 0))
+		return ret;
+
 	return 0;
 }
 #if SCP_RESERVED_MEM
@@ -1014,7 +1095,8 @@ static int scp_reserve_memory_ioremap(void)
 		accumlate_memory_size += scp_reserve_mblock[id].size;
 #ifdef DEBUG
 		pr_debug("[SCP] [%d] phys:0x%llx, virt:0x%llx, len:0x%llx\n",
-			id, (uint64_t)scp_reserve_mblock[id].start_phys,
+			id,
+			(uint64_t)scp_reserve_mblock[id].start_phys,
 			(uint64_t)scp_reserve_mblock[id].start_virt,
 			(uint64_t)scp_reserve_mblock[id].size);
 #endif /* DEBUG */
@@ -1707,6 +1789,14 @@ static int __init scp_init(void)
 #endif
 
 	scp_recovery_init();
+
+#ifdef SCP_PARAMS_TO_SCP_SUPPORT
+	/* The function, sending parameters to scp must be anchored before
+	 * 1. disabling 26M, 2. resetting SCP
+	 */
+	if (params_to_scp() != 0)
+		goto err;
+#endif
 
 #if SCP_DVFS_INIT_ENABLE
 	wait_scp_dvfs_init_done();

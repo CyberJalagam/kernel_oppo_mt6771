@@ -85,10 +85,6 @@ struct DumpFirstErrorStruct {
 };
 #endif
 
-#ifdef CMDQ_DISP_DSI_DEBUG
-extern void ddp_dump_and_reset_dsi0(void);
-#endif
-
 #define CMDQ_LOG(string, args...) \
 do {			\
 	pr_notice("[CMDQ]"string, ##args); \
@@ -1137,6 +1133,8 @@ extern "C" {
  * cmdq_core_save_first_dump - save a CMDQ first error dump to file
  */
 	int32_t cmdq_core_save_first_dump(const char *string, ...);
+
+	const char *cmdq_core_query_first_err_mod(void);
 /**
  * cmdq_core_save_hex_first_dump - save a CMDQ first error hex dump to file
  * @prefix_str: string to prefix each line with;

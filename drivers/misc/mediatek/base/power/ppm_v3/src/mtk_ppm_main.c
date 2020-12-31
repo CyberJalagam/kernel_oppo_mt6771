@@ -557,7 +557,12 @@ static void ppm_main_log_print(unsigned int policy_mask, unsigned int min_power_
 	}
 
 	if (!filter_log)
+		#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+		/*xing.xiong@BSP.Kernel.Debug, 2018/12/26, Modify for limiting kernel log*/
 		ppm_info("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
+		#else
+		ppm_ver("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
+		#endif
 	else
 		ppm_ver("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
 

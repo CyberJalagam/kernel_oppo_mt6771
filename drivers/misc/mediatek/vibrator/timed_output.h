@@ -46,5 +46,8 @@ struct timed_output_dev {
 
 extern int timed_output_dev_register(struct timed_output_dev *dev);
 extern void timed_output_dev_unregister(struct timed_output_dev *dev);
-
+#ifdef VENDOR_EDIT
+/*Fei.Mo@EXP.BSP.Sensor, 2017/06/13, Add for solve vibrator noise in gsensor*/
+extern void register_vibrator_notify(void (*notify)(int));
+#endif /* VENDOR_EDIT */
 #endif

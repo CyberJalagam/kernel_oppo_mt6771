@@ -238,7 +238,10 @@ int reg_loading_tracking_sp(void (*fn)(int loading), unsigned long polling_ms,
 	queue_delayed_work(ps_lk_wq, &new_work->s_work,
 		msecs_to_jiffies(new_user->polling_ms));
 
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 	pr_debug(TAG"%s %s success\n", __func__, caller);
+#endif
 
 	goto reg_loading_tracking_out;
 
@@ -274,7 +277,11 @@ int unreg_loading_tracking_sp(void (*fn)(int loading), const char *caller)
 	}
 
 	free_lt_user(ltiter);
+	
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+	/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 	pr_debug(TAG"%s %s success\n", __func__, caller);
+#endif
 
 unreg_loading_tracking_out:
 	lt_unlock(__func__);

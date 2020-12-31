@@ -356,6 +356,15 @@ mt_cpufreq_thermal_protect(unsigned int limited_power)
 #endif
 #endif
 
+int __attribute__((weak))
+mtk_eara_thermal_pb_handle(int total_pwr_budget,
+	int max_cpu_power, int max_gpu_power,
+	int max_vpu_power,  int max_mdla_power)
+{
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	return 0;
+}
+
 bool __attribute__((weak))
 mtk_get_gpu_loading(unsigned int *pLoading)
 {
@@ -956,6 +965,45 @@ static int adjust_gpu_power(int power)
 #endif
 #endif
 
+/*
+ *Pass ATM total power budget to EARA for C/G/... allocation
+ *ATM follow up if ERAR bypass
+ */
+static int EARA_handled(int total_power)
+{
+#if defined(EARA_THERMAL_SUPPORT)
+	int ret;
+	int total_power_eara;
+
+#if defined(CATM_TPCB_EXTEND)
+	if (!g_turbo_bin)
+		return 0;
+#endif
+
+#if defined(THERMAL_VPU_SUPPORT) && defined(THERMAL_MDLA_SUPPORT)
+	if (total_power == 0)
+		total_power_eara = 0;
+	else if (is_cpu_power_unlimit())
+		total_power_eara = total_power +
+			MAXIMUM_VPU_POWER + MAXIMUM_MDLA_POWER;
+	else
+		total_power_eara = total_power +
+			MINIMUM_VPU_POWER + MINIMUM_MDLA_POWER;
+	ret = mtk_eara_thermal_pb_handle(total_power_eara,
+		MAXIMUM_CPU_POWER, MAXIMUM_GPU_POWER,
+		MAXIMUM_VPU_POWER, MAXIMUM_MDLA_POWER);
+#else
+	total_power_eara = total_power;
+	ret = mtk_eara_thermal_pb_handle(total_power_eara,
+		MAXIMUM_CPU_POWER, MAXIMUM_GPU_POWER, -1, -1);
+#endif
+		return ret;
+
+#else
+		return 0;
+#endif
+}
+
 static int P_adaptive(int total_power, unsigned int gpu_loading)
 {
 	/*
@@ -979,7 +1027,7 @@ static int P_adaptive(int total_power, unsigned int gpu_loading)
 #endif
 	g_total_power = total_power;
 
-	if (total_power == 0) {
+	if (EARA_handled(total_power) || (total_power == 0)) {
 		cpu_power = gpu_power = 0;
 #if defined(THERMAL_VPU_SUPPORT)
 		vpu_power = 0;
@@ -1066,12 +1114,7 @@ static int P_adaptive(int total_power, unsigned int gpu_loading)
 
 #if defined(DDR_STRESS_WORKAROUND)
 	if (tscpu_g_curr_temp > 70000) {
-#if defined(CATM_TPCB_EXTEND)
-		if ((mt_ppm_thermal_get_cur_power() >= mt_ppm_thermal_get_max_power()) ||
-			(g_turbo_bin && (mt_ppm_thermal_get_cur_power() >= mt_ppm_thermal_get_power_big_max_opp(1))))
-#else
 		if (mt_ppm_thermal_get_cur_power() >= mt_ppm_thermal_get_max_power())
-#endif
 			opp0_cool = 1;
 	} else if (tscpu_g_curr_temp < 65000)
 		opp0_cool = 0;
@@ -1079,17 +1122,10 @@ static int P_adaptive(int total_power, unsigned int gpu_loading)
 #if defined(CATM_TPCB_EXTEND)
 	if ((g_turbo_bin) && (STEADY_TARGET_TPCB >= 58000))
 		opp0_cool = 0;
+#endif
 
-	if (g_turbo_bin && (opp0_cool)) {
-		if (cpu_power > mt_ppm_thermal_get_power_big_max_opp(1))
-			cpu_power = mt_ppm_thermal_get_power_big_max_opp(1) - 5;
-	} else if (opp0_cool)
-		cpu_power -= 5;
-
-#else
 	if (opp0_cool)
 		cpu_power -= 5;
-#endif
 #endif
 
 #if defined(THERMAL_VPU_SUPPORT)

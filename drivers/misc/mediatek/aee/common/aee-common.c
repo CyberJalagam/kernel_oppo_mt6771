@@ -234,6 +234,7 @@ EXPORT_SYMBOL(aee_kernel_reminding_api);
 void aed_md_exception_api(const int *log, int log_size, const int *phy, int phy_size,
 			  const char *detail, const int db_opt)
 {
+
 #ifdef CONFIG_MTK_AEE_AED
 	pr_debug("%s\n", __func__);
 	if (g_aee_api) {
@@ -246,6 +247,7 @@ void aed_md_exception_api(const int *log, int log_size, const int *phy, int phy_
 	} else {
 		pr_debug("g_aee_api is null\n");
 	}
+
 	pr_debug("%s out\n", __func__);
 #endif
 }
@@ -396,3 +398,4 @@ static void __exit aee_common_exit(void)
 
 module_init(aee_common_init);
 module_exit(aee_common_exit);
+

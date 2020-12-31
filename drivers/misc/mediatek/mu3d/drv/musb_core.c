@@ -1949,6 +1949,121 @@ musb_srp_store(struct device *dev, struct device_attribute *attr, const char *bu
 
 	return n;
 }
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@@Prd6.BaseDrv.USB.Basic, 2017/07/28, Add for otg */
+extern bool is_switch_done(void);
+extern void mtk_xhci_eint_iddig_gpio_mode(void);
+extern int iddig_gpio_mode(int mode);
+
+static bool start_id_polling= false;
+static bool id_polling_state = false;
+void somc_chg_usbid_start_polling_delay_work(struct work_struct *work)
+{
+	struct musb *usb_id;
+	usb_id =_mu3d_musb;
+	spin_lock(&usb_id->change_irq_lock);
+	iddig_gpio_mode(0);
+	id_polling_state = true;
+    spin_unlock(&usb_id->change_irq_lock);
+
+}
+
+void somc_chg_usbid_stop_polling_delay_work(struct work_struct *work)
+{
+	struct musb *usb_id;
+	usb_id =_mu3d_musb;
+	spin_lock(&usb_id->change_irq_lock);
+	id_polling_state = false;
+	iddig_gpio_mode(1);
+	spin_unlock(&usb_id->change_irq_lock);
+	//stop_polling_hcd_cleanup();
+}
+
+static void somc_chg_usbid_start_polling(struct musb *usb_id)
+{
+	printk("somc_chg_usbid_start_polling\n");
+	schedule_delayed_work(&usb_id->start_polling_delay, 0);
+}
+
+static void somc_chg_usbid_stop_polling(struct musb *usb_id)
+{
+	printk("somc_chg_usbid_stop_polling\n");
+	cancel_delayed_work_sync(&usb_id->stop_polling_delay);
+	schedule_delayed_work(&usb_id->stop_polling_delay, 0);
+}
+
+static int set_start_id_polling(void)
+{
+	int ret = 1;
+	struct musb *usb_id;
+	usb_id =_mu3d_musb;
+    if(start_id_polling) {
+		usb_id->user_request_polling = true;
+		somc_chg_usbid_start_polling(usb_id);
+	} else {
+		usb_id->user_request_polling = false;
+		somc_chg_usbid_stop_polling(usb_id);
+	}
+
+	return ret;
+}
+
+void oppo_set_otg_switch_status(bool value)
+{
+	start_id_polling = value;
+	printk("start_id_polling_store_start_id_polling =%d\n", start_id_polling);
+	set_start_id_polling();
+}
+EXPORT_SYMBOL(oppo_set_otg_switch_status);
+
+static ssize_t start_id_polling_show(struct device* dev, struct device_attribute *attr, char *buf)
+{
+	if (!dev) {
+	    return 0;
+	}
+	return sprintf(buf, "%d\n", start_id_polling);
+}
+
+static ssize_t start_id_polling_store(struct device* dev, struct device_attribute *attr,
+                const char *buf, size_t count)
+{
+	int value;
+	printk("start_id_polling_store\n");
+	if (!dev) {
+		return count;
+	} else {
+		sscanf(buf, "%d", &value);
+		start_id_polling = value;
+		printk("start_id_polling_store_start_id_polling =%d\n",start_id_polling);
+		set_start_id_polling();
+	}
+	return count;
+}
+
+static ssize_t musb_id_state_show(struct device* dev, struct device_attribute *attr, char *buf)
+{
+	if (!dev) {
+		return 0;
+	}
+	return sprintf(buf, "%d\n", id_polling_state);
+}
+
+static ssize_t musb_id_state_store(struct device* dev, struct device_attribute *attr,
+                const char *buf, size_t count)
+{
+	int value;
+
+	if (!dev) {
+		return count;
+	} else {
+		sscanf(buf, "%d", &value);
+		id_polling_state = value;
+	}
+	return count;
+}
+DEVICE_ATTR(idpolling, 0664, start_id_polling_show, start_id_polling_store);
+DEVICE_ATTR(idstate, 0664, musb_id_state_show, musb_id_state_store);
+#endif /* VENDOR_EDIT */
 
 static DEVICE_ATTR(srp, 0644, NULL, musb_srp_store);
 DEVICE_ATTR(cmode, 0664, musb_cmode_show, musb_cmode_store);
@@ -1971,6 +2086,11 @@ static struct attribute *musb_attributes[] = {
 	&dev_attr_srp.attr,
 	&dev_attr_cmode.attr,
 	&dev_attr_saving.attr,
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@@Prd6.BaseDrv.USB.Basic, 2017/07/25, Add for charger */
+	&dev_attr_idpolling.attr,
+	&dev_attr_idstate.attr,
+	#endif /* VENDOR_EDIT */
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	&dev_attr_portmode.attr,
 	&dev_attr_tx.attr,
@@ -2233,6 +2353,16 @@ static int __init musb_init_controller(struct device *dev, int nIrq, void __iome
 	musb->usb_mode = CABLE_MODE_NORMAL;
 
 	_mu3d_musb = musb;
+
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@@Prd6.BaseDrv.USB.Basic, 2017/07/28, Add for otg */
+	_mu3d_musb->user_request_polling = false;
+	spin_lock_init(&_mu3d_musb->change_irq_lock);
+	INIT_DELAYED_WORK(&_mu3d_musb->start_polling_delay,
+				somc_chg_usbid_start_polling_delay_work);
+	INIT_DELAYED_WORK(&_mu3d_musb->stop_polling_delay,
+				somc_chg_usbid_stop_polling_delay_work);
+	#endif /* VENDOR_EDIT */
 
 	wake_lock_init(&musb->usb_wakelock, WAKE_LOCK_SUSPEND, "USB.lock");
 

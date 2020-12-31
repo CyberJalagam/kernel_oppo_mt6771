@@ -156,6 +156,9 @@ static irqreturn_t spm_irq0_handler(int irq, void *dev_id)
 	u32 isr;
 	unsigned long flags;
 	struct twam_sig twamsig;
+#if defined(CONFIG_MACH_MT6771)
+	u32 cnt;
+#endif
 
 	spin_lock_irqsave(&__spm_lock, flags);
 	/* get ISR status */
@@ -174,6 +177,13 @@ static irqreturn_t spm_irq0_handler(int irq, void *dev_id)
 
 	if (isr & (ISRS_SW_INT1)) {
 		spm_err("IRQ0 (ISRS_SW_INT1) HANDLER SHOULD NOT BE EXECUTED (0x%x)\n", isr);
+#if defined(CONFIG_MACH_MT6771)
+		cnt = spm_read(SPM_SW_RSV_3);
+		if (cnt < 0xFFFFFFFF)
+			cnt++;
+		spm_write(SPM_SW_RSV_3, cnt);
+#endif
+
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
 		spm_vcorefs_dump_dvfs_regs(NULL);
 #endif

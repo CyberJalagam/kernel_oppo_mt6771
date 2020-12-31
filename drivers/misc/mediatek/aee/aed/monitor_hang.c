@@ -1659,14 +1659,6 @@ static int hang_detect_thread(void *arg)
 
 				if (Hang_Detect_first == true) {
 					pr_err("[Hang_Detect] aee mode is %d, we should triger KE...\n", aee_mode);
-#ifdef CONFIG_MTK_RAM_CONSOLE
-					if (watchdog_thread_exist == false && reboot_flag == false)
-						aee_rr_rec_hang_detect_timeout_count(COUNT_ANDROID_REBOOT);
-#endif
-#ifdef CONFIG_MTK_ENG_BUILD
-					if (monit_hang_flag == 1) {
-				/* eng load can detect whether KE*/
-#endif
 					/* BUG(); */
 					/* show_kaslr(); */
 					aee_rr_rec_exp_type(5);

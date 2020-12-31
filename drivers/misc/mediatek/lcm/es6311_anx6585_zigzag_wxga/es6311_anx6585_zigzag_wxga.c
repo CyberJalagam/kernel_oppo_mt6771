@@ -656,15 +656,13 @@ static void lcm_initial_registers(void)
 	data_array[1] = 0x000000E7;
 	dsi_set_cmdq(data_array, 2, 1);
 
-#if 0
 	data_array[0] = 0x00110500;
 	dsi_set_cmdq(data_array, 1, 1);
 	MDELAY(120);
 
 	data_array[0] = 0x00290500;
 	dsi_set_cmdq(data_array, 1, 1);
-	MDELAY(10);
-#endif
+	MDELAY(120);
 
 	data_array[0] = 0x00023902;
 	data_array[1] = 0x00000035;
@@ -677,11 +675,11 @@ static void lcm_initial_registers(void)
 
 	data_array[0] = 0x00110500;
 	dsi_set_cmdq(data_array, 1, 1);
-	MDELAY(120);
+	MDELAY(200);
 
 	data_array[0] = 0x00290500;
 	dsi_set_cmdq(data_array, 1, 1);
-	MDELAY(10);
+	MDELAY(100);
 }
 
 
@@ -707,6 +705,7 @@ static void lcm_resume_power(void)
 	pr_debug("[Kernel/LCM] lcm_resume_power() enter\n");
 
 	lcm_set_gpio_output(GPIO_LCD_PWR_EN, 1);
+	MDELAY(20);
 }
 
 /* --------------------------------------------------------------------------- */
@@ -773,26 +772,22 @@ void lcm_resume(void)
 
 	lcm_set_gpio_output(GPIO_LCD_RST_EN, 0);
 	lcm_set_gpio_output(GPIO_LCD_PWR_EN, 0);
-	MDELAY(1);
+	MDELAY(90);
 
 	lcm_set_gpio_output(GPIO_LCD_PWR_EN, 1);
-	MDELAY(2);
+	MDELAY(30);
 
 	lcm_set_gpio_output(GPIO_LCD_RST_EN, 1);
-	MDELAY(5);
+	MDELAY(10);
 
 	lcm_set_gpio_output(GPIO_LCD_RST_EN, 0);
-	MDELAY(5);
+	MDELAY(10);
 
 	lcm_set_gpio_output(GPIO_LCD_RST_EN, 1);
-	MDELAY(5);
+	MDELAY(130);
 
 	lcm_initial_registers();
-}
-
-static unsigned int lcm_ata_check(unsigned char *buffer)
-{
-	return 1;
+	MDELAY(400);
 }
 
 #if (LCM_DSI_CMD_MODE)
@@ -842,7 +837,6 @@ LCM_DRIVER es6311_anx6585_zigzag_wxga_lcm_drv = {
 	.init_power = lcm_init_power,
 	.resume_power = lcm_resume_power,
 	.suspend_power = lcm_suspend_power,
-	.ata_check = lcm_ata_check,
 #if (LCM_DSI_CMD_MODE)
 	.update = lcm_update,
 #endif

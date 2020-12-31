@@ -316,7 +316,13 @@ static int mtk_memcfg_memory_layout_open(struct inode *inode, struct file *file)
 
 /* end of kenerl memory information */
 
-#ifdef CONFIG_MTK_ENG_BUILD
+//#ifdef VENDOR_EDIT
+//Wen.Luo@BSP.Kernel.Stability, 2018/11/28, Enable slabtrace for ageing test
+//#ifdef CONFIG_OPPO_SPECIAL_BUILD
+#ifdef CONFIG_SLUB_DEBUG
+//#else
+//#ifdef CONFIG_MTK_ENG_BUILD
+//#endif
 /* memblock reserve information */
 static int mtk_memcfg_memblock_reserved_show(struct seq_file *m, void *v)
 {
@@ -668,7 +674,13 @@ static const struct file_operations mtk_memcfg_memory_layout_operations = {
 	.release = single_release,
 };
 
-#ifdef CONFIG_MTK_ENG_BUILD
+//#ifdef VENDOR_EDIT
+//Wen.Luo@BSP.Kernel.Stability, 2018/11/28, Enable slabtrace for ageing test
+//#ifdef CONFIG_OPPO_SPECIAL_BUILD
+#ifdef CONFIG_SLUB_DEBUG
+//#else
+//#ifdef CONFIG_MTK_ENG_BUILD
+//#endif
 static const struct file_operations mtk_memcfg_memblock_reserved_operations = {
 	.open = mtk_memcfg_memblock_reserved_open,
 	.read = seq_read,
@@ -720,7 +732,13 @@ static int __init mtk_memcfg_late_init(void)
 		if (!entry)
 			pr_err("create memory_layout proc entry failed\n");
 
-#ifdef CONFIG_MTK_ENG_BUILD
+//#ifdef VENDOR_EDIT
+//Wen.Luo@BSP.Kernel.Stability, 2018/11/28, Enable slabtrace for ageing test
+//#ifdef CONFIG_OPPO_SPECIAL_BUILD
+#ifdef CONFIG_SLUB_DEBUG
+//#else
+//#ifdef CONFIG_MTK_ENG_BUILD
+//#endif
 		/* memblock reserved */
 		entry = proc_create("memblock_reserved", S_IRUGO | S_IWUSR,
 				mtk_memcfg_dir,

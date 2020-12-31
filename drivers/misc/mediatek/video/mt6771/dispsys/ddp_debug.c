@@ -270,11 +270,31 @@ static void process_dbg_opt(const char *opt)
 			snprintf(buf, 50, "error to parse cmd %s\n", opt);
 			return;
 		}
-		ddp_init_met_tag(met_on, rdma0_mode, rdma1_mode);
+		ddp_init_met_tag(met_on, 0, rdma0_mode, rdma1_mode);
 		DDPMSG("process_dbg_opt, met_on=%d,rdma0_mode %d, rdma1 %d\n", met_on, rdma0_mode,
 		       rdma1_mode);
 		sprintf(buf, "met_on:%d,rdma0_mode:%d,rdma1_mode:%d\n", met_on, rdma0_mode,
 			rdma1_mode);
+
+	} else if (strncmp(opt, "systrace_met_on:", 15) == 0) {
+		int systrace_met_on;
+		int met_on;
+		int rdma0_mode = 0, rdma1_mode = 0;
+
+		ret = sscanf(opt, "systrace_met_on:%d\n", &systrace_met_on);
+		if (ret != 1) {
+			snprintf(buf, 50, "error to parse cmd %s\n", opt);
+			return;
+		}
+
+		if (systrace_met_on) {
+			met_on = 1;
+			ddp_init_met_tag(met_on, systrace_met_on, rdma0_mode, rdma1_mode);
+		} else {
+			met_on = 0;
+			ddp_init_met_tag(met_on, systrace_met_on, rdma0_mode, rdma1_mode);
+		}
+
 	} else if (strncmp(opt, "backlight:", 10) == 0) {
 		char *p = (char *)opt + 10;
 		unsigned int level;

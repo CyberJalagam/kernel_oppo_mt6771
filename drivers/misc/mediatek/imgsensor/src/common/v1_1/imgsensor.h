@@ -75,5 +75,13 @@ imgsensor_sensor_control(
 		struct IMGSENSOR_SENSOR *psensor,
 		MSDK_SCENARIO_ID_ENUM ScenarioId);
 
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config[];
+#ifdef VENDOR_EDIT
+/*Yijun.Tan@Camera.Driver  add for 17197  board 20180101*/
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_17197[];
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_18531[];
+/*Xiaoyang.Huang@RM.Camera add for 18611 board,20190304*/
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_18611[];
+#endif
 #endif
 

@@ -105,7 +105,6 @@ static void __init check_and_fix_base(struct reserved_mem *rmem, phys_addr_t tot
 }
 #endif
 
-#ifdef CONFIG_MTK_MEMORY_LOWPOWER
 static bool __init zmc_is_the_last(struct reserved_mem *rmem)
 {
 	phys_addr_t phys_end = memblock_end_of_DRAM();
@@ -118,7 +117,6 @@ static bool __init zmc_is_the_last(struct reserved_mem *rmem)
 
 	return false;
 }
-#endif
 
 static int __init zmc_memory_init(struct reserved_mem *rmem)
 {
@@ -154,14 +152,12 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 		return -1;
 	}
 
-#ifdef CONFIG_MTK_MEMORY_LOWPOWER
 	if (!zmc_is_the_last(rmem)) {
 		pr_info("[Fail] ZMC is not the last\n");
 		memblock_free(rmem->base, rmem->size);
 		memblock_add(rmem->base, rmem->size);
 		return -1;
 	}
-#endif
 
 	check_and_fix_base(rmem, total_phys_size);
 

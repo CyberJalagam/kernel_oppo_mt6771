@@ -20,6 +20,15 @@
 #include "imgsensor_sensor.h"
 #include "imgsensor_hw.h"
 
+#ifndef VENDOR_EDIT
+#define VENDOR_EDIT
+#endif
+
+#ifdef VENDOR_EDIT
+/*Yijun.Tan@Camera.Driver  add for 17197  board 20180101*/
+#include<soc/oppo/oppo_project.h>
+#endif
+
 char *imgsensor_sensor_idx_name[IMGSENSOR_SENSOR_IDX_MAX_NUM] = {
 	IMGSENSOR_SENSOR_IDX_NAME_MAIN,
 	IMGSENSOR_SENSOR_IDX_NAME_SUB,
@@ -43,10 +52,14 @@ enum IMGSENSOR_RETURN imgsensor_hw_init(struct IMGSENSOR_HW *phw)
 			(phw->pdev[i]->init) (phw->pdev[i]->pinstance, &phw->common);
 	}
 
+	PK_DBG("imgsensor_hw_init\n");
+
 	for (i = 0; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++) {
 		psensor_pwr = &phw->sensor_pwr[i];
 
 		pcust_pwr_cfg = imgsensor_hw_get_cfg((enum IMGSENSOR_SENSOR_IDX)i);
+		while (pcust_pwr_cfg->sensor_idx != i)
+			pcust_pwr_cfg++;
 
 		if (pcust_pwr_cfg == NULL)
 			continue;
@@ -114,7 +127,7 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 
 				if (__ratelimit(&ratelimit))
 					PK_DBG
-					("sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_on %d",
+					("sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_on %d\n",
 					sensor_idx, ppwr_info->pin, ppwr_info->pin_state_on);
 
 				if (pdev->set != NULL)
@@ -137,7 +150,7 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 
 			if (__ratelimit(&ratelimit))
 				PK_DBG
-				("sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_off %d",
+				("sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_off %d\n",
 				sensor_idx, ppwr_info->pin, ppwr_info->pin_state_off);
 
 			if (ppwr_info->pin != IMGSENSOR_HW_PIN_UNDEF) {
@@ -238,7 +251,34 @@ enum IMGSENSOR_RETURN imgsensor_hw_dump(struct IMGSENSOR_HW *phw)
 
 struct IMGSENSOR_HW_CFG *imgsensor_hw_get_cfg(enum IMGSENSOR_SENSOR_IDX sensor_idx)
 {
-	struct IMGSENSOR_HW_CFG *pcust_cfg = imgsensor_custom_config;
+	struct IMGSENSOR_HW_CFG *pcust_cfg;
+	#ifdef VENDOR_EDIT
+		/*Yijun.Tan@Camera.Driver  add for 17197 & 18531  board 20181009*/
+		if (is_project(OPPO_17197)) {
+			PK_DBG("17197: imgsensor_set_driver_17197\n");
+			pcust_cfg = imgsensor_custom_config_for_17197;
+		} else if (is_project(OPPO_18531)) {
+			PK_DBG("18531: imgsensor_set_driver_18531\n");
+			pcust_cfg = imgsensor_custom_config_for_18531;
+		} else if (is_project(OPPO_18561)) {
+			PK_DBG("18561: imgsensor_set_driver_18561\n");
+			pcust_cfg = imgsensor_custom_config_for_18531;
+		} else if (is_project(OPPO_18161)) {
+			PK_DBG("18161: imgsensor_set_driver_18161\n");
+			pcust_cfg = imgsensor_custom_config_for_18531;
+		/*Xiaoyang.Huang@RM.Camera add for 18611,20190304*/
+		} else if (is_project(OPPO_18611)) {
+			PK_DBG("18161: imgsensor_set_driver_18611\n");
+			pcust_cfg = imgsensor_custom_config_for_18611;
+		} else {
+			PK_DBG("normal: imgsensor_set_driver_normal\n");
+			pcust_cfg = imgsensor_custom_config;
+
+		}
+	#else
+		pcust_cfg = imgsensor_custom_config;
+	#endif
+
 
 	while (pcust_cfg->sensor_idx != sensor_idx && pcust_cfg->sensor_idx != IMGSENSOR_SENSOR_IDX_NONE)
 		pcust_cfg++;

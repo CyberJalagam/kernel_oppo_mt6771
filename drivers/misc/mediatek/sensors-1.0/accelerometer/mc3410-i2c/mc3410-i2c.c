@@ -444,6 +444,7 @@ static void initKernelEnv(void)
 {
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
+	GSE_LOG("initKernelEnv\n");
 }
 
 /*****************************************
@@ -489,7 +490,9 @@ static int mcube_write_log_data(struct i2c_client *client, u8 data[0x3f])
 	mdelay(50);
 
 	err = writeFile(fd_file, _pszBuffer, n);
-	if (err <= 0)
+	if (err > 0)
+		GSE_LOG("buf:%s\n", _pszBuffer);
+	else
 		GSE_LOG("write file error %d\n", err);
 
 	kfree(_pszBuffer);
@@ -505,6 +508,8 @@ static int mcube_write_log_data(struct i2c_client *client, u8 data[0x3f])
  *****************************************/
 static int MC3XXX_ValidateSensorIC(unsigned char *pbPCode, unsigned char *pbHwID)
 {
+	GSE_LOG("[%s] *pbPCode: 0x%02X, *pbHwID: 0x%02X\n", __func__, *pbPCode, *pbHwID);
+
 	if ((*pbHwID == 0x01) || (*pbHwID == 0x03)
 		|| ((*pbHwID >= 0x04) && (*pbHwID <= 0x0F))) {
 		if ((*pbPCode == MC3XXX_PCODE_3210) || (*pbPCode == MC3XXX_PCODE_3230)
@@ -548,6 +553,8 @@ static int MC3XXX_Read_Reg_Map(struct i2c_client *p_i2c_client, u8 *pbUserBuf)
 	u8	 _baData[MC3XXX_REGMAP_LENGTH] = { 0 };
 	int	_nIndex = 0;
 
+	GSE_LOG("[%s]\n", __func__);
+
 	if (p_i2c_client == NULL)
 		return (-EINVAL);
 
@@ -556,6 +563,8 @@ static int MC3XXX_Read_Reg_Map(struct i2c_client *p_i2c_client, u8 *pbUserBuf)
 
 		if (pbUserBuf != NULL)
 			pbUserBuf[_nIndex] = _baData[_nIndex];
+
+		GSE_LOG("[Gsensor] REG[0x%02X] = 0x%02X\n", _nIndex, _baData[_nIndex]);
 	}
 
 	mcube_write_log_data(p_i2c_client, _baData);
@@ -568,8 +577,14 @@ static int MC3XXX_Read_Reg_Map(struct i2c_client *p_i2c_client, u8 *pbUserBuf)
  *****************************************/
 static void MC3XXX_SaveDefaultOffset(struct i2c_client *p_i2c_client)
 {
+	GSE_LOG("[%s]\n", __func__);
+
 	MC3XXX_i2c_read_block(p_i2c_client, 0x21, &s_baOTP_OffsetData[0], 3);
 	MC3XXX_i2c_read_block(p_i2c_client, 0x24, &s_baOTP_OffsetData[3], 3);
+
+	GSE_LOG("s_baOTP_OffsetData: 0x%02X - 0x%02X - 0x%02X - 0x%02X - 0x%02X - 0x%02X\n",
+		s_baOTP_OffsetData[0], s_baOTP_OffsetData[1], s_baOTP_OffsetData[2],
+		s_baOTP_OffsetData[3], s_baOTP_OffsetData[4], s_baOTP_OffsetData[5]);
 }
 
 /*****************************************
@@ -589,6 +604,16 @@ static void MC3XXX_LPF(struct mc3xxx_i2c_data *priv, s16 data[MC3XXX_AXES_NUM])
 				priv->fir.sum[MC3XXX_AXIS_X] += data[MC3XXX_AXIS_X];
 				priv->fir.sum[MC3XXX_AXIS_Y] += data[MC3XXX_AXIS_Y];
 				priv->fir.sum[MC3XXX_AXIS_Z] += data[MC3XXX_AXIS_Z];
+
+				if (atomic_read(&priv->trace) & MCUBE_TRC_FILTER) {
+					GSE_LOG("add [%2d] [%5d %5d %5d] => [%5d %5d %5d]\n", priv->fir.num,
+						priv->fir.raw[priv->fir.num][MC3XXX_AXIS_X],
+						priv->fir.raw[priv->fir.num][MC3XXX_AXIS_Y],
+						priv->fir.raw[priv->fir.num][MC3XXX_AXIS_Z],
+						priv->fir.sum[MC3XXX_AXIS_X],
+						priv->fir.sum[MC3XXX_AXIS_Y], priv->fir.sum[MC3XXX_AXIS_Z]);
+				}
+
 				priv->fir.num++;
 				priv->fir.idx++;
 			} else {
@@ -606,6 +631,14 @@ static void MC3XXX_LPF(struct mc3xxx_i2c_data *priv, s16 data[MC3XXX_AXES_NUM])
 				data[MC3XXX_AXIS_X] = priv->fir.sum[MC3XXX_AXIS_X]/firlen;
 				data[MC3XXX_AXIS_Y] = priv->fir.sum[MC3XXX_AXIS_Y]/firlen;
 				data[MC3XXX_AXIS_Z] = priv->fir.sum[MC3XXX_AXIS_Z]/firlen;
+
+				if (atomic_read(&priv->trace) & MCUBE_TRC_FILTER) {
+					GSE_LOG("add [%2d] [%5d %5d %5d] => [%5d %5d %5d] : [%5d %5d %5d]\n", idx,
+					priv->fir.raw[idx][MC3XXX_AXIS_X], priv->fir.raw[idx][MC3XXX_AXIS_Y],
+					priv->fir.raw[idx][MC3XXX_AXIS_Z], priv->fir.sum[MC3XXX_AXIS_X],
+					priv->fir.sum[MC3XXX_AXIS_Y], priv->fir.sum[MC3XXX_AXIS_Z],
+					data[MC3XXX_AXIS_X], data[MC3XXX_AXIS_Y], data[MC3XXX_AXIS_Z]);
+				}
 			}
 		}
 	}
@@ -673,6 +706,10 @@ static void _MC3XXX_LowResFilter(s16 nAxis, s16 naData[MC3XXX_AXES_NUM])
 	s_taLRF_CB[nAxis].nIsNewRound = 1;
 
 _LRF_RETURN:
+
+	GSE_LOG(">>>>> [_MC3XXX_LowResFilter][%d] _nCurrDiff: %4d _nSumDiff: %4d _nCurrData:%4d	 Rep:%4d\n",
+		nAxis, _nCurrDiff, _nSumDiff, _nCurrData, s_taLRF_CB[nAxis].nRepValue);
+
 	s_taLRF_CB[nAxis].nPreValue = _nCurrData;
 
 	#undef _LRF_DIFF_COUNT_POS
@@ -688,12 +725,19 @@ _LRF_RETURN:
  *****************************************/
 static void	_MC3XXX_ReadData_RBM2RAW(s16 waData[MC3XXX_AXES_NUM])
 {
+	struct mc3xxx_i2c_data   *_pt_i2c_obj = mc3xxx_obj_i2c_data;
+
 	waData[MC3XXX_AXIS_X] = (waData[MC3XXX_AXIS_X] + offset_data[MC3XXX_AXIS_X] / 2)
 		* 1024 / gain_data[MC3XXX_AXIS_X] + 8096;
 	waData[MC3XXX_AXIS_Y] = (waData[MC3XXX_AXIS_Y] + offset_data[MC3XXX_AXIS_Y] / 2)
 		* 1024 / gain_data[MC3XXX_AXIS_Y] + 8096;
 	waData[MC3XXX_AXIS_Z] = (waData[MC3XXX_AXIS_Z] + offset_data[MC3XXX_AXIS_Z] / 2)
 		* 1024 / gain_data[MC3XXX_AXIS_Z] + 8096;
+
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("RBM->RAW <<<<<[%08d %08d %08d]\n", waData[MC3XXX_AXIS_X],
+			waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
+
 
 	iAReal0_X			 = (0x0010 * waData[MC3XXX_AXIS_X]);
 	iAcc1Lpf0_X		   = GetLowPassFilter(iAReal0_X, iAcc1Lpf1_X);
@@ -709,9 +753,16 @@ static void	_MC3XXX_ReadData_RBM2RAW(s16 waData[MC3XXX_AXES_NUM])
 	iAcc1Lpf0_Z		   = GetLowPassFilter(iAReal0_Z, iAcc1Lpf1_Z);
 	iAcc0Lpf0_Z		   = GetLowPassFilter(iAcc1Lpf0_Z, iAcc0Lpf1_Z);
 	waData[MC3XXX_AXIS_Z] = (iAcc0Lpf0_Z / 0x0010);
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("RBM->RAW->LPF <<<<<[%08d %08d %08d]\n", waData[MC3XXX_AXIS_X],
+			waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
+
 	waData[MC3XXX_AXIS_X] = (waData[MC3XXX_AXIS_X] - 8096) * gsensor_gain.x / 1024;
 	waData[MC3XXX_AXIS_Y] = (waData[MC3XXX_AXIS_Y] - 8096) * gsensor_gain.y / 1024;
 	waData[MC3XXX_AXIS_Z] = (waData[MC3XXX_AXIS_Z] - 8096) * gsensor_gain.z / 1024;
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("RBM->RAW->LPF->RAW <<<<<[%08d %08d %08d]\n", waData[MC3XXX_AXIS_X],
+			waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
 
 	iAcc0Lpf1_X = iAcc0Lpf0_X;
 	iAcc1Lpf1_X = iAcc1Lpf0_X;
@@ -738,6 +789,8 @@ static int	MC3XXX_ReadData(struct i2c_client *pt_i2c_client, s16 waData[MC3XXX_A
 		return MC3XXX_RETCODE_ERROR_NULL_POINTER;
 	}
 	_pt_i2c_obj = ((struct mc3xxx_i2c_data *) i2c_get_clientdata(pt_i2c_client));
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("[%s] s_nIsRBM_Enabled: %d\n", __func__, s_nIsRBM_Enabled);
 
 	if (!s_nIsRBM_Enabled) {
 		if (s_bResolution == MC3XXX_RESOLUTION_LOW) {
@@ -751,6 +804,10 @@ static int	MC3XXX_ReadData(struct i2c_client *pt_i2c_client, s16 waData[MC3XXX_A
 			waData[MC3XXX_AXIS_X] = ((s8) _baData[0]);
 			waData[MC3XXX_AXIS_Y] = ((s8) _baData[1]);
 			waData[MC3XXX_AXIS_Z] = ((s8) _baData[2]);
+
+			if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+				GSE_LOG("[%s][low] X: %d, Y: %d, Z: %d\n",
+					__func__, waData[MC3XXX_AXIS_X], waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
 
 		#ifdef _MC3XXX_SUPPORT_LRF_
 			_MC3XXX_LowResFilter(MC3XXX_AXIS_X, waData);
@@ -768,12 +825,23 @@ static int	MC3XXX_ReadData(struct i2c_client *pt_i2c_client, s16 waData[MC3XXX_A
 			waData[MC3XXX_AXIS_X] = ((signed short) ((_baData[0]) | (_baData[1]<<8)));
 			waData[MC3XXX_AXIS_Y] = ((signed short) ((_baData[2]) | (_baData[3]<<8)));
 			waData[MC3XXX_AXIS_Z] = ((signed short) ((_baData[4]) | (_baData[5]<<8)));
+			if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+				GSE_LOG("[%s][high] X: %d, Y: %d, Z: %d\n",
+					__func__, waData[MC3XXX_AXIS_X], waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
+
 		}
+
+		if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+			GSE_LOG("RAW<<<<<[%04d %04d %04d]\n",
+				waData[MC3XXX_AXIS_X], waData[MC3XXX_AXIS_Y], waData[MC3XXX_AXIS_Z]);
 
 	#ifdef _MC3XXX_SUPPORT_LPF_
 		_ptPrivData = i2c_get_clientdata(pt_i2c_client);
 
 		MC3XXX_LPF(_ptPrivData, waData);
+		if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+			GSE_LOG("LPF<<<<<[%04d %04d %04d]\n", waData[MC3XXX_AXIS_X], waData[MC3XXX_AXIS_Y],
+				waData[MC3XXX_AXIS_Z]);
 	#endif
 	} else {
 		if (MC3XXX_i2c_read_block(pt_i2c_client, MC3XXX_REG_XOUT_EX_L, _baData,
@@ -787,6 +855,10 @@ static int	MC3XXX_ReadData(struct i2c_client *pt_i2c_client, s16 waData[MC3XXX_A
 		waData[MC3XXX_AXIS_Y] = ((s16)((_baData[2]) | (_baData[3] << 8)));
 		waData[MC3XXX_AXIS_Z] = ((s16)((_baData[4]) | (_baData[5] << 8)));
 
+		if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+			GSE_LOG("RBM<<<<<[%08d %08d %08d]\n", waData[MC3XXX_AXIS_X], waData[MC3XXX_AXIS_Y],
+				waData[MC3XXX_AXIS_Z]);
+
 		_MC3XXX_ReadData_RBM2RAW(waData);
 	}
 
@@ -794,6 +866,7 @@ static int	MC3XXX_ReadData(struct i2c_client *pt_i2c_client, s16 waData[MC3XXX_A
 		_nTemp = waData[MC3XXX_AXIS_X];
 		waData[MC3XXX_AXIS_X] = waData[MC3XXX_AXIS_Y];
 		waData[MC3XXX_AXIS_Y] = -_nTemp;
+		GSE_LOG("[%s] 3250 read remap\n", __func__);
 	} else {
 		if (s_bMPOL & 0x01)
 			waData[MC3XXX_AXIS_X] = -waData[MC3XXX_AXIS_X];
@@ -885,6 +958,8 @@ static int MC3XXX_WriteCalibration(struct i2c_client *client, int dat[MC3XXX_AXE
 	s32 dwRangePosLimit  = 0x1FFF;
 	s32 dwRangeNegLimit  = -0x2000;
 
+	GSE_LOG("UPDATE dat: (%+3d %+3d %+3d)\n", dat[MC3XXX_AXIS_X], dat[MC3XXX_AXIS_Y], dat[MC3XXX_AXIS_Z]);
+
 	cali[MC3XXX_AXIS_X] = obj->cvt.sign[MC3XXX_AXIS_X]*(dat[obj->cvt.map[MC3XXX_AXIS_X]]);
 	cali[MC3XXX_AXIS_Y] = obj->cvt.sign[MC3XXX_AXIS_Y]*(dat[obj->cvt.map[MC3XXX_AXIS_Y]]);
 	cali[MC3XXX_AXIS_Z] = obj->cvt.sign[MC3XXX_AXIS_Z]*(dat[obj->cvt.map[MC3XXX_AXIS_Z]]);
@@ -893,12 +968,16 @@ static int MC3XXX_WriteCalibration(struct i2c_client *client, int dat[MC3XXX_AXE
 		_nTemp = cali[MC3XXX_AXIS_X];
 		cali[MC3XXX_AXIS_X] = -cali[MC3XXX_AXIS_Y];
 		cali[MC3XXX_AXIS_Y] = _nTemp;
+		GSE_LOG("[%s] 3250 write remap\n", __func__);
 	} else {
 		if (s_bMPOL & 0x01)
 			cali[MC3XXX_AXIS_X] = -cali[MC3XXX_AXIS_X];
 		if (s_bMPOL & 0x02)
 			cali[MC3XXX_AXIS_Y] = -cali[MC3XXX_AXIS_Y];
+		GSE_LOG("[%s] 35X0 remap [s_bMPOL: %d]\n", __func__, s_bMPOL);
 	}
+
+	GSE_LOG("UPDATE dat: (%+3d %+3d %+3d)\n", cali[MC3XXX_AXIS_X], cali[MC3XXX_AXIS_Y], cali[MC3XXX_AXIS_Z]);
 
 	/* read registers 0x21~0x29 */
 	err = MC3XXX_i2c_read_block(client, 0x21, buf, 3);
@@ -1006,6 +1085,10 @@ static int MC3XXX_SetPowerMode(struct i2c_client *client, bool enable)
 	u8 databuf[2] = {0};
 	int res = 0;
 	u8 addr = MC3XXX_REG_MODE_FEATURE;
+	struct mc3xxx_i2c_data *obj = i2c_get_clientdata(client);
+
+	if (enable == mc3xxx_sensor_power)
+		GSE_LOG("Sensor power status should not be set again!!!\n");
 
 	if (MC3XXX_i2c_read_block(client, addr, databuf, 1)) {
 		GSE_PR_ERR("read power ctl register err!\n");
@@ -1028,13 +1111,15 @@ static int MC3XXX_SetPowerMode(struct i2c_client *client, bool enable)
 	if (res < 0) {
 		GSE_LOG("fwq set power mode failed!\n");
 		return MC3XXX_RETCODE_ERROR_I2C;
-	}
+	} else if (atomic_read(&obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("fwq set power mode ok %d!\n", databuf[1]);
 
 	mc3xxx_sensor_power = enable;
 	if (mc3xxx_obj_i2c_data->flush) {
-		if (mc3xxx_sensor_power)
+		if (mc3xxx_sensor_power) {
+			GSE_LOG("remain flush, will call mc3410_flush in setPowerMode\n");
 			mc3410_flush();
-		else
+		} else
 			mc3xxx_obj_i2c_data->flush = false;
 	}
 	return MC3XXX_RETCODE_SUCCESS;
@@ -1090,6 +1175,8 @@ static void MC3XXX_SetResolution(void)
 	default:
 		GSE_PR_ERR("ERR: no resolution assigned!\n");
 	}
+
+	GSE_LOG("[%s] s_bResolution: %d\n", __func__, s_bResolution);
 }
 
 /*****************************************
@@ -1301,6 +1388,11 @@ static int MC3XXX_ReadSensorData(struct i2c_client *pt_i2c_client, char *pbBuf, 
 		return MC3XXX_RETCODE_ERROR_I2C;
 	}
 
+	/* output format: mg */
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("[%s] raw data: %d, %d, %d\n", __func__, _pt_i2c_obj->data[MC3XXX_AXIS_X],
+			_pt_i2c_obj->data[MC3XXX_AXIS_Y], _pt_i2c_obj->data[MC3XXX_AXIS_Z]);
+
 	_naAccelData[(_pt_i2c_obj->cvt.map[MC3XXX_AXIS_X])] = (_pt_i2c_obj->cvt.sign[MC3XXX_AXIS_X]
 		* _pt_i2c_obj->data[MC3XXX_AXIS_X]);
 	_naAccelData[(_pt_i2c_obj->cvt.map[MC3XXX_AXIS_Y])] = (_pt_i2c_obj->cvt.sign[MC3XXX_AXIS_Y]
@@ -1308,9 +1400,17 @@ static int MC3XXX_ReadSensorData(struct i2c_client *pt_i2c_client, char *pbBuf, 
 	_naAccelData[(_pt_i2c_obj->cvt.map[MC3XXX_AXIS_Z])] = (_pt_i2c_obj->cvt.sign[MC3XXX_AXIS_Z]
 		* _pt_i2c_obj->data[MC3XXX_AXIS_Z]);
 
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("[%s] map data: %d, %d, %d!\n", __func__, _naAccelData[MC3XXX_AXIS_X],
+			_naAccelData[MC3XXX_AXIS_Y], _naAccelData[MC3XXX_AXIS_Z]);
+
 	_naAccelData[MC3XXX_AXIS_X] = (_naAccelData[MC3XXX_AXIS_X] * GRAVITY_EARTH_1000 / gsensor_gain.x);
 	_naAccelData[MC3XXX_AXIS_Y] = (_naAccelData[MC3XXX_AXIS_Y] * GRAVITY_EARTH_1000 / gsensor_gain.y);
 	_naAccelData[MC3XXX_AXIS_Z] = (_naAccelData[MC3XXX_AXIS_Z] * GRAVITY_EARTH_1000 / gsensor_gain.z);
+
+	if (atomic_read(&_pt_i2c_obj->trace) & MCUBE_TRC_INFO)
+		GSE_LOG("[%s] accel data: %d, %d, %d!\n", __func__, _naAccelData[MC3XXX_AXIS_X],
+			_naAccelData[MC3XXX_AXIS_Y], _naAccelData[MC3XXX_AXIS_Z]);
 
 	sprintf(pbBuf, "%04x %04x %04x",
 		_naAccelData[MC3XXX_AXIS_X], _naAccelData[MC3XXX_AXIS_Y], _naAccelData[MC3XXX_AXIS_Z]);
@@ -1366,6 +1466,7 @@ static ssize_t show_chipinfo_value(struct device_driver *ddri, char *buf)
 	struct i2c_client *client = mc3xxx_i2c_client;
 	char strbuf[MC3XXX_BUF_SIZE] = {0};
 
+	GSE_LOG("fwq show_chipinfo_value\n");
 	if (client == NULL) {
 		GSE_PR_ERR("i2c client is null!!\n");
 		return 0;
@@ -1469,8 +1570,24 @@ static ssize_t show_firlen_value(struct device_driver *ddri, char *buf)
 	struct i2c_client *client = mc3xxx_i2c_client;
 	struct mc3xxx_i2c_data *obj = i2c_get_clientdata(client);
 
+	GSE_LOG("fwq show_firlen_value\n");
+	if (atomic_read(&obj->firlen)) {
+		int idx = 0, len = atomic_read(&obj->firlen);
+
+		GSE_LOG("len = %2d, idx = %2d\n", obj->fir.num, obj->fir.idx);
+
+		for (idx = 0; idx < len; idx++)
+			GSE_LOG("[%5d %5d %5d]\n", obj->fir.raw[idx][MC3XXX_AXIS_X],
+				obj->fir.raw[idx][MC3XXX_AXIS_Y], obj->fir.raw[idx][MC3XXX_AXIS_Z]);
+
+		GSE_LOG("sum = [%5d %5d %5d]\n", obj->fir.sum[MC3XXX_AXIS_X],
+			obj->fir.sum[MC3XXX_AXIS_Y], obj->fir.sum[MC3XXX_AXIS_Z]);
+		GSE_LOG("avg = [%5d %5d %5d]\n", obj->fir.sum[MC3XXX_AXIS_X]/len,
+			obj->fir.sum[MC3XXX_AXIS_Y]/len, obj->fir.sum[MC3XXX_AXIS_Z]/len);
+	}
 	return snprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&obj->firlen));
 	#else
+	GSE_LOG("fwq show_firlen_value\n");
 	return snprintf(buf, PAGE_SIZE, "not support\n");
 	#endif
 }
@@ -1485,6 +1602,8 @@ static ssize_t store_firlen_value(struct device_driver *ddri, const char *buf, s
 	struct mc3xxx_i2c_data *obj = i2c_get_clientdata(client);
 	int firlen = 0;
 	int ret = 0;
+
+	GSE_LOG("fwq store_firlen_value\n");
 
 	ret = kstrtoint(buf, 10, &firlen);
 	if (ret != 0)
@@ -1512,6 +1631,8 @@ static ssize_t show_trace_value(struct device_driver *ddri, char *buf)
 	ssize_t res = 0;
 	struct mc3xxx_i2c_data *obj = mc3xxx_obj_i2c_data;
 
+	GSE_LOG("fwq show_trace_value\n");
+
 	if (obj == NULL) {
 		GSE_PR_ERR("i2c_data obj is null!!\n");
 		return 0;
@@ -1528,6 +1649,8 @@ static ssize_t store_trace_value(struct device_driver *ddri, const char *buf, si
 {
 	struct mc3xxx_i2c_data *obj = mc3xxx_obj_i2c_data;
 	int trace = 0;
+
+	GSE_LOG("fwq store_trace_value\n");
 
 	if (obj == NULL) {
 		GSE_PR_ERR("i2c_data obj is null!!\n");
@@ -1549,6 +1672,8 @@ static ssize_t show_status_value(struct device_driver *ddri, char *buf)
 {
 	ssize_t len = 0;
 	struct mc3xxx_i2c_data *obj = mc3xxx_obj_i2c_data;
+
+	GSE_LOG("fwq show_status_value\n");
 
 	if (obj == NULL) {
 		GSE_PR_ERR("i2c_data obj is null!!\n");
@@ -1663,6 +1788,8 @@ static ssize_t show_chip_orientation(struct device_driver *ptDevDrv, char *pbBuf
 	if (obj == NULL)
 		return 0;
 
+	GSE_LOG("[%s] default direction: %d\n", __func__, obj->hw.direction);
+
 	_tLength = snprintf(pbBuf, PAGE_SIZE, "default direction = %d\n", obj->hw.direction);
 
 	return _tLength;
@@ -1685,6 +1812,8 @@ static ssize_t store_chip_orientation(struct device_driver *ptDevDrv, const char
 		if (hwmsen_get_convert(_nDirection, &_pt_i2c_obj->cvt))
 			GSE_PR_ERR("ERR: fail to set direction\n");
 	}
+
+	GSE_LOG("[%s] set direction: %d\n", __func__, _nDirection);
 
 	return tCount;
 }
@@ -2046,6 +2175,7 @@ static int mc3xxx_set_delay(u64 ns)
 	int value = 0;
 
 	value = (int)ns/1000/1000;
+	GSE_LOG("mc3xxx_set_delay (%d), chip only use 1024HZ\n", value);
 	return 0;
 }
 
@@ -2065,6 +2195,7 @@ static int mc3xxx_get_data(int *x, int *y, int *z, int *status)
 		if (g_samedataCounter < MC3XXX_SAME_NUM) {
 			g_samedataCounter++;
 		} else {
+			GSE_LOG("samedata[%d]:%x,%x,%x\n", g_samedataCounter, *x, *y, *z);
 			g_samedataCounter = 0;
 			/*MC3XXX_reset(mc3xxx_i2c_client);*/
 			err = MC3XXX_Init(mc3xxx_i2c_client, 0);/*init acc hw*/
@@ -2130,6 +2261,7 @@ static int mc3410_factory_get_raw_data(int32_t data[3])
 	char strbuf[MC3XXX_BUF_SIZE] = { 0 };
 
 	MC3XXX_ReadRawData(mc3xxx_i2c_client, strbuf);
+	GSE_LOG("support mc3410_factory_get_raw_data!\n");
 	return 0;
 }
 static int mc3410_factory_enable_calibration(void)
@@ -2207,6 +2339,8 @@ static int mc3xxx_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 	struct acc_control_path ctl = {0};
 	struct acc_data_path data = {0};
 	int err = 0;
+
+	GSE_LOG("mc3xxx_i2c_probe\n");
 
 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj) {
@@ -2286,6 +2420,7 @@ static int mc3xxx_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 		GSE_PR_ERR("acc_register_data_path(%d)\n", err);
 		goto exit_kfree;
 	}
+	GSE_LOG("%s: OK\n", __func__);
 	s_nInitFlag = MC3XXX_INIT_SUCC;
 	return 0;
 
@@ -2343,6 +2478,8 @@ static int mc3xxx_remove(void)
  *****************************************/
 static int  mc3xxx_local_init(void)
 {
+	GSE_LOG("mc3xxx_local_init\n");
+
 	if (i2c_add_driver(&mc3xxx_i2c_driver)) {
 		GSE_PR_ERR("add driver error\n");
 		return -1;
@@ -2367,6 +2504,7 @@ static int __init mc3410_init(void)
  *****************************************/
 static void __exit mc3410_exit(void)
 {
+	GSE_LOG("mc3xxx_exit\n");
 #ifdef CONFIG_CUSTOM_KERNEL_ACCELEROMETER_MODULE
 	success_Flag = false;
 #endif

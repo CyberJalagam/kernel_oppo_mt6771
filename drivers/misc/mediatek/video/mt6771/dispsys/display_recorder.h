@@ -235,4 +235,6 @@ int dprec_mmp_dump_ovl_layer(struct OVL_CONFIG_STRUCT *ovl_layer, unsigned int l
 			     unsigned int session /*1:primary, 2:external, 3:memory */);
 void init_log_buffer(void);
 char *get_dprec_status_ptr(int buffer_idx);
+unsigned long disp_get_tracing_mark(void);
+
 #endif

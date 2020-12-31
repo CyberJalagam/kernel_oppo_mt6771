@@ -628,6 +628,15 @@ struct musb {
 	u32 error_wQmuVal;
 	u32 error_wErrVal;
 #endif
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@@Prd6.BaseDrv.USB.Basic, 2017/07/28, Add for otg */
+	spinlock_t		change_irq_lock;
+	bool		user_request_polling;
+	struct delayed_work	start_polling_delay;
+	struct delayed_work	stop_polling_delay;
+	#endif /* VENDOR_EDIT */
+
+
 	struct workqueue_struct *st_wq;
 };
 

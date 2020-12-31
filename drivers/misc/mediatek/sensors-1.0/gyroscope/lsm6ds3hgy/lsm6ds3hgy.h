@@ -15,7 +15,8 @@
 #define LSM6DS3HGY_H
 
 #include <linux/ioctl.h>
-#include <linux/types.h>
+
+typedef unsigned char      u8;
 
 #define LSM6DS3H_ACCESS_BY_GSE_I2C
 #define LSM6DS3H_SENSITIVITY_SCALING

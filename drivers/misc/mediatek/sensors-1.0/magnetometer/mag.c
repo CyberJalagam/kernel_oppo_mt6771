@@ -651,8 +651,11 @@ static int check_abnormal_data(int x, int y, int z, int status)
 
 	total = (x*x + y*y + z*z)/(cxt->mag_dev_data.div * cxt->mag_dev_data.div);
 	if ((total < 100) || (total > 10000)) {
+		#ifndef VENDOR_EDIT
+		/*Yan.Chen@BSP.PSW.sensor,2018/01/14,remove for log*/
 		if (count % 10 == 0)
 			MAG_INFO("mag sensor abnormal data: x=%d,y=%d,z=%d, status=%d\n", x, y, z, status);
+		#endif
 		count++;
 		if (count > 1000)
 			count = 0;

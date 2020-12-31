@@ -103,11 +103,11 @@ int g_FG_PSEUDO1[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 
 int g_FG_PSEUDO100[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	/*bat1,   bat2,   bat3,    bat4*/
-	{ 100, 100, 100, 100},/*T0*/
-	{ 100, 100, 100, 100},/*T1*/
-	{ 100, 100, 100, 100},/*T2*/
-	{ 100, 100, 100, 100},/*T3*/
-	{ 100, 100, 100, 100},/*T4*/
+	{ 98, 98, 98, 97},/*T0*/
+	{ 95, 95, 94, 93},/*T1*/
+	{ 90, 90, 90, 89},/*T2*/
+	{ 80, 80, 86, 85},/*T3*/
+	{ 80, 80, 82, 81},/*T4*/
 	{ 100, 100, 100, 100},/*T5*/
 	{ 100, 100, 100, 100},/*T6*/
 	{ 100, 100, 100, 100},/*T7*/
@@ -136,11 +136,11 @@ int g_FG_PSEUDO1_OFFSET[TOTAL_BATTERY_NUMBER] = {0, 0, 0, 0};
 /* pmic_min_vol by temp ,control by MULTI_TEMP_GAUGE0=1, 34000=3.4v */
 int g_PMIC_MIN_VOL[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	/*bat1,   bat2,   bat3,    bat4*/
-	{33500, 33500, 33500, 33500},/*T0*/
-	{33500, 33500, 33500, 33500},/*T1*/
-	{33500, 33500, 33500, 33500},/*T2*/
-	{32200, 32200, 32200, 32200},/*T3*/
-	{31000, 31000, 31000, 31000},/*T4*/
+	{33600, 33600, 33600, 33600},/*T0*/
+	{33600, 33600, 33600, 33600},/*T1*/
+	{33600, 33600, 33600, 33600},/*T2*/
+	{32600, 32600, 32600, 32600},/*T3*/
+	{31900, 31900, 31900, 31900},/*T4*/
 	{33001, 33006, 33009, 33004},/*T5*/
 	{33002, 33007, 33008, 33003},/*T6*/
 	{33003, 33008, 33007, 33002},/*T7*/
@@ -166,10 +166,10 @@ int g_PON_SYS_IBOOT[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 /* Q_MAX_SYS_VOLTAGE by temp ,control by MULTI_TEMP_GAUGE0=1, */
 int g_QMAX_SYS_VOL[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	/*bat1,   bat2,   bat3,    bat4*/
-	{33500, 33500, 33500, 33500},/*T0*/
-	{33500, 33500, 33500, 33500},/*T1*/
+	{33000, 33000, 33000, 33000},/*T0*/
+	{33000, 33000, 33000, 33000},/*T1*/
 	{33500, 33500, 33500, 33500},/*T2*/
-	{32900, 32900, 32900, 32900},/*T3*/
+	{34300, 34300, 34300, 34300},/*T3*/
 	{32800, 32800, 32800, 32800},/*T4*/
 	{33500, 33500, 33500, 33500},/*T5*/
 	{33500, 33500, 33500, 33500},/*T6*/
@@ -200,7 +200,12 @@ int g_temperature[MAX_TABLE] = {
 #define BAT_NTC_47 0
 
 #if (BAT_NTC_10 == 1)
+#ifndef VENDOR_EDIT
+/* Jun.Wei  PSW.BSP.CHG  2019-03-04  for NTC pull up R */
 #define RBAT_PULL_UP_R             24000
+#else
+#define RBAT_PULL_UP_R             16000
+#endif
 #endif
 
 #if (BAT_NTC_47 == 1)
@@ -212,7 +217,7 @@ int g_temperature[MAX_TABLE] = {
 #define BIF_NTC_R 16000
 
 #if (BAT_NTC_10 == 1)
-struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21] = {
+struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[27] = {
 		{-40, 195652},
 		{-35, 148171},
 		{-30, 113347},
@@ -233,7 +238,13 @@ struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21] = {
 		{45, 4917},
 		{50, 4161},
 		{55, 3535},
-		{60, 3014}
+		{60, 3014},
+        {65, 2559},
+        {70, 2144},
+        {75, 1912},
+        {80, 1662},
+        {85, 1451},
+        {90, 1272},
 };
 #endif
 

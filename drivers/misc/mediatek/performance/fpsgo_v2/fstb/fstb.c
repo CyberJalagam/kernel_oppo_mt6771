@@ -190,6 +190,19 @@ int switch_sample_window(long long time_usec)
 	return 0;
 }
 
+int switch_margin_mode(int mode)
+{
+	if (mode > 1 || mode < 0)
+		return -EINVAL;
+
+	mutex_lock(&fstb_lock);
+	if (mode != margin_mode)
+		margin_mode = mode;
+	mutex_unlock(&fstb_lock);
+
+	return 0;
+}
+
 int switch_dfps_ceiling(int fps)
 {
 #ifdef CONFIG_MTK_DYNAMIC_FPS_FRAMEWORK_SUPPORT
@@ -485,6 +498,9 @@ void gpu_time_update(long long t_gpu, unsigned int cur_freq, unsigned int cur_ma
 		return;
 	}
 
+	iter->gpu_time = t_gpu;
+	iter->gpu_freq = cur_freq;
+
 	if (iter->weighted_gpu_time_begin < 0 ||
 			iter->weighted_gpu_time_end < 0 ||
 			iter->weighted_gpu_time_begin > iter->weighted_gpu_time_end ||
@@ -525,14 +541,14 @@ void gpu_time_update(long long t_gpu, unsigned int cur_freq, unsigned int cur_ma
 		iter->weighted_gpu_time_begin = 0;
 	}
 
-	if (cur_max_freq > 0 && cur_max_freq > cur_freq) {
+	if (cur_max_freq > 0 && cur_max_freq >= cur_freq
+		&& t_gpu > 0LL && t_gpu < 1000000000LL) {
 		iter->weighted_gpu_time[iter->weighted_gpu_time_end] = t_gpu * cur_freq;
 		do_div(iter->weighted_gpu_time[iter->weighted_gpu_time_end], cur_max_freq);
-	} else
-		iter->weighted_gpu_time[iter->weighted_gpu_time_end] = t_gpu;
-
-	iter->weighted_gpu_time_ts[iter->weighted_gpu_time_end] = cur_time_us;
-	iter->weighted_gpu_time_end++;
+		iter->weighted_gpu_time_ts[iter->weighted_gpu_time_end] =
+			cur_time_us;
+		iter->weighted_gpu_time_end++;
+	}
 
 	/*print debug message*/
 	mtk_fstb_dprintk("fstb: time %lld %lld t_gpu %lld cur_freq %u cur_max_freq %u\n",
@@ -576,6 +592,13 @@ static int get_gpu_frame_time(struct FSTB_FRAME_INFO *iter)
 	return ret;
 
 }
+
+void (*eara_thrm_frame_start_fp)(int pid,
+	int cpu_time, int vpu_time, int mdla_time,
+	int cpu_cap, int vpu_cap, int mdla_cap,
+	int queuefps, unsigned long long q2q_time,
+	int AI_cross_vpu, int AI_cross_mdla, int AI_bg_vpu,
+	int AI_bg_mdla, ktime_t cur_time);
 
 int fpsgo_fbt2fstb_update_cpu_frame_info(
 		int pid,
@@ -681,6 +704,45 @@ int fpsgo_fbt2fstb_update_cpu_frame_info(
 	fpsgo_systrace_c_fstb(pid, (int)max_current_cap, "cur_cpu_cap");
 	fpsgo_systrace_c_fstb(pid, (int)max_cpu_cap, "max_cpu_cap");
 
+	if (eara_thrm_frame_start_fp) {
+		eara_thrm_frame_start_fp(pid, (int)Runnging_time,
+			0, 0, Curr_cap,
+			0, 0, iter->queue_fps,
+			Q2Q_time, 0, 0,
+			0, 0, cur_time);
+	}
+
+	mutex_unlock(&fstb_lock);
+	return 0;
+}
+
+void (*eara_thrm_enqueue_end_fp)(int pid, int gpu_time, int gpu_freq,
+	unsigned long long enq);
+int fpsgo_comp2fstb_enq_end(int pid, unsigned long long enq)
+{
+	struct FSTB_FRAME_INFO *iter;
+
+	mutex_lock(&fstb_lock);
+
+	if (!fstb_enable) {
+		mutex_unlock(&fstb_lock);
+		return 0;
+	}
+
+	hlist_for_each_entry(iter, &fstb_frame_infos, hlist) {
+		if (iter->pid == pid)
+			break;
+	}
+
+	if (iter == NULL) {
+		mutex_unlock(&fstb_lock);
+		return 0;
+	}
+
+	if (eara_thrm_enqueue_end_fp)
+		eara_thrm_enqueue_end_fp(pid,
+			iter->gpu_time, iter->gpu_freq, enq);
+
 	mutex_unlock(&fstb_lock);
 	return 0;
 }
@@ -778,6 +840,7 @@ void fpsgo_comp2fstb_queue_time_update(int pid,
 		}
 		new_frame_info->pid = pid;
 		new_frame_info->target_fps = max_fps_limit;
+		new_frame_info->target_fps_margin = 0;
 		new_frame_info->queue_fps = CFG_MAX_FPS_LIMIT;
 		new_frame_info->frame_type = frame_type;
 		new_frame_info->render_method = render_method;
@@ -888,11 +951,17 @@ static int fstb_get_queue_fps(struct FSTB_FRAME_INFO *iter, long long interval)
 	if (avg_frame_interval != 0) {
 		retval = 1000000000ULL * frame_interval_count;
 		do_div(retval, avg_frame_interval);
+		#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+		/*xing.xiong@BSP.Kernel.Debug, 2018/12/26, Modify for limiting kernel log*/
 		mtk_fstb_dprintk_always("%s  %d %llu\n", __func__, iter->pid, retval);
+		#endif
 		fpsgo_systrace_c_fstb(iter->pid, (int)retval, "queue_fps");
 		return retval;
 	}
+	#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+	/*xing.xiong@BSP.Kernel.Debug, 2018/12/26, Modify for limiting kernel log*/
 	mtk_fstb_dprintk_always("%s  %d %d\n", __func__, iter->pid, 0);
+	#endif
 	fpsgo_systrace_c_fstb(iter->pid, 0, "queue_fps");
 
 	return 0;
@@ -916,6 +985,7 @@ static int fps_update(struct FSTB_FRAME_INFO *iter)
 static int calculate_fps_limit(struct FSTB_FRAME_INFO *iter, int target_fps)
 {
 	int ret_fps = target_fps;
+	int margin = 0;
 	int i;
 	struct task_struct *tsk, *gtsk;
 	struct FSTB_RENDER_TARGET_FPS *rtfiter = NULL;
@@ -961,10 +1031,20 @@ static int calculate_fps_limit(struct FSTB_FRAME_INFO *iter, int target_fps)
 			}
 
 			if (i < 0)
+				/* no need to set margin to reset fps*/
 				ret_fps = rtfiter->level[0].start;
+			else if (i && ret_fps == rtfiter->level[i].start)
+				margin = RESET_TOLERENCE;
 			break;
 		}
 	}
+
+	if (ret_fps == 30)
+		margin = RESET_TOLERENCE;
+	else if (ret_fps == CFG_MAX_FPS_LIMIT)
+		margin = 0;
+
+	iter->target_fps_margin = margin;
 
 out:
 
@@ -1012,7 +1092,8 @@ static int cal_target_fps(struct FSTB_FRAME_INFO *iter)
 		fpsgo_systrace_c_fstb(iter->pid, (int)target_limit, "tmp_target_limit");
 		fpsgo_systrace_c_fstb(iter->pid, second_chance_flag, "second_chance_flag");
 		/*increase*/
-	} else if (iter->target_fps - iter->queue_fps <= 1) {
+	} else if (iter->queue_fps >=
+		iter->target_fps + iter->target_fps_margin) {
 
 		second_chance_flag = 0;
 		fpsgo_systrace_c_fstb(iter->pid, second_chance_flag, "second_chance_flag");
@@ -1077,8 +1158,13 @@ int fpsgo_fbt2fstb_query_fps(int pid)
 
 	if (iter == NULL)
 		targetfps = max_fps_limit;
-	else
-		targetfps = iter->target_fps;
+	else {
+		if (margin_mode)
+			targetfps = iter->target_fps + iter->target_fps_margin;
+		else
+			targetfps = iter->target_fps >= CFG_MAX_FPS_LIMIT ?
+				CFG_MAX_FPS_LIMIT : iter->target_fps + RESET_TOLERENCE;
+	}
 
 	mutex_unlock(&fstb_lock);
 
@@ -1122,7 +1208,10 @@ static void fstb_fps_stats(struct work_struct *work)
 			}
 
 			iter->target_fps = calculate_fps_limit(iter, target_fps);
-			ged_kpi_set_target_FPS(iter->bufid, iter->target_fps);
+			fpsgo_systrace_c_fstb(iter->pid,
+				iter->target_fps_margin, "target_fps_margin");
+			ged_kpi_set_target_FPS_margin(iter->bufid, iter->target_fps,
+				iter->target_fps_margin);
 			/* if queue fps == 0, we delete that frame_info */
 		} else {
 			hlist_del(&iter->hlist);
@@ -1596,6 +1685,42 @@ static const struct file_operations fstb_tune_window_size_fops = {
 	.release = single_release,
 };
 
+static int fstb_margin_mode_read(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", margin_mode);
+	return 0;
+}
+
+static ssize_t fstb_margin_mode_write(struct file *file,
+		const char __user *buffer,
+		size_t count, loff_t *data)
+{
+	int ret;
+	int arg;
+
+	if (!kstrtoint_from_user(buffer, count, 0, &arg))
+		ret = switch_margin_mode(arg);
+	else
+		ret = -EINVAL;
+
+	return (ret < 0) ? ret : count;
+}
+
+static int fstb_margin_mode_open(struct inode *inode,
+		struct file *file)
+{
+	return single_open(file, fstb_margin_mode_read, NULL);
+}
+
+static const struct file_operations fstb_margin_mode_fops = {
+	.owner = THIS_MODULE,
+	.open = fstb_margin_mode_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.write = fstb_margin_mode_write,
+	.release = single_release,
+};
+
 static int fstb_tune_dfps_ceiling_read(struct seq_file *m, void *v)
 {
 	seq_printf(m, "%d\n", dfps_ceiling);
@@ -1785,7 +1910,7 @@ static int fpsgo_status_read(struct seq_file *m, void *v)
 		return 0;
 	}
 
-	seq_puts(m, "tid\tname\t\tBypass\tVsync-aligned\trenderMethod\tcurrentFPS\ttargetFPS\tfteh_list\n");
+	seq_puts(m, "tid\tname\t\tBypass\tVsync-aligned\trenderMethod\tcurrentFPS\ttargetFPS\tFPS_margin\tfteh_list\n");
 
 	hlist_for_each_entry(iter, &fstb_frame_infos, hlist) {
 		rcu_read_lock();
@@ -1839,6 +1964,8 @@ static int fpsgo_status_read(struct seq_file *m, void *v)
 			seq_printf(m, "%d\t\t", iter->target_fps);
 		else
 			seq_puts(m, "NA\t\t");
+
+		seq_printf(m, "%d\t\t\t", iter->target_fps_margin);
 
 		seq_printf(m, "%d\t",
 			fpsgo_fbt2fstb_query_fteh_list(iter->pid));
@@ -1953,6 +2080,12 @@ int mtk_fstb_init(void)
 			fstb_debugfs_dir,
 			NULL,
 			&fstb_tune_dfps_ceiling_fops);
+
+	debugfs_create_file("margin_mode",
+			0664,
+			fstb_debugfs_dir,
+			NULL,
+			&fstb_margin_mode_fops);
 
 	reset_fps_level();
 

@@ -43,6 +43,22 @@
 #include "mtk_pbm.h" /* DLPT */
 #endif
 
+#ifndef VENDOR_EDIT
+#define VENDOR_EDIT
+#endif
+
+#ifdef VENDOR_EDIT
+/*Feng.Hu@Camera.Driver 20171215 add to control flashlight via proc file*/
+#include<linux/proc_fs.h>
+/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+#include <linux/regulator/consumer.h>
+
+/*Yijun.Tan@Camera.Driver 20180322 add for resove flash cann't be closed sometimes after poweroff */
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
+
+int pin_gpio_strobe = 0;
+#endif
 
 /******************************************************************************
  * Definition
@@ -71,7 +87,12 @@ static int pt_is_low(int pt_low_vol, int pt_low_bat, int pt_over_cur);
 
 /******************************************************************************
  * Flashlight operations
- *****************************************************************************/
+*****************************************************************************/
+#ifdef VENDOR_EDIT
+/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+void FlashRegulatorCtrl(int Stage);
+#endif
+
 static int fl_set_level(struct flashlight_dev *fdev, int level)
 {
 	struct flashlight_dev_arg fl_dev_arg;
@@ -295,7 +316,21 @@ static struct flashlight_dev *flashlight_find_dev_by_full_index(
 
 	return NULL;
 }
+#ifdef VENDOR_EDIT
+static struct flashlight_dev *flashlight_find_dev_by_index(
+		const int type, const int ct, const int part)
+{
+	struct flashlight_dev *fdev;
 
+	/* return the first flashlight device */
+	list_for_each_entry(fdev, &flashlight_list, node) {
+		if (fdev->dev_id.type == type && fdev->dev_id.ct == ct && fdev->dev_id.part == part)
+			return fdev;
+	}
+
+	return NULL;
+}
+#else
 static struct flashlight_dev *flashlight_find_dev_by_index(
 		const int type, const int ct)
 {
@@ -309,7 +344,7 @@ static struct flashlight_dev *flashlight_find_dev_by_index(
 
 	return NULL;
 }
-
+#endif
 static struct flashlight_dev *flashlight_find_dev_by_device_id(
 		const struct flashlight_device_id *dev_id)
 {
@@ -465,7 +500,6 @@ int flashlight_dev_unregister_by_device_id(struct flashlight_device_id *dev_id)
 {
 	struct flashlight_dev *fdev;
 
-	pr_info("%d\n", __LINE__);
 	if (!dev_id)
 		return -EINVAL;
 
@@ -505,6 +539,172 @@ ssize_t strobe_VDIrq(void)
 	return 0;
 }
 EXPORT_SYMBOL(strobe_VDIrq);
+#ifdef VENDOR_EDIT
+extern int mp3331_readReg(int reg);
+extern int lm3642_readReg(int reg);
+/*Yijun.Tan@Camera.Driver, 2017/12/06  add new flashlight driver ic aw3642*/
+extern int aw3642_readReg(int reg);
+/*Yijun.Tan@Camera modify for can not read deivce id in factory mode 20180321*/
+extern int kdVIOPowerOn( int On);
+
+static int part_id = -1;
+int strobe_getPartId(int sensorDev, int strobeId)
+{
+    /* return 0 or 1 (backup flash part). Other numbers are invalid. */
+    /*Yijun.Tan@Camera add for can not read deivce id in factory mode 20180321*/
+    if (part_id != -1) {
+        return part_id;
+    }
+    kdVIOPowerOn(1);
+    if (sensorDev == 1 && strobeId == 1) {
+        if (lm3642_readReg(0x00) == 0){
+            part_id = 0;
+        }
+        else if (mp3331_readReg(0x00) == 0x18){
+            part_id = 2;
+        }
+        /*Yijun.Tan@Camera.Driver, 2017/12/06  add new flashlight driver ic aw3642*/
+        else if (aw3642_readReg(0x00) == 0x36){
+            part_id = 1;
+        }
+        else {
+            part_id = 0;
+        }
+    }
+    else {
+        part_id = 0;
+    }
+    /*Yijun.Tan@Camera add for can not read deivce id in factory mode 20180321*/
+    kdVIOPowerOn(0);
+	pr_err("strobe_getPartId part_id = %d \n", part_id);
+    return part_id;
+}
+
+
+/*Feng.Hu@Camera.Driver 20171215 add to control flashlight via proc file*/
+static int flashlight_state = 0;
+static ssize_t FL_HW_WRITE( struct file *file, const char __user *buffer, size_t count,
+                                                                     loff_t *data)
+{
+	char regBuf[64] = {'\0'};
+	struct flashlight_dev_arg fl_dev_arg;
+	struct flashlight_dev *fdev;
+	int partIndex = 0;
+
+	u32 u4CopyBufSize = (count < (sizeof(regBuf) - 1)) ? (count) : (sizeof(regBuf) - 1);
+
+	if (copy_from_user(regBuf, buffer, u4CopyBufSize))
+		return -EFAULT;
+
+	pr_err("new_state = %d, old_flashlight_state:%d\n",regBuf[0] - '0',flashlight_state);
+	if(regBuf[0] == '6') {
+		flashlight_state = regBuf[0] - '0';
+		return count;
+	}
+	if (regBuf[0] == '5' && flashlight_state != 1) {
+		flashlight_state = regBuf[0] - '0';
+		return count;
+	}
+
+	if (flashlight_state == regBuf[0] - '0') {
+		pr_err("flash state is same, do not need set flash \n");
+		return count;
+	}
+
+	partIndex = strobe_getPartId(1,1);
+
+	fdev = flashlight_find_dev_by_full_index(0, 0, partIndex);
+	if (!fdev) {
+		pr_info("Find no flashlight device\n");
+		return -EFAULT;
+	}
+
+	if (regBuf[0] == '5' && flashlight_state == 1) {
+		flashlight_state = regBuf[0] - '0';
+
+		fl_dev_arg.channel = fdev->dev_id.channel;
+		fl_dev_arg.arg = 0;
+		if (fdev->ops) {
+			fdev->ops->flashlight_ioctl(FLASH_IOC_SET_DUTY, (unsigned long)&fl_dev_arg);
+			fdev->ops->flashlight_ioctl(FLASH_IOC_SET_ONOFF, (unsigned long)&fl_dev_arg);
+		} else {
+			pr_info("Failed with no flashlight ops\n");
+		}
+		kdVIOPowerOn(0);
+		pr_err("sensor is poweron ,need to set flash off\n");
+		return count;
+	}
+
+	if (flashlight_state == 5 && regBuf[0] == '0') {
+		pr_err("camera is open ,not to set flash\n");
+		return count;
+	}
+	if (flashlight_state == 6 && regBuf[0] == '0') {
+		return count;
+	}
+
+	if(regBuf[0] == '0') {
+		flashlight_state = regBuf[0] - '0';
+
+		fl_dev_arg.channel = fdev->dev_id.channel;
+		fl_dev_arg.arg = 0;
+		if (fdev->ops->flashlight_ioctl(FLASH_IOC_SET_ONOFF, (unsigned long)&fl_dev_arg)) {
+			pr_err("Failed to set on/off.\n");
+		} else {
+			pr_info("Failed with no flashlight ops\n");
+		}
+		kdVIOPowerOn(0);
+	} else if (regBuf[0] == '1') {
+		kdVIOPowerOn(1);
+
+		fl_dev_arg.channel = fdev->dev_id.channel;
+		fl_dev_arg.arg = 0;
+		if (fdev->ops) {
+			fdev->ops->flashlight_ioctl(FLASH_IOC_SET_DUTY, (unsigned long)&fl_dev_arg);
+			fdev->ops->flashlight_ioctl(FLASH_IOC_SET_TIME_OUT_TIME_MS, (unsigned long)&fl_dev_arg);
+		} else {
+			pr_info("Failed with no flashlight ops\n");
+			kdVIOPowerOn(0);
+			return -EFAULT;
+		}
+		fl_dev_arg.arg = 1;
+		if (fdev->ops->flashlight_ioctl(FLASH_IOC_SET_ONOFF, (unsigned long)&fl_dev_arg)) {
+			pr_err("Failed to set on/off.\n");
+		}
+	}
+	flashlight_state = regBuf[0] - '0';
+
+	pr_err("flashlight_state=%d\n",flashlight_state);
+
+	return count;
+}
+
+static ssize_t FL_HW_READ(struct file *filp, char __user *buff,
+                        	size_t len, loff_t *data)
+{
+	char value[2] = {0};
+
+	snprintf(value, sizeof(value), "%d", flashlight_state);
+	return simple_read_from_buffer(buff, len, data, value,1);
+}
+
+static const struct file_operations flashlight_proc_fops = {
+	.owner = THIS_MODULE,
+	.read = FL_HW_READ,
+	.write = FL_HW_WRITE,
+};
+
+static int flash_proc_init(void)
+{
+	int ret=0;
+	struct proc_dir_entry *proc_entry = proc_create_data( "qcom_flash", 0666, NULL,&flashlight_proc_fops, NULL);
+	if (proc_entry == NULL) {
+		ret = -ENOMEM;
+		pr_err("Error! Couldn't create qcom_flash proc entry\n");
+	}
+	return ret;
+}
+#endif /*VENDOR_EDIT*/
 
 
 /******************************************************************************
@@ -665,12 +865,25 @@ static long _flashlight_ioctl(
 		pr_err("Failed copy arguments from user\n");
 		return -EFAULT;
 	}
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver add for two flash IC 20180304*/
+	part = strobe_getPartId(1,1);
+	#endif
 
 	/* find flashlight device */
 	mutex_lock(&fl_mutex);
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver add for two flash IC 20180304*/
+	fdev = flashlight_find_dev_by_index(
+			flashlight_get_type_index(fl_arg.type_id),
+			flashlight_get_ct_index(fl_arg.ct_id),
+			part);
+	#else
 	fdev = flashlight_find_dev_by_index(
 			flashlight_get_type_index(fl_arg.type_id),
 			flashlight_get_ct_index(fl_arg.ct_id));
+	#endif
+
 	mutex_unlock(&fl_mutex);
 	if (!fdev) {
 		pr_info("Find no flashlight device\n");
@@ -682,8 +895,12 @@ static long _flashlight_ioctl(
 	fl_dev_arg.channel = fdev->dev_id.channel;
 	type = fdev->dev_id.type;
 	ct = fdev->dev_id.ct;
+	#ifndef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver add for two flash IC 20180304*/
 	part = fdev->dev_id.part;
+	#endif
 
+    pr_err("type = %d ct = %d part = %d ",type,ct,part );
 	if (flashlight_verify_index(type, ct, part)) {
 		pr_err("Failed with error index\n");
 		return -EINVAL;
@@ -812,10 +1029,19 @@ static long _flashlight_ioctl(
 		pr_debug("FLASH_IOC_SET_ONOFF(%d,%d,%d): %d\n",
 				type, ct, part, fl_arg.arg);
 		mutex_lock(&fl_mutex);
+
+		#ifdef VENDOR_EDIT
+		/*Yijun.Tan@Camera.Driver 20180322 add for resove flash cann't be closed sometimes after poweroff */
+		gpio_set_value(pin_gpio_strobe,fl_arg.arg);
+		pr_err("FLASH_IOC_SET_ONOFF after set gpio to %d",fl_arg.arg);
+		#endif
+
 		ret = fl_enable(fdev, fl_arg.arg);
 		mutex_unlock(&fl_mutex);
 		break;
 
+	case FLASH_IOC_GET_DUTY_NUMBER:
+	case FLASH_IOC_GET_DUTY_CURRENT:
 	case FLASH_IOC_GET_HW_FAULT:
 	case FLASH_IOC_GET_HW_FAULT2:
 		if (fdev->ops) {
@@ -824,7 +1050,8 @@ static long _flashlight_ioctl(
 			fl_arg.arg = fl_dev_arg.arg;
 			if (copy_to_user((void __user *)arg, (void *)&fl_arg,
 					sizeof(struct flashlight_user_arg))) {
-				pr_info("Failed to copy hw fault to user\n");
+				pr_info("Failed to copy arg to user cmd:%d\n",
+					_IOC_NR(cmd));
 				return -EFAULT;
 			}
 		} else {
@@ -866,6 +1093,12 @@ static int flashlight_open(struct inode *inode, struct file *file)
 	struct flashlight_dev *fdev;
 
 	mutex_lock(&fl_mutex);
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+	/* Regulator enable */
+	FlashRegulatorCtrl(1);
+	#endif
+
 	list_for_each_entry(fdev, &flashlight_list, node) {
 		if (!fdev->ops)
 			continue;
@@ -884,6 +1117,11 @@ static int flashlight_release(struct inode *inode, struct file *file)
 	struct flashlight_dev *fdev;
 
 	mutex_lock(&fl_mutex);
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+	/* Regulator disable */
+	FlashRegulatorCtrl(2);
+	#endif
 	list_for_each_entry(fdev, &flashlight_list, node) {
 		if (!fdev->ops)
 			continue;
@@ -1375,157 +1613,6 @@ unlock:
 }
 static DEVICE_ATTR_RW(flashlight_current);
 
-/* flashlight fault sysfs */
-static ssize_t flashlight_fault_show(
-		struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct flashlight_dev *fdev;
-	struct flashlight_dev_arg fl_dev_arg;
-
-	/* flashlight capability */
-	int fault_flag1;
-	int fault_flag2;
-	char fault[FLASHLIGHT_FAULT_BUF_SIZE];
-	char fault_tmp[FLASHLIGHT_FAULT_TMPBUF_SIZE];
-
-	pr_debug("Fault show\n");
-
-	memset(fault, '\0', FLASHLIGHT_FAULT_BUF_SIZE);
-
-	mutex_lock(&fl_mutex);
-	list_for_each_entry(fdev, &flashlight_list, node) {
-		if (!fdev->ops)
-			continue;
-
-		fl_dev_arg.channel = fdev->dev_id.channel;
-
-		fl_dev_arg.arg = -1;
-		fdev->ops->flashlight_ioctl(FLASH_IOC_GET_HW_FAULT,
-				(unsigned long)&fl_dev_arg);
-		fault_flag1 = fl_dev_arg.arg;
-
-		fl_dev_arg.arg = -1;
-		fdev->ops->flashlight_ioctl(FLASH_IOC_GET_HW_FAULT2,
-				(unsigned long)&fl_dev_arg);
-		fault_flag2 = fl_dev_arg.arg;
-
-		snprintf(fault_tmp, FLASHLIGHT_FAULT_TMPBUF_SIZE,
-				"%d %d %d %s %d %d %d %d\n",
-				fdev->dev_id.type, fdev->dev_id.ct,
-				fdev->dev_id.part, fdev->dev_id.name,
-				fdev->dev_id.channel, fdev->dev_id.decouple,
-				fault_flag1, fault_flag2);
-		strncat(fault, fault_tmp,
-				FLASHLIGHT_FAULT_TMPBUF_SIZE);
-	}
-	mutex_unlock(&fl_mutex);
-
-	return scnprintf(buf, PAGE_SIZE,
-			"[TYPE] [CT] [PART] [DEVICE] [CHANNEL] [DECOUPLE] [FAULT FLAG1] [FAULT FLAG2]\n%s\n",
-			fault);
-}
-static DEVICE_ATTR_RO(flashlight_fault);
-
-/* sw disable sysfs */
-static ssize_t flashlight_sw_disable_show(
-		struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct flashlight_dev *fdev;
-	char status[FLASHLIGHT_SW_DISABLE_STATUS_BUF_SIZE];
-	char status_tmp[FLASHLIGHT_SW_DISABLE_STATUS_TMPBUF_SIZE];
-
-	pr_debug("Charger status show\n");
-
-	memset(status, '\0', FLASHLIGHT_SW_DISABLE_STATUS_BUF_SIZE);
-
-	mutex_lock(&fl_mutex);
-	list_for_each_entry(fdev, &flashlight_list, node) {
-		if (!fdev->ops)
-			continue;
-
-		snprintf(status_tmp,
-				FLASHLIGHT_SW_DISABLE_STATUS_TMPBUF_SIZE,
-				"%d %d\n", fdev->dev_id.type,
-				fdev->sw_disable_status);
-		strncat(status, status_tmp,
-				FLASHLIGHT_SW_DISABLE_STATUS_TMPBUF_SIZE);
-	}
-	mutex_unlock(&fl_mutex);
-
-	return scnprintf(buf, PAGE_SIZE,
-			"[TYPE] [SW_DISABLE_STATUS]\n%s\n", status);
-}
-
-static ssize_t flashlight_sw_disable_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct flashlight_dev *fdev;
-	struct flashlight_arg fl_arg;
-	int sw_disable_status_tmp = 0;
-	s32 num;
-	int count = 0;
-	char delim[] = " ";
-	char *token, *cur = (char *)buf;
-	int ret;
-
-	pr_debug("Sw disable store\n");
-
-	memset(&fl_arg, 0, sizeof(struct flashlight_arg));
-
-	while (cur) {
-		token = strsep(&cur, delim);
-		ret = kstrtos32(token, 10, &num);
-		if (ret) {
-			pr_info("Error arguments\n");
-			goto unlock;
-		}
-
-		if (count == FLASHLIGHT_SW_DISABLE_TYPE)
-			fl_arg.type = (int)num;
-		else if (count == FLASHLIGHT_SW_DISABLE_STATUS)
-			sw_disable_status_tmp = (int)num;
-		else {
-			count++;
-			break;
-		}
-
-		count++;
-	}
-
-	/* verify data */
-	if (count != FLASHLIGHT_SW_DISABLE_NUM) {
-		pr_info("Error argument number: (%d)\n", count);
-		ret = -1;
-		goto unlock;
-	}
-	if (sw_disable_status_tmp < FLASHLIGHT_SW_DISABLE_OFF ||
-			sw_disable_status_tmp > FLASHLIGHT_SW_DISABLE_ON) {
-		pr_info("Error arguments sw disable status(%d)\n",
-				sw_disable_status_tmp);
-		ret = -1;
-		goto unlock;
-	}
-
-	pr_debug("(%d), (%d)\n", fl_arg.type, sw_disable_status_tmp);
-
-	/* store sw_disable status */
-	mutex_lock(&fl_mutex);
-	list_for_each_entry(fdev, &flashlight_list, node) {
-		if (!fdev->ops)
-			continue;
-		if (fl_arg.type == fdev->dev_id.type) {
-			if (sw_disable_status_tmp == FLASHLIGHT_SW_DISABLE_ON)
-				fl_enable(fdev, 0);
-
-			fdev->sw_disable_status = sw_disable_status_tmp;
-		}
-	}
-	mutex_unlock(&fl_mutex);
-	ret = size;
-unlock:
-	return ret;
-}
-static DEVICE_ATTR_RW(flashlight_sw_disable);
 
 /******************************************************************************
  * Platform device and driver
@@ -1534,6 +1621,49 @@ static struct class *flashlight_class;
 static struct device *flashlight_device;
 static dev_t flashlight_devno;
 static struct cdev *flashlight_cdev;
+
+#ifdef VENDOR_EDIT
+/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+/******************************************************************************
+ * Flashlight operations
+ *****************************************************************************/
+static struct regulator *regVCAMIO;
+static int g_VCAMIOEn = 0;
+
+void FlashRegulatorCtrl(int Stage)
+{
+    pr_debug("FlashRegulatorCtrl stage %d, en %d\n", Stage, g_VCAMIOEn);
+
+    if (Stage == 0) {
+        if (regVCAMIO == NULL) {
+            regVCAMIO = regulator_get(flashlight_device, "vcamio");
+            pr_debug("[Init] regulator_get %p\n", regVCAMIO);
+        }
+    } else if (Stage == 1) {
+        if (regVCAMIO != NULL && g_VCAMIOEn == 0) {
+            if (regulator_set_voltage(regVCAMIO, 1800000, 1800000))
+                pr_debug("regulator_set_voltage fail\n");
+
+                if (regulator_enable(regVCAMIO))
+                    pr_debug("regulator_enable fail\n");
+
+            g_VCAMIOEn = 1;
+            pr_debug("Flash VCAMIO Power on\n");
+        }
+    } else if (Stage == 2) {
+        if (regVCAMIO != NULL && g_VCAMIOEn == 1) {
+            if (regulator_disable(regVCAMIO))
+                pr_debug("Fail to regulator_disable\n");
+            g_VCAMIOEn = 0;
+            pr_debug("Flash VCAMIO Power off\n");
+        }
+    } else {
+        if (regVCAMIO != NULL) {
+            regulator_put(regVCAMIO);
+        }
+    }
+}
+#endif
 
 static int fl_init(void)
 {
@@ -1545,6 +1675,10 @@ static int fl_uninit(void)
 	struct flashlight_dev *fdev, *n;
 
 	mutex_lock(&fl_mutex);
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera add for resolve flash can not be close when power off 20180427*/
+	FlashRegulatorCtrl(1);
+	#endif
 	list_for_each_entry_safe(fdev, n, &flashlight_list, node) {
 		/* uninit device */
 		if (fdev->ops) {
@@ -1559,6 +1693,10 @@ static int fl_uninit(void)
 		list_del(&fdev->node);
 		kfree(fdev);
 	}
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera add for resolve flash can not be close when power off 20180427*/
+	FlashRegulatorCtrl(2);
+	#endif
 	mutex_unlock(&fl_mutex);
 
 	return 0;
@@ -1595,8 +1733,7 @@ static int flashlight_probe(struct platform_device *dev)
 	/* create class */
 	flashlight_class = class_create(THIS_MODULE, FLASHLIGHT_CORE);
 	if (IS_ERR(flashlight_class)) {
-		pr_info("Failed to create class (%d)\n",
-				(int)PTR_ERR(flashlight_class));
+		pr_err("Failed to create class (%d)\n", (int)PTR_ERR(flashlight_class));
 		goto err_create_class;
 	}
 
@@ -1635,6 +1772,7 @@ static int flashlight_probe(struct platform_device *dev)
 		pr_err("Failed to create device file(current)\n");
 		goto err_create_current_device_file;
 	}
+	/*
 	if (device_create_file(flashlight_device, &dev_attr_flashlight_fault)) {
 		pr_info("Failed to create device file(fault)\n");
 		goto err_create_fault_device_file;
@@ -1644,18 +1782,28 @@ static int flashlight_probe(struct platform_device *dev)
 		pr_info("Failed to create device file(sw_disable)\n");
 		goto err_create_sw_disable_device_file;
 	}
-
+	*/
+	#ifdef VENDOR_EDIT
+	/*zhengjiang.zhu@Camera.driver, 2017/06/28  add for flashlight */
+	flash_proc_init();
+	#endif /*VENDOR_EDIT*/
 	/* init flashlight */
 	fl_init();
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+	/* Regulator get */
+	FlashRegulatorCtrl(0);
+	#endif
 
 	pr_debug("Probe done\n");
 
 	return 0;
-
+/*
 err_create_sw_disable_device_file:
 	device_remove_file(flashlight_device, &dev_attr_flashlight_sw_disable);
 err_create_fault_device_file:
 	device_remove_file(flashlight_device, &dev_attr_flashlight_fault);
+*/
 err_create_current_device_file:
 	device_remove_file(flashlight_device, &dev_attr_flashlight_capability);
 err_create_capability_device_file:
@@ -1682,8 +1830,10 @@ static int flashlight_remove(struct platform_device *dev)
 	fl_uninit();
 
 	/* remove device file */
+	/*
 	device_remove_file(flashlight_device, &dev_attr_flashlight_sw_disable);
 	device_remove_file(flashlight_device, &dev_attr_flashlight_fault);
+	*/
 	device_remove_file(flashlight_device, &dev_attr_flashlight_current);
 	device_remove_file(flashlight_device, &dev_attr_flashlight_capability);
 	device_remove_file(flashlight_device, &dev_attr_flashlight_charger);
@@ -1697,6 +1847,12 @@ static int flashlight_remove(struct platform_device *dev)
 	cdev_del(flashlight_cdev);
 	/* unregister char device number */
 	unregister_chrdev_region(flashlight_devno, 1);
+
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180204 add for resolve flash cts verify fail*/
+	/* Regulator put */
+	FlashRegulatorCtrl(3);
+	#endif
 
 	return 0;
 }
@@ -1740,6 +1896,10 @@ static struct platform_driver flashlight_platform_driver = {
 static int __init flashlight_init(void)
 {
 	int ret;
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180322 add for resove flash cann't be closed sometimes after poweroff */
+	struct device_node *node = NULL;
+	#endif
 
 	pr_debug("Init start\n");
 
@@ -1758,13 +1918,23 @@ static int __init flashlight_init(void)
 	}
 
 #ifdef CONFIG_MTK_FLASHLIGHT_PT
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/05/25, Add for pmic invalid at low battery voltage */
 	register_low_battery_notify(
 			&pt_low_vol_callback, LOW_BATTERY_PRIO_FLASHLIGHT);
 	register_battery_percent_notify(
 			&pt_low_bat_callback, BATTERY_PERCENT_PRIO_FLASHLIGHT);
+#endif
 	register_battery_oc_notify(
 			&pt_oc_callback, BATTERY_OC_PRIO_FLASHLIGHT);
 #endif
+
+	#ifdef VENDOR_EDIT
+	/*Yijun.Tan@Camera.Driver 20180322 add for resove flash cann't be closed sometimes after poweroff */
+	node = of_find_matching_node(node, flashlight_of_match);
+	pin_gpio_strobe = of_get_named_gpio(node, "gpio_strob", 0);
+	pr_debug("pin_gpio_strobe = %d \n",pin_gpio_strobe);
+	#endif
 
 	pr_debug("Init done\n");
 

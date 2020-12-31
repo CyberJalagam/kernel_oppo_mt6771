@@ -29,10 +29,27 @@ struct ppm_cobra_lookup cobra_lookup_data;
 
 static int Core_limit[NR_PPM_CLUSTERS] = {CORE_NUM_L, CORE_NUM_B};
 int cobra_init_done;
+static int is_perf_fist;
 
 #define ACT_CORE(cluster)	(active_core[PPM_CLUSTER_##cluster])
 #define CORE_LIMIT(cluster)	(core_limit_tmp[PPM_CLUSTER_##cluster])
 
+struct ppm_cobra_data *ppm_cobra_pass_tbl(void)
+{
+	if (cobra_init_done)
+		return cobra_tbl;
+	return NULL;
+}
+
+int eara_is_perf_first(void)
+{
+	return is_perf_fist;
+}
+
+void eara_pass_perf_first_hint(int enable)
+{
+	is_perf_fist = enable;
+}
 
 static unsigned int get_idx_in_pwr_tbl(enum ppm_cluster cluster)
 {
@@ -113,6 +130,44 @@ static short get_delta_perf(enum ppm_cluster cluster, unsigned int core, unsigne
 	}
 
 	return delta_perf;
+}
+
+static int get_perf(enum ppm_cluster cluster, unsigned int core, unsigned int opp)
+{
+	unsigned int idx, min_idx;
+	int perf;
+	int ratio = 0;
+
+	if (core > get_cluster_max_cpu_core(cluster)) {
+		ppm_err("%s: Invalid input: cluster=%d, core=%d, opp=%d\n",
+			__func__, cluster, core, opp);
+		WARN_ON(1);
+		return 0;
+	}
+
+	if (core == 0)
+		return 0;
+
+	min_idx = get_cluster_min_cpufreq_idx(cluster);
+
+	if (opp >= min_idx) {
+		opp = min_idx;
+		core--;
+		ratio = 100;
+	}
+
+	if (core == 0)
+		core = 1;
+
+	idx = get_idx_in_pwr_tbl(cluster);
+
+	perf = cobra_tbl->basic_pwr_tbl[idx+core-1][opp].perf_idx *
+		cobra_tbl->basic_pwr_tbl[idx][opp].perf_idx;
+
+	if (ratio)
+		perf = perf * ratio;
+
+	return perf;
 }
 
 static short get_delta_eff(enum ppm_cluster cluster, unsigned int core, unsigned int opp)
@@ -283,7 +338,12 @@ void ppm_cobra_update_limit(void *user_req)
 			if (ACT_CORE(B) > 0 && opp[PPM_CLUSTER_B] > 0) {
 				target_delta_pwr = get_delta_pwr(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]-1);
 				if (delta_power >= target_delta_pwr) {
-					MaxEff = get_delta_eff(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]-1);
+
+					if (is_perf_fist)
+						MaxEff = get_perf(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]-1);
+					else
+						MaxEff = get_delta_eff(PPM_CLUSTER_B, ACT_CORE(B),
+									opp[PPM_CLUSTER_B]-1);
 					ChoosenCl = PPM_CLUSTER_B;
 					ChoosenPwr = target_delta_pwr;
 				}
@@ -292,7 +352,11 @@ void ppm_cobra_update_limit(void *user_req)
 			/* L-cluster */
 			if (ACT_CORE(L) > 0 && opp[PPM_CLUSTER_L] > 0) {
 				target_delta_pwr = get_delta_pwr(PPM_CLUSTER_L, ACT_CORE(L), opp[PPM_CLUSTER_L]-1);
-				target_delta_eff = get_delta_eff(PPM_CLUSTER_L, ACT_CORE(L), opp[PPM_CLUSTER_L]-1);
+				if (is_perf_fist)
+					target_delta_eff = get_perf(PPM_CLUSTER_L, ACT_CORE(L), opp[PPM_CLUSTER_L]-1);
+				else
+					target_delta_eff = get_delta_eff(PPM_CLUSTER_L, ACT_CORE(L),
+									opp[PPM_CLUSTER_L]-1);
 				if (delta_power >= target_delta_pwr && MaxEff <= target_delta_eff) {
 					MaxEff = target_delta_eff;
 					ChoosenCl = PPM_CLUSTER_L;
@@ -309,26 +373,51 @@ void ppm_cobra_update_limit(void *user_req)
 			if (opp[PPM_CLUSTER_L] != 0)
 				goto end;
 
-			/* give budget to L */
-			while (CORE_LIMIT(L) < get_cluster_max_cpu_core(PPM_CLUSTER_L)) {
-				target_delta_pwr = get_delta_pwr(PPM_CLUSTER_L,
-					CORE_LIMIT(L)+1, COBRA_OPP_NUM-1);
-				if (delta_power < target_delta_pwr)
-					break;
 
-				delta_power -= target_delta_pwr;
-				req->limit[PPM_CLUSTER_L].max_cpu_core = ++CORE_LIMIT(L);
-			}
+			if (is_perf_fist) {
+				/* give budget to B */
+				while (CORE_LIMIT(B) < get_cluster_max_cpu_core(PPM_CLUSTER_B)) {
+					target_delta_pwr = get_delta_pwr(PPM_CLUSTER_B, CORE_LIMIT(B)+1,
+									COBRA_OPP_NUM-1);
+					if (delta_power < target_delta_pwr)
+						break;
 
-			/* give budget to B */
-			while (CORE_LIMIT(B) < get_cluster_max_cpu_core(PPM_CLUSTER_B)) {
-				target_delta_pwr = get_delta_pwr(PPM_CLUSTER_B,
-					CORE_LIMIT(B)+1, COBRA_OPP_NUM-1);
-				if (delta_power < target_delta_pwr)
-					break;
+					delta_power -= target_delta_pwr;
+					req->limit[PPM_CLUSTER_B].max_cpu_core = ++CORE_LIMIT(B);
+				}
 
-				delta_power -= target_delta_pwr;
-				req->limit[PPM_CLUSTER_B].max_cpu_core = ++CORE_LIMIT(B);
+				/* give budget to L */
+				while (CORE_LIMIT(L) < get_cluster_max_cpu_core(PPM_CLUSTER_L)) {
+					target_delta_pwr = get_delta_pwr(PPM_CLUSTER_L, CORE_LIMIT(L)+1,
+									COBRA_OPP_NUM-1);
+					if (delta_power < target_delta_pwr)
+						break;
+
+					delta_power -= target_delta_pwr;
+					req->limit[PPM_CLUSTER_L].max_cpu_core = ++CORE_LIMIT(L);
+				}
+			} else {
+				/* give budget to L */
+				while (CORE_LIMIT(L) < get_cluster_max_cpu_core(PPM_CLUSTER_L)) {
+					target_delta_pwr = get_delta_pwr(PPM_CLUSTER_L,
+						CORE_LIMIT(L)+1, COBRA_OPP_NUM-1);
+					if (delta_power < target_delta_pwr)
+						break;
+
+					delta_power -= target_delta_pwr;
+					req->limit[PPM_CLUSTER_L].max_cpu_core = ++CORE_LIMIT(L);
+				}
+
+				/* give budget to B */
+				while (CORE_LIMIT(B) < get_cluster_max_cpu_core(PPM_CLUSTER_B)) {
+					target_delta_pwr = get_delta_pwr(PPM_CLUSTER_B,
+						CORE_LIMIT(B)+1, COBRA_OPP_NUM-1);
+					if (delta_power < target_delta_pwr)
+						break;
+
+					delta_power -= target_delta_pwr;
+					req->limit[PPM_CLUSTER_B].max_cpu_core = ++CORE_LIMIT(B);
+				}
 			}
 
 end:
@@ -356,14 +445,26 @@ prepare_next_round:
 
 			/* B-cluster */
 			if (ACT_CORE(B) > 0 && opp[PPM_CLUSTER_B] < PPM_COBRA_MAX_FREQ_IDX) {
-				MinEff = get_delta_eff(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]);
+				if (is_perf_fist)
+					MinEff = get_perf(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]);
+				else
+					MinEff = get_delta_eff(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]);
 				ChoosenCl = PPM_CLUSTER_B;
 				ChoosenPwr = get_delta_pwr(PPM_CLUSTER_B, ACT_CORE(B), opp[PPM_CLUSTER_B]);
 			}
 
 			/* L-cluster */
 			if (ACT_CORE(L) > 0 && opp[PPM_CLUSTER_L] < PPM_COBRA_MAX_FREQ_IDX) {
-				target_delta_eff = get_delta_eff(PPM_CLUSTER_L, ACT_CORE(L), opp[PPM_CLUSTER_L]);
+				if (is_perf_fist) {
+					/*keep 1L active*/
+					if (ACT_CORE(L) > 1 || opp[PPM_CLUSTER_L] != PPM_COBRA_MAX_FREQ_IDX-1)
+						target_delta_eff = get_perf(PPM_CLUSTER_L, ACT_CORE(L),
+										opp[PPM_CLUSTER_L]);
+					else
+						target_delta_eff = 9999999;
+				} else
+					target_delta_eff = get_delta_eff(PPM_CLUSTER_L, ACT_CORE(L),
+									opp[PPM_CLUSTER_L]);
 				if (MinEff > target_delta_eff) {
 					MinEff = target_delta_eff;
 					ChoosenCl = PPM_CLUSTER_L;

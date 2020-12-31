@@ -547,7 +547,10 @@ int do_ptim_internal(bool isSuspend, unsigned int *bat, signed int *cur, bool *i
 #else
 	*cur = 0;
 #endif
+#ifndef VENDOR_EDIT
+///tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  Add for debug log
 	pr_info("do_ptim_internal : bat %d cur %d\n", *bat, *cur);
+#endif
 
 	return ret;
 }
@@ -906,8 +909,11 @@ int get_dlpt_imix(void)
 	imix = (curr_avg + (volt_avg - g_lbatInt1) * 1000 / ptim_rac_val_avg) / 10;
 
 #if defined(CONFIG_MTK_SMART_BATTERY)
+#ifndef VENDOR_EDIT
+///tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 	pr_info("[get_dlpt_imix] %d,%d,%d,%d,%d,%d,%d\n", volt_avg, curr_avg, g_lbatInt1,
 		ptim_rac_val_avg, imix, battery_get_soc(), bat_get_ui_percentage());
+#endif
 #endif
 
 	if (imix < 0) {
@@ -982,7 +988,10 @@ int dlpt_notify_handler(void *unused)
 	unsigned long dlpt_notify_interval;
 	int pre_ui_soc = 0;
 	int cur_ui_soc = 0;
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 	int diff_ui_soc = 1;
+#endif
 
 #if defined(CONFIG_MTK_SMART_BATTERY)
 	pre_ui_soc = bat_get_ui_percentage();
@@ -1033,10 +1042,12 @@ int dlpt_notify_handler(void *unused)
 					g_imix_val = IMAX_MAX_VALUE;
 				exec_dlpt_callback(g_imix_val);
 				pre_ui_soc = cur_ui_soc;
-
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 				pr_info("[DLPT_final] %d,%d,%d,%d,%d\n",
 					g_imix_val, pre_ui_soc, cur_ui_soc,
 					diff_ui_soc, IMAX_MAX_VALUE);
+#endif
 			}
 		}
 
@@ -1058,9 +1069,11 @@ int dlpt_notify_handler(void *unused)
 					set_shutdown_cond(DLPT_SHUTDOWN);
 					cnt++;
 					pr_info("[DLPT_POWER_OFF_EN] notify SOC=0 to power off , cnt=%d\n", cnt);
-
+#ifndef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/10/16, sjc Delete for remove dlpt shutdown */
 					if (cnt >= 4)
 						kernel_restart("DLPT reboot system");
+#endif /* VENDOR_EDIT */
 #endif
 				} else {
 					cnt = 0;

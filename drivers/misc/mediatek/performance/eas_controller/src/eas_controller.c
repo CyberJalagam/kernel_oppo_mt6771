@@ -25,7 +25,7 @@
 #include <linux/string.h>
 #include <asm/div64.h>
 
-#if defined(CONFIG_MTK_FPSGO) && defined(FPSGO_CPI)
+#if defined(CONFIG_MTK_FPSGO) && !defined(CONFIG_MTK_CM_MGR)
 #include <fpsgo_common.h>
 #include <mtk_vcorefs_governor.h>
 #include <mtk_vcorefs_manager.h>
@@ -47,7 +47,7 @@ static int boost_value[NR_CGROUP][EAS_MAX_KIR];
 static int debug_boost_value[NR_CGROUP];
 static int debug;
 
-#if defined(CONFIG_MTK_FPSGO) && defined(FPSGO_CPI)
+#if defined(CONFIG_MTK_FPSGO) && !defined(CONFIG_MTK_CM_MGR)
 /* for CPI monitor */
 static int vcore_high;
 static int vcore;
@@ -131,11 +131,13 @@ int update_eas_boost_value(int kicker, int cgroup_idx, int value)
 
 	current_boost_value[cgroup_idx] = check_boost_value(final_boost_value);
 
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 	if (kicker == EAS_KIR_PERF)
 		pr_debug(TAG"kicker:%d, boost:%d, final:%d, current:%d",
 				kicker, boost_value[cgroup_idx][kicker],
 				final_boost_value, current_boost_value[cgroup_idx]);
-
+#endif
 
 	if (!debug) {
 		boost_write_for_perf_idx(cgroup_idx, current_boost_value[cgroup_idx]);
@@ -652,7 +654,7 @@ static const struct file_operations perfmgr_m_sched_migrate_cost_n_fops = {
 };
 
 /*************************************************************************************/
-#if defined(CONFIG_MTK_FPSGO) && defined(FPSGO_CPI)
+#if defined(CONFIG_MTK_FPSGO) && !defined(CONFIG_MTK_CM_MGR)
 static ssize_t perfmgr_cpi_thres_write(struct file *filp, const char *ubuf,
 		size_t cnt, loff_t *pos)
 {
@@ -762,7 +764,7 @@ void perfmgr_eas_boost_init(void)
 	/*--sched migrate cost n--*/
 	proc_create("m_sched_migrate_cost_n", 0644, boost_dir, &perfmgr_m_sched_migrate_cost_n_fops);
 
-#if defined(CONFIG_MTK_FPSGO) && defined(FPSGO_CPI)
+#if defined(CONFIG_MTK_FPSGO) && !defined(CONFIG_MTK_CM_MGR)
 	proc_create("vcore_high", 0644, boost_dir, &perfmgr_vcore_high_fops);
 	proc_create("cpi_thres", 0644, boost_dir, &perfmgr_cpi_thres_fops);
 

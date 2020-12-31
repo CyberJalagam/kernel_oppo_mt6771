@@ -30,6 +30,13 @@
 #include "disp_drv_platform.h"
 #include "primary_display.h"
 #include "mt-plat/mtk_chip.h"
+#ifdef VENDOR_EDIT
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/09/26,
+* add for aod feature
+*/
+#include <soc/oppo/oppo_project.h>
+#endif /*VENDOR_EDIT*/
 
 /* use this magic_code to detect memory corruption */
 #define MAGIC_CODE 0xDEADAAA0U
@@ -377,7 +384,19 @@ void disp_helper_option_init(void)
 
 	disp_helper_set_option(DISP_OPT_REG_PARSER_RAW_DUMP, 0);
 
+	#ifndef VENDOR_EDIT
+	/*
+	* Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/09/26,
+	* add for Aod feature
+	*/
 	disp_helper_set_option(DISP_OPT_AOD, 1);
+	#else
+	if (is_project(OPPO_17197)) {
+		disp_helper_set_option(DISP_OPT_AOD, 1);
+	} else {
+		disp_helper_set_option(DISP_OPT_AOD, 0);
+	}
+	#endif /* VENDOR_EDIT */
 
 	/* ARR phase 1 option*/
 	disp_helper_set_option(DISP_OPT_ARR_PHASE_1, 0);

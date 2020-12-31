@@ -228,12 +228,11 @@ static int _pwrap_timeout_ns(unsigned long long start_time_ns, unsigned long lon
 
 	/* avoid timer over flow exiting in FPGA env */
 	if (cur_time < start_time_ns) {
-		PWRAPLOG("Timer overflow: start time: %lld\n", start_time_ns);
-		PWRAPLOG("Timer overflow: current time: %lld\n", cur_time);
+		PWRAPLOG("@@@@Timer overflow! start%lld cur timer%lld\n", start_time_ns, cur_time);
 		start_time_ns = cur_time;
 		timeout_time_ns = TIMEOUT_WAIT_IDLE * 1000;	/* 10000us */
-		PWRAPLOG("Timer reset: start time: %lld\n", start_time_ns);
-		PWRAPLOG("Timer reset: set timeout: %lld\n", timeout_time_ns);
+		PWRAPLOG("@@@@reset timer! start%lld setting%lld\n", start_time_ns,
+			 timeout_time_ns);
 	}
 
 	elapse_time = cur_time - start_time_ns;
@@ -241,10 +240,8 @@ static int _pwrap_timeout_ns(unsigned long long start_time_ns, unsigned long lon
 	/* check if timeout */
 	if (timeout_time_ns <= elapse_time) {
 		/* timeout */
-		PWRAPLOG("Timeout: elapse time: %lld\n", elapse_time);
-		PWRAPLOG("Timeout: start time: %lld\n", start_time_ns);
-		PWRAPLOG("Timeout: set timeout: %lld\n", timeout_time_ns);
-
+		PWRAPLOG("@@@@Timeout: elapse time%lld,start%lld setting timer%lld\n",
+			 elapse_time, start_time_ns, timeout_time_ns);
 		/* check if timeout be caused by mpu vio */
 		if ((WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0) & 0x80000000) != 0)
 			return 1;
@@ -354,8 +351,6 @@ static inline unsigned int wait_for_state_ready_init(loop_condition_fp fp, unsig
 			if ((WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0)
 				& 0x80000000) != 0) {
 				pwrap_mpu_info();
-				pwrap_logging_at_isr();
-				pwrap_reenable_pmic_logging();
 				WRAP_WR32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0,
 					0x80000000);
 				return E_PWR_INVALID_ADDR;
@@ -392,8 +387,6 @@ static inline unsigned int wait_for_state_idle(loop_condition_fp fp, unsigned in
 			if ((WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0)
 				& 0x80000000) != 0) {
 				pwrap_mpu_info();
-				pwrap_logging_at_isr();
-				pwrap_reenable_pmic_logging();
 				WRAP_WR32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0,
 					0x80000000);
 				return E_PWR_INVALID_ADDR;
@@ -448,8 +441,6 @@ static inline unsigned int wait_for_state_ready(loop_condition_fp fp, unsigned i
 			if ((WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0)
 				& 0x80000000) != 0) {
 				pwrap_mpu_info();
-				pwrap_logging_at_isr();
-				pwrap_reenable_pmic_logging();
 				WRAP_WR32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0,
 					0x80000000);
 				return E_PWR_INVALID_ADDR;
@@ -496,7 +487,6 @@ static signed int pwrap_wacs2_hal(unsigned int write, unsigned int adr, unsigned
 	/* clear pmic mpu acc vio */
 	WRAP_WR32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0, 0x80000000);
 	WRAP_WR32(PMIC_WRAP_MPU_PWRAP_ACC_VIO_INFO_0, 0x80000000);
-
 	/* Check IDLE & INIT_DONE in advance */
 	return_value =
 	    wait_for_state_idle(wait_for_fsm_idle, TIMEOUT_WAIT_IDLE, PMIC_WRAP_WACS2_RDATA,
@@ -529,8 +519,9 @@ static signed int pwrap_wacs2_hal(unsigned int write, unsigned int adr, unsigned
 
 FAIL:
 	spin_unlock_irqrestore(&wrp_lock, flags);
-	if (return_value != 0)
+	if (return_value != 0) {
 		PWRAPLOG("pwrap_wacs2_hal fail, ret=%d\n", return_value);
+	}
 
 	return return_value;
 }
@@ -787,33 +778,29 @@ static void _pwrap_InitStaUpd(void)
 #else
 	WRAP_WR32(PMIC_WRAP_STAUPD_GRPEN, 0xfc);
 #endif
-
-#ifdef PMIC_WRAP_CRC_SUPPORT
+#if 0
 	/* CRC */
-#ifndef DUAL_PMICS
+#ifdef DUAL_PMICS
 	pwrap_write_nochk(PMIC_DEW_CRC_EN_ADDR, 0x1);
 	WRAP_WR32(PMIC_WRAP_CRC_EN, 0x1);
-	WRAP_WR32(PMIC_WRAP_SIG_ADR, PMIC_DEW_CRC_VAL_ADDR);
+	WRAP_WR32(PMIC_WRAP_SIG_ADR, DEW_CRC_VAL);
 #else
 	pwrap_write_nochk(PMIC_DEW_CRC_EN_ADDR, 0x1);
 	pwrap_write_nochk(EXT_DEW_CRC_EN, 0x1);
 	WRAP_WR32(PMIC_WRAP_CRC_EN, 0x1);
-	WRAP_WR32(PMIC_WRAP_SIG_ADR, (PMIC_EXT_DEW_CRC_VAL << 16 |
-					PMIC_DEW_CRC_VAL_ADDR));
+	WRAP_WR32(PMIC_WRAP_SIG_ADR, (EXT_DEW_CRC_VAL << 16 | DEW_CRC_VAL));
 #endif
-#else
+#endif
 	/* Signature */
 #ifndef DUAL_PMICS
 	WRAP_WR32(PMIC_WRAP_SIG_MODE, 0x1);
-	WRAP_WR32(PMIC_WRAP_SIG_ADR, PMIC_DEW_CRC_VAL_ADDR);
+	WRAP_WR32(PMIC_WRAP_SIG_ADR, MT6358_DEW_CRC_VAL);
 	WRAP_WR32(PMIC_WRAP_SIG_VALUE, 0x83);
 #else
 	WRAP_WR32(PMIC_WRAP_SIG_MODE, 0x3);
-	WRAP_WR32(PMIC_WRAP_SIG_ADR, (PMIC_EXT_DEW_CRC_VAL << 16) |
-					PMIC_DEW_CRC_VAL_ADDR);
+	WRAP_WR32(PMIC_WRAP_SIG_ADR, (EXT_DEW_CRC_VAL << 16) | DEW_CRC_VAL);
 	WRAP_WR32(PMIC_WRAP_SIG_VALUE, (0x83 << 16) | 0x83);
 #endif
-#endif /* end of crc */
 
 	WRAP_WR32(PMIC_WRAP_EINT_STA0_ADR, PMIC_CPU_INT_STA_ADDR);
 #ifdef DUAL_PMICS
@@ -1379,39 +1366,28 @@ static inline void pwrap_dump_ap_register(void)
 	PWRAPLOG("dump reg\n");
 	if (__ratelimit(&ratelimit)) {
 		for (i = 0; i <= PMIC_WRAP_REG_RANGE; i++) {
-#if (PMIC_WRAP_KERNEL) || (PMIC_WRAP_CTP)
-			reg_addr = (unsigned int *) (PMIC_WRAP_BASE + i * 4);
-			val = WRAP_RD32(reg_addr);
-			PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
-#else
 			reg_addr = (PMIC_WRAP_BASE + i * 4);
-			val = WRAP_RD32(reg_addr);
-			PWRAPLOG("addr:0x%x = 0x%x\n", reg_addr, val);
+#if (PMIC_WRAP_KERNEL)
+		val = WRAP_RD32(((unsigned int *) (PMIC_WRAP_BASE + i * 4)));
+#else
+		val = WRAP_RD32(reg_addr);
 #endif
+		PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
 		}
 	}
 	for (i = 0; i <= 14; i++) {
 		offset = 0xc00 + i * 4;
-#if (PMIC_WRAP_KERNEL) || (PMIC_WRAP_CTP)
-		reg_addr = (unsigned int *) (PMIC_WRAP_BASE + offset);
-		val = WRAP_RD32(reg_addr);
-		PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
-#else
 		reg_addr = (PMIC_WRAP_BASE + offset);
+#if (PMIC_WRAP_KERNEL)
+		val = WRAP_RD32(((unsigned int *) (PMIC_WRAP_BASE + offset)));
+#else
 		val = WRAP_RD32(reg_addr);
-		PWRAPLOG("addr:0x%x = 0x%x\n", reg_addr, val);
 #endif
+		PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
 	}
 	WRAP_WR32(PMIC_WRAP_WACS2_EN, 0x0);
 	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x8); /* clear log */
-
-#ifdef PMIC_WRAP_MATCH_SUPPORT
-	/* Matching mode and Stop recording after interrupt trigger */
-	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x5); /* reenable */
-#else
-	/* Matching mode and Continue recording after interrupt trigger */
-	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x1); /* reenable */
-#endif
+	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x2); /* reenable */
 	WRAP_WR32(PMIC_WRAP_WACS2_EN, 0x1);
 }
 
@@ -1472,28 +1448,17 @@ static void pwrap_logging_at_isr(void)
 	PWRAPLOG("WDATA_SEQ_5=0x%x\n", WRAP_RD32(PMIC_WRAP_WDATA_SEQUENCE_5));
 	PWRAPLOG("WDATA_SEQ_6=0x%x\n", WRAP_RD32(PMIC_WRAP_WDATA_SEQUENCE_6));
 	PWRAPLOG("WDATA_SEQ_7=0x%x\n", WRAP_RD32(PMIC_WRAP_WDATA_SEQUENCE_7));
-
 	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x8); /* clear log */
-
-#ifdef PMIC_WRAP_MATCH_SUPPORT
-	/* Matching mode and Stop recording after interrupt trigger */
-	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x5); /* reenable */
-#else
-	/* Matching mode and Continue recording after interrupt trigger */
-	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x1); /* reenable */
-#endif
-
+	WRAP_WR32(PMIC_WRAP_MONITOR_CTRL_0, 0x2); /* reenable */
 	for (i = 0; i <= 14; i++) {
 		offset = 0xc00 + i * 4;
-#if (PMIC_WRAP_KERNEL) || (PMIC_WRAP_CTP)
-		reg_addr = (unsigned int *) (PMIC_WRAP_BASE + offset);
-		val = WRAP_RD32(reg_addr);
-		PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
-#else
 		reg_addr = (PMIC_WRAP_BASE + offset);
+#if (PMIC_WRAP_KERNEL)
+		val = WRAP_RD32(((unsigned int *) (PMIC_WRAP_BASE + offset)));
+#else
 		val = WRAP_RD32(reg_addr);
-		PWRAPLOG("addr:0x%x = 0x%x\n", reg_addr, val);
 #endif
+		PWRAPLOG("addr:0x%p = 0x%x\n", reg_addr, val);
 	}
 	}
 }
@@ -1503,21 +1468,21 @@ static void pwrap_mpu_info(void)
 	static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 5);
 
 	if (__ratelimit(&ratelimit)) {
-	PWRAPLOG("PMIC_INFO_0 = 0x%x\n",
+	PWRAPLOG("PMIC_INFO_0 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_0));
-	PWRAPLOG("PMIC_INFO_1 = 0x%x\n",
+	PWRAPLOG("PMIC_INFO_1 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_1));
-	PWRAPLOG("PMIC_INFO_2 = 0x%x\n",
+	PWRAPLOG("PMIC_INFO_2 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_INFO_2));
-	PWRAPLOG("P2P_INFO_0 = 0x%x\n",
+	PWRAPLOG("P2P_INFO_0 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_P2P_INFO_0));
-	PWRAPLOG("P2P_INFO_1 = 0x%x\n",
+	PWRAPLOG("P2P_INFO_1 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_P2P_INFO_1));
-	PWRAPLOG("P2P_INFO_2 = 0x%x\n",
+	PWRAPLOG("P2P_INFO_2 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PMIC_ACC_VIO_P2P_INFO_2));
-	PWRAPLOG("PWRAP_INFO_0 = 0x%x\n",
+	PWRAPLOG("PWRAP_INFO_0 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PWRAP_ACC_VIO_INFO_0));
-	PWRAPLOG("PWRAP_INFO_1 = 0x%x\n",
+	PWRAPLOG("PWRAP_INFO_1 0x%x\n",
 		WRAP_RD32(PMIC_WRAP_MPU_PWRAP_ACC_VIO_INFO_1));
 	}
 }
@@ -1552,15 +1517,13 @@ static void pwrap_reenable_pmic_logging(void)
 	sub_return = pwrap_write_nochk(PMIC_RG_SPI_RECORD_CLR_ADDR, 0x0);
 	if (sub_return != 0)
 		PWRAPLOG("clear record command fail, ret=%x\n", sub_return);
-	PWRAPLOG("clear record command ok\n");
+	PWRAPLOG("clear record command ok\n\r");
 
 }
 void pwrap_dump_and_recovery(void)
 {
-	PWRAPLOG("%s start!!!\n", __func__);
 	pwrap_dump_ap_register();
 	pwrap_dump_pmic_register();
-	PWRAPLOG("%s end!!!\n", __func__);
 }
 void pwrap_dump_all_register(void)
 {
@@ -1695,16 +1658,11 @@ static int g_case_flag;
 static irqreturn_t mt_pmic_wrap_irq(int irqno, void *dev_id)
 {
 	unsigned int int0_flg = 0, int1_flg = 0, ret = 0;
-
-#ifdef PMIC_WRAP_CRC_SUPPORT
 	unsigned char str[50] = "";
-#endif
 
 	int0_flg = WRAP_RD32(PMIC_WRAP_INT0_FLG);
-	int1_flg = WRAP_RD32(PMIC_WRAP_INT1_FLG);
-
 	if ((int0_flg & 0xffffffff) != 0) {
-		PWRAPLOG("[PWRAP] INT0 error = 0x%x\n", int0_flg);
+		PWRAPLOG("[PWRAP]INT0 error:0x%x\n", int0_flg);
 		WRAP_WR32(PMIC_WRAP_INT0_CLR, 0xffffffff);
 #if 0
 		/* trigger MD ASSERT when CRC fail*/
@@ -1713,15 +1671,11 @@ static irqreturn_t mt_pmic_wrap_irq(int irqno, void *dev_id)
 		}
 #endif
 	}
-
+	int1_flg = WRAP_RD32(PMIC_WRAP_INT1_FLG);
 	if ((int1_flg & 0xffffffff) != 0) {
-		PWRAPLOG("[PWRAP]INT1 error = 0x%x\n", int1_flg);
+		PWRAPLOG("[PWRAP]INT1 error:0x%x\n", int1_flg);
 		if ((int1_flg & (0x3 << 26)) != 0) {
-			PWRAPLOG("[PWRAP] MPU Access Violation\n");
 			pwrap_mpu_info();
-			pwrap_logging_at_isr();
-			pwrap_reenable_pmic_logging();
-			aee_kernel_warning("PWRAP:MPU Violation", "PWRAP");
 			WRAP_WR32(PMIC_WRAP_INT1_CLR, int1_flg);
 		} else {
 			pwrap_dump_all_register();
@@ -1732,43 +1686,26 @@ static irqreturn_t mt_pmic_wrap_irq(int irqno, void *dev_id)
 	if ((int0_flg & 0x01) == 0x01) {
 		g_wrap_wdt_irq_count++;
 		g_case_flag = 0;
-		PWRAPLOG("g_wrap_wdt_irq_count = %d\n", g_wrap_wdt_irq_count);
+		PWRAPLOG("g_wrap_wdt_irq_count=%d\n", g_wrap_wdt_irq_count);
 
 	} else if ((int0_flg & 0x02) == 0x02) {
-
-#ifdef PMIC_WRAP_CRC_SUPPORT
-		snprintf(str, 50, "[PWRAP] CRC = 0x%x",
-			 WRAP_RD32(PMIC_WRAP_SIG_ERRVAL));
+		snprintf(str, 50, "PWRAP CRC=0x%x",
+			WRAP_RD32(PMIC_WRAP_SIG_ERRVAL));
 		aee_kernel_warning(str, str);
-#endif
 		pwrap_logging_at_isr();
 		pwrap_reenable_pmic_logging();
+		WRAP_WR32(PMIC_WRAP_INT0_EN, 0xfffffff9);
 
-#ifdef PMIC_WRAP_CRC_SUPPORT
-		WRAP_WR32(PMIC_WRAP_INT0_EN, 0xffffffff);
-#else
-		WRAP_WR32(PMIC_WRAP_INT0_EN, 0xfffffff9); /* Disable CRC INT */
-#endif
-
-		/* Clear SPISLV CRC status */
+		/* Clear spislv CRC sta */
 		ret = pwrap_write_nochk(PMIC_DEW_CRC_SWRST_ADDR, 0x1);
 		if (ret != 0)
-			PWRAPLOG("reset crc fail, ret=%x\n", ret);
+			PWRAPLOG("clear crc fail, ret=%x\n", ret);
 		ret = pwrap_write_nochk(PMIC_DEW_CRC_SWRST_ADDR, 0x0);
 		if (ret != 0)
 			PWRAPLOG("clear crc fail, ret=%x\n", ret);
-		ret = pwrap_write_nochk(PMIC_DEW_CRC_EN_ADDR, 0x0);
-		if (ret != 0)
-			pr_notice("disable crc fail, ret=%x\n", ret);
-
+		pwrap_write_nochk(PMIC_DEW_CRC_EN_ADDR, 0x0);
 		WRAP_WR32(PMIC_WRAP_CRC_EN, 0x0);
-
-#ifdef PMIC_WRAP_CRC_SUPPORT
-		WRAP_WR32(PMIC_WRAP_STAUPD_GRPEN, 0xf5);
-#else
-		WRAP_WR32(PMIC_WRAP_STAUPD_GRPEN, 0xf4); /* Disable CRC STAUPD */
-#endif
-
+		WRAP_WR32(PMIC_WRAP_STAUPD_GRPEN, 0xf4);
 	} else {
 		g_case_flag = 1;
 	}
@@ -1777,7 +1714,6 @@ static irqreturn_t mt_pmic_wrap_irq(int irqno, void *dev_id)
 		WARN_ON(1);
 
 	return IRQ_HANDLED;
-
 }
 
 static void pwrap_int_test(void)
@@ -1789,7 +1725,7 @@ static void pwrap_int_test(void)
 		rdata1 = WRAP_RD32(PMIC_WRAP_EINT_STA);
 		pwrap_read(PMIC_CPU_INT_STA_ADDR, &rdata2);
 		PWRAPREG
-			("PMIC_WRAP_EINT_STA=0x%x,INT_STA[0x042e]=0x%x\n",
+			("Pwrap INT status check,PMIC_WRAP_EINT_STA=0x%x,INT_STA[0x01B4]=0x%x\n",
 			 rdata1, rdata2);
 		msleep(500);
 	}

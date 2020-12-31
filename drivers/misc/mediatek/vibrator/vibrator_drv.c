@@ -47,7 +47,12 @@
 #define VERSION					        "v 0.1"
 #define VIB_DEVICE				"mtk_vibrator"
 
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2018/12/26, Modify for limiting kernel log*/
 static int debug_enable_vib_hal = 1;
+#else
+static int debug_enable_vib_hal = 0;
+#endif
 /* #define pr_fmt(fmt) "[vibrator]"fmt */
 #define VIB_DEBUG(format, args...) do { \
 	if (debug_enable_vib_hal) {\
@@ -98,9 +103,30 @@ static int vibe_state;
 static int ldo_state;
 static int shutdown_flag;
 
+#ifdef VENDOR_EDIT
+/*Fei.Mo@EXP.BSP.Sensor, 2017/06/13, Add for solve vibrator noise in gsensor*/
+static void (*vibrator_notify)(int);
+
+void register_vibrator_notify(void (*notify)(int))
+{
+	vibrator_notify = notify;
+}
+
+static void notify_vibr_to_sensor(int enable) {
+	printk("vibrator enable/disable %d\n", enable);
+	if (vibrator_notify) {
+		vibrator_notify(enable);
+	}
+}
+#endif /* VENDOR_EDIT */
+
 static int vibr_Enable(void)
 {
 	if (!ldo_state) {
+	#ifdef VENDOR_EDIT
+	/*Fei.Mo@EXP.BSP.Sensor, 2017/06/13, Add for solve vibrator noise in gsensor*/
+		notify_vibr_to_sensor(1);
+	#endif /* VENDOR_EDIT */
 		vibr_Enable_HW();
 		ldo_state = 1;
 	}
@@ -112,16 +138,31 @@ static int vibr_Disable(void)
 	if (ldo_state) {
 		vibr_Disable_HW();
 		ldo_state = 0;
+	#ifdef VENDOR_EDIT
+	/*Fei.Mo@EXP.BSP.Sensor, 2017/06/13, Add for solve vibrator noise in gsensor*/
+		notify_vibr_to_sensor(0);
+	#endif /* VENDOR_EDIT */
 	}
 	return 0;
 }
 
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
+static int vibe_time = 0;
+#endif /*VENDOR_EDIT*/
 static void update_vibrator(struct work_struct *work)
 {
 	if (!vibe_state)
 		vibr_Disable();
 	else
 		vibr_Enable();
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
+	if (vibe_time) {
+		hrtimer_start(&vibe_timer,ktime_set(vibe_time / 1000, (vibe_time % 1000) * 1000000), HRTIMER_MODE_REL);
+		vibe_time=0;
+	}
+#endif /*VENDOR_EDIT*/
 }
 
 static int vibrator_get_time(struct timed_output_dev *dev)
@@ -142,6 +183,10 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	struct vibrator_hw *hw = mt_get_cust_vibrator_hw();
 #endif
 
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
+	VIB_DEBUG("vibrator_enable: vibrator first in value = %d\n", value);
+#endif /* VENDOR_EDIT */
 	if (hrtimer_cancel(&vibe_timer))
 		VIB_DEBUG("vibrator_enable: cancel existed hrtimer, cust timer: %d(ms), value: %d, shutdown: %d\n",
 			hw->vib_timer, value, shutdown_flag);
@@ -162,12 +207,29 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 
 		value = (value > 15000 ? 15000 : value);
 		vibe_state = 1;
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
 		hrtimer_start(&vibe_timer,
 			      ktime_set(value / 1000, (value % 1000) * 1000000),
 			      HRTIMER_MODE_REL);
+#endif /*VENDOR_EDIT*/
 	}
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
+	vibe_time = value;
+#endif /*VENDOR_EDIT*/
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
 	spin_unlock_irqrestore(&vibe_lock, flags);
+#endif /*VENDOR_EDIT*/
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
 	queue_work(vibrator_queue, &vibrator_work);
+#else
+	update_vibrator(&vibrator_work);
+	spin_unlock_irqrestore(&vibe_lock, flags);
+	VIB_DEBUG("vibrator_enable: end\n");
+#endif /* VENDOR_EDIT */
 }
 
 static void vibrator_oc_handler(void)
@@ -180,7 +242,12 @@ static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 {
 	vibe_state = 0;
 	VIB_DEBUG("vibrator_timer_func: vibrator will disable\n");
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/07/17, Modify for vibrator some act abnormal(case:ALPS03078335) */
 	queue_work(vibrator_queue, &vibrator_work);
+#else
+	vibr_Disable();
+#endif /* VENDOR_EDIT */
 	return HRTIMER_NORESTART;
 }
 

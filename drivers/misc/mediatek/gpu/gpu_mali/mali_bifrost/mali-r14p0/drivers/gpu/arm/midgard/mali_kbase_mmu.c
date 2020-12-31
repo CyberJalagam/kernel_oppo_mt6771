@@ -48,6 +48,11 @@
 #include <mali_kbase_time.h>
 #include <mali_kbase_mem.h>
 
+#ifdef VENDOR_EDIT
+/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+#include <linux/oppo_mm_kevent_fb.h>
+#endif /*VENDOR_EDIT*/
+
 #define KBASE_MMU_PAGE_ENTRIES 512
 
 /**
@@ -2325,6 +2330,11 @@ static void kbase_mmu_report_fault_and_kill(struct kbase_context *kctx,
 	struct kbase_device *kbdev;
 	struct kbasep_js_device_data *js_devdata;
 
+	#ifdef VENDOR_EDIT
+	/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+	unsigned char payload[500] = "";
+	#endif
+
 #if KBASE_GPU_RESET_EN
 	bool reset_status = false;
 #endif
@@ -2359,6 +2369,27 @@ static void kbase_mmu_report_fault_and_kill(struct kbase_context *kctx,
 		access_type, access_type_name(kbdev, as->fault_status),
 		source_id,
 		kctx->pid);
+
+	#ifdef VENDOR_EDIT
+	/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+	scnprintf(payload, sizeof(payload), "EventID@@%d$$GPU_mmu_fault@@Unhandled Page fault in AS%d at VA 0x%016llX"
+		" Reason: %s"
+		" raw fault status: 0x%X"
+		" decoded fault status: %s"
+		" exception type 0x%X: %s"
+		" access type 0x%X: %s"
+		" source id 0x%X"
+		" pid: %d",
+		OPPO_MM_DIRVER_FB_EVENT_ID_MTK_GPU_MMU_FAULT,as_no, as->fault_addr,
+		reason_str,
+		as->fault_status,
+		(as->fault_status & (1 << 10) ? "DECODER FAULT" : "SLAVE FAULT"),
+		exception_type, kbase_exception_name(kbdev, exception_type),
+		access_type, access_type_name(kbdev, as->fault_status),
+		source_id,
+		kctx->pid);
+	upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
+	#endif
 
 	/* hardware counters dump fault handling */
 	if ((kbdev->hwcnt.kctx) && (kbdev->hwcnt.kctx->as_nr == as_no) &&

@@ -58,3 +58,7 @@ obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_UID_SYS_STATS) += uid_sys_stats.o
 obj-$(CONFIG_MEDIATEK_SOLUTION)	+= mediatek/
 obj-$(CONFIG_MEMORY_STATE_TIME) += memory_state_time.o
+# Mengmeng.Wang@SRC.System, 2018/08/28, Add for oiface
+#ifdef VENDOR_EDIT
+obj-y		+= schedx.o
+#endif

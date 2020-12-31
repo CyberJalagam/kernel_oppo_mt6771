@@ -72,6 +72,13 @@ char blockio_aee_buffer[BLOCKIO_AEE_BUFFER_SIZE];
 /* debugfs dentries */
 struct dentry *mtk_btag_droot;
 struct dentry *mtk_btag_dlog;
+
+/* mini context for major embedded storage only */
+#define MICTX_PROC_CMD_BUF_SIZE (1)
+static struct mtk_btag_mictx_struct *mtk_btag_mictx;
+static bool mtk_btag_mictx_ready;
+static bool mtk_btag_mictx_debug;
+
 static void mtk_btag_init_debugfs(void);
 
 /* blocktag */
@@ -124,7 +131,8 @@ static size_t mtk_btag_seq_pidlog_usedmem(char **buff, unsigned long *size,
 #define biolog_fmt_rt "rt:%d,%d,%lld."
 #define pidlog_fmt "{%05d:%05d:%08d:%05d:%08d}"
 
-void mtk_btag_pidlog_insert(struct mtk_btag_pidlogger *pidlog, pid_t pid, __u32 len, int rw)
+void mtk_btag_pidlog_insert(struct mtk_btag_pidlogger *pidlog, pid_t pid,
+	__u32 len, int write)
 {
 	int i;
 	struct mtk_btag_pidlogger_entry *pe;
@@ -134,7 +142,7 @@ void mtk_btag_pidlog_insert(struct mtk_btag_pidlogger *pidlog, pid_t pid, __u32 
 		pe = &pidlog->info[i];
 		if ((pe->pid == pid) || (pe->pid == 0)) {
 			pe->pid = pid;
-			prw = (rw) ? &pe->w : &pe->r;
+			prw = (write) ? &pe->w : &pe->r;
 			prw->count++;
 			prw->length += len;
 			break;
@@ -146,19 +154,19 @@ EXPORT_SYMBOL_GPL(mtk_btag_pidlog_insert);
 static void mtk_btag_pidlog_add(struct request_queue *q, struct bio *bio,
 	unsigned short pid, __u32 len)
 {
-	int rw = (bio->bi_rw & REQ_WRITE) ? 1 : 0;
+	int write = bio_data_dir(bio);
 	int major = bio->bi_bdev ? MAJOR(bio->bi_bdev->bd_dev) : 0;
 
 	if (pid != 0xFFFF && major) {
 #ifdef CONFIG_MTK_UFS_BLOCK_IO_LOG
 		if (major == SCSI_DISK0_MAJOR || major == BLOCK_EXT_MAJOR) {
-			mtk_btag_pidlog_add_ufs(q, pid, len, rw);
+			mtk_btag_pidlog_add_ufs(q, pid, len, write);
 			return;
 		}
 #endif
 #ifdef CONFIG_MMC_BLOCK_IO_LOG
 		if (major == MMC_BLOCK_MAJOR || major == BLOCK_EXT_MAJOR) {
-			mtk_btag_pidlog_add_mmc(q, pid, len, rw);
+			mtk_btag_pidlog_add_mmc(q, pid, len, write);
 			return;
 		}
 #endif
@@ -287,6 +295,26 @@ void mtk_btag_vmstat_eval(struct mtk_btag_vmstat *vm)
 }
 EXPORT_SYMBOL_GPL(mtk_btag_vmstat_eval);
 
+void mtk_btag_mictx_dump(void)
+{
+	struct mtk_btag_mictx_iostat_struct iostat;
+	int ret;
+
+	ret = mtk_btag_mictx_get_data(&iostat);
+
+	if (ret) {
+		pr_info("[BLOCK_TAG] Mictx: Get data failed %d\n", ret);
+		return;
+	}
+
+	pr_info("[BLOCK_TAG] Mictx: %llu|%u|%u|%u|%u|%u|%u|%u|%u|%u|%u\n",
+		iostat.duration, iostat.q_depth, iostat.wl,
+		iostat.tp_req_r, iostat.tp_req_w,
+		iostat.tp_all_r, iostat.tp_all_w,
+		iostat.reqcnt_r, iostat.reqcnt_w,
+		iostat.reqsize_r, iostat.reqsize_w);
+}
+
 /* evaluate pidlog trace from context */
 void mtk_btag_pidlog_eval(struct mtk_btag_pidlogger *pl, struct mtk_btag_pidlogger *ctx_pl)
 {
@@ -303,6 +331,10 @@ void mtk_btag_pidlog_eval(struct mtk_btag_pidlogger *pl, struct mtk_btag_pidlogg
 		memcpy(&pl->info[0], &ctx_pl->info[0], size);
 		memset(&ctx_pl->info[0], 0, size);
 	}
+
+	if (mtk_btag_mictx_debug)
+		mtk_btag_mictx_dump();
+
 }
 EXPORT_SYMBOL_GPL(mtk_btag_pidlog_eval);
 
@@ -365,6 +397,27 @@ void mtk_btag_cpu_eval(struct mtk_btag_cpu *cpu)
 	cpu->softirq = cputime64_to_clock_t(softirq);
 }
 EXPORT_SYMBOL_GPL(mtk_btag_cpu_eval);
+
+static __u32 mtk_btag_eval_tp_speed(__u32 bytes, __u64 duration)
+{
+	__u32 speed_kbs = 0;
+
+	if (!bytes || !duration)
+		return 0;
+
+	/* convert ns to ms */
+	do_div(duration, 1000000);
+
+	if (duration) {
+		/* bytes/ms */
+		speed_kbs = bytes / (__u32)duration;
+
+		/* KB/s */
+		speed_kbs = (speed_kbs * 1000) >> 10;
+	}
+
+	return speed_kbs;
+}
 
 static void mtk_btag_throughput_rw_eval(struct mtk_btag_throughput_rw *rw)
 {
@@ -809,6 +862,71 @@ static const struct file_operations mtk_btag_sub_fops = {
 	.write		= mtk_btag_sub_write,
 };
 
+static ssize_t mtk_btag_mictx_sub_write(struct file *file,
+	const char __user *ubuf,
+	size_t count, loff_t *ppos)
+{
+	int ret;
+	char cmd[MICTX_PROC_CMD_BUF_SIZE];
+
+	if (count == 0)
+		goto err;
+	else if (count > MICTX_PROC_CMD_BUF_SIZE)
+		count = MICTX_PROC_CMD_BUF_SIZE;
+
+	ret = copy_from_user(cmd, ubuf, count);
+
+	if (ret < 0)
+		goto err;
+
+	if (cmd[0] == '1')
+		mtk_btag_mictx_enable(1);
+	else if (cmd[0] == '2')
+		mtk_btag_mictx_enable(0);
+	else if (cmd[0] == '3')
+		mtk_btag_mictx_debug = 1;
+	else if (cmd[0] == '4')
+		mtk_btag_mictx_debug = 0;
+	else {
+		pr_info("[pidmap] invalid arg: 0x%x\n", cmd[0]);
+		goto err;
+	}
+
+	return count;
+
+err:
+	return -1;
+}
+
+/* The debugfs functions are optimized away when CONFIG_DEBUG_FS isn't set. */
+static int mtk_btag_mctx_sub_show(struct seq_file *s, void *data)
+{
+	seq_puts(s, "<MTK Blocktag Mini Context>\n");
+	seq_puts(s, "Status:\n");
+	seq_printf(s, "  Ready: %d\n", mtk_btag_mictx_ready);
+	seq_printf(s, "  Mictx Instance: %p\n", mtk_btag_mictx);
+	seq_puts(s, "Commands:\n");
+	seq_puts(s, "  Enable Mini Context : echo 1 > blocktag_mictx\n");
+	seq_puts(s, "  Disable Mini Context: echo 2 > blocktag_mictx\n");
+	seq_puts(s, "  Enable Self-Test    : echo 3 > blocktag_mictx\n");
+	seq_puts(s, "  Disable Self-Test   : echo 4 > blocktag_mictx\n");
+	return 0;
+}
+
+static int mtk_btag_mictx_sub_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, mtk_btag_mctx_sub_show, inode->i_private);
+}
+
+static const struct file_operations mtk_btag_mictx_sub_fops = {
+	.owner		= THIS_MODULE,
+	.open		= mtk_btag_mictx_sub_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+	.write		= mtk_btag_mictx_sub_write,
+};
+
 struct mtk_blocktag *mtk_btag_alloc(const char *name,
 	unsigned ringtrace_count, size_t ctx_size, unsigned ctx_count,
 	mtk_btag_seq_f seq_show)
@@ -883,6 +1001,14 @@ struct mtk_blocktag *mtk_btag_alloc(const char *name,
 
 	if (IS_ERR(btag->dentry.dlog))
 		pr_warn("[BLOCK_TAG] %s: fail to create blockio at debugfs\n", name);
+
+	btag->dentry.dlog_mictx = debugfs_create_file("blockio_mictx",
+		S_IFREG | 0444,
+		btag->dentry.droot, (void *)0, &mtk_btag_mictx_sub_fops);
+
+	if (IS_ERR(btag->dentry.dlog_mictx))
+		pr_info("[BLOCK_TAG] %s: fail to create blockio_mictx at debugfs\n",
+			name);
 
 out:
 	spin_lock_init(&btag->prbuf.lock);
@@ -1027,6 +1153,189 @@ static void mtk_btag_init_debugfs(void)
 		(void *)0, &mtk_btag_main_fops);
 	if (IS_ERR(mtk_btag_dlog))
 		pr_warn("[BLOCK_TAG] blocktag: fail to create log at debugfs\n");
+}
+
+static inline
+struct mtk_btag_mictx_struct *mtk_btag_mictx_get_ctx(void)
+{
+	if (mtk_btag_mictx_ready)
+		return mtk_btag_mictx;
+	else
+		return NULL;
+}
+
+void mtk_btag_mictx_eval_tp(
+	unsigned int write, __u64 usage, __u32 size)
+{
+	struct mtk_btag_mictx_struct *ctx;
+	struct mtk_btag_throughput_rw *tprw;
+	unsigned long flags;
+	__u64 cur_time = sched_clock();
+	__u64 req_begin_time;
+
+	ctx = mtk_btag_mictx_get_ctx();
+	if (!ctx)
+		return;
+
+	tprw = (write) ? &ctx->tp.w : &ctx->tp.r;
+
+	spin_lock_irqsave(&ctx->lock, flags);
+	tprw->size += size;
+	tprw->usage += usage;
+
+	ctx->tp_max_time = cur_time;
+	req_begin_time = cur_time - usage;
+
+	if (!ctx->tp_min_time)
+		ctx->tp_min_time = req_begin_time;
+	else {
+		if (req_begin_time < ctx->tp_min_time)
+			ctx->tp_min_time = req_begin_time;
+	}
+	spin_unlock_irqrestore(&ctx->lock, flags);
+}
+
+void mtk_btag_mictx_eval_req(
+	unsigned int write, __u32 cnt, __u32 size)
+{
+	struct mtk_btag_mictx_struct *ctx;
+	struct mtk_btag_req_rw *reqrw;
+	unsigned long flags;
+
+	ctx = mtk_btag_mictx_get_ctx();
+	if (!ctx)
+		return;
+
+	reqrw = (write) ? &ctx->req.w : &ctx->req.r;
+	spin_lock_irqsave(&ctx->lock, flags);
+	reqrw->count += cnt;
+	reqrw->size += size;
+	spin_unlock_irqrestore(&ctx->lock, flags);
+}
+
+void mtk_btag_mictx_update_ctx(__u32 q_depth)
+{
+	struct mtk_btag_mictx_struct *ctx;
+	unsigned long flags;
+
+	ctx = mtk_btag_mictx_get_ctx();
+	if (!ctx)
+		return;
+
+	spin_lock_irqsave(&ctx->lock, flags);
+	ctx->q_depth = q_depth;
+
+	if (!ctx->q_depth) {
+		ctx->idle_begin = sched_clock();
+	} else {
+		if (ctx->idle_begin) {
+			ctx->idle_total +=
+				(sched_clock() - ctx->idle_begin);
+			ctx->idle_begin = 0;
+		}
+	}
+	spin_unlock_irqrestore(&ctx->lock, flags);
+}
+
+static void mtk_btag_mictx_reset(
+	struct mtk_btag_mictx_struct *ctx,
+	__u64 window_begin)
+{
+	if (!window_begin)
+		window_begin = sched_clock();
+	ctx->window_begin = window_begin;
+
+	if (!ctx->q_depth)
+		ctx->idle_begin = ctx->window_begin;
+	else
+		ctx->idle_begin = 0;
+
+	ctx->idle_total = 0;
+	ctx->tp_min_time = ctx->tp_max_time = 0;
+	memset(&ctx->tp, 0, sizeof(struct mtk_btag_throughput));
+	memset(&ctx->req, 0, sizeof(struct mtk_btag_req));
+}
+
+int mtk_btag_mictx_get_data(
+	struct mtk_btag_mictx_iostat_struct *iostat)
+{
+	struct mtk_btag_mictx_struct *ctx;
+	__u64 time_cur, dur, tp_dur;
+	unsigned long flags;
+
+	ctx = mtk_btag_mictx_get_ctx();
+	if (!ctx || !iostat)
+		return -1;
+
+	spin_lock_irqsave(&ctx->lock, flags);
+
+	time_cur = sched_clock();
+	dur = time_cur - ctx->window_begin;
+
+	/* fill-in duration */
+	iostat->duration = dur;
+
+	/* calculate throughput (per-request) */
+	iostat->tp_req_r = mtk_btag_eval_tp_speed(
+		ctx->tp.r.size, ctx->tp.r.usage);
+	iostat->tp_req_w = mtk_btag_eval_tp_speed(
+		ctx->tp.w.size, ctx->tp.w.usage);
+
+	/* calculate throughput (overlapped, not 100% precise) */
+	tp_dur = ctx->tp_max_time - ctx->tp_min_time;
+	iostat->tp_all_r = mtk_btag_eval_tp_speed(
+		ctx->tp.r.size, tp_dur);
+	iostat->tp_all_w = mtk_btag_eval_tp_speed(
+		ctx->tp.w.size, tp_dur);
+
+	/* provide request count and size */
+	iostat->reqcnt_r = ctx->req.r.count;
+	iostat->reqsize_r = ctx->req.r.size;
+	iostat->reqcnt_w = ctx->req.w.count;
+	iostat->reqsize_w = ctx->req.w.size;
+
+	/* calculate workload */
+	if (ctx->idle_begin)
+		ctx->idle_total += (time_cur - ctx->idle_begin);
+
+	iostat->wl = 100 -
+		((__u32)((ctx->idle_total >> 10) * 100) / (__u32)(dur >> 10));
+
+	/* fill-in cmdq depth */
+	iostat->q_depth = ctx->q_depth;
+
+	/* everything was provided, now we can reset the ctx */
+	mtk_btag_mictx_reset(ctx, time_cur);
+
+	spin_unlock_irqrestore(&ctx->lock, flags);
+
+	return 0;
+}
+
+void mtk_btag_mictx_enable(int enable)
+{
+	if (enable && mtk_btag_mictx)
+		return;
+
+	if (enable) {
+		mtk_btag_mictx =
+			kzalloc(sizeof(struct mtk_btag_mictx_struct), GFP_NOFS);
+		if (!mtk_btag_mictx) {
+			pr_info("[BLOCK_TAG] mtk_btag_mictx allocation fail, disabled.\n");
+			return;
+		}
+
+		spin_lock_init(&mtk_btag_mictx->lock);
+		mtk_btag_mictx_reset(mtk_btag_mictx, 0);
+		mtk_btag_mictx_ready = 1;
+	} else {
+		if (!mtk_btag_mictx)
+			return;
+
+		mtk_btag_mictx_ready = 0;
+		kfree(mtk_btag_mictx);
+		mtk_btag_mictx = NULL;
+	}
 }
 
 static int __init mtk_btag_init(void)

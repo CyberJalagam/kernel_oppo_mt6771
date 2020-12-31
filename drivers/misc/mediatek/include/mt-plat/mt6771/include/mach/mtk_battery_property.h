@@ -17,9 +17,14 @@
 /* customize */
 #define DIFFERENCE_FULLOCV_ITH	200	/* mA */
 #define MTK_CHR_EXIST 1
-#define KEEP_100_PERCENT 1
-#define R_FG_VALUE	5				/* mOhm */
+#define KEEP_100_PERCENT 2
+#define R_FG_VALUE	10				/* mOhm */
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/28, Add for charger at low temprature*/
+#define EMBEDDED_SEL 1
+#else
 #define EMBEDDED_SEL 0
+#endif /*VENDOR_EDIT*/
 #define PMIC_SHUTDOWN_CURRENT 20	/* 0.01 mA */
 #define FG_METER_RESISTANCE	75
 #define CAR_TUNE_VALUE	100 /*1.00 */
@@ -33,7 +38,7 @@
 /* enable that uisoc = 1 and wait xmins then shutdown */
 #define SHUTDOWN_GAUGE1_XMINS 1
 /* define Xmins to shutdown*/
-#define SHUTDOWN_1_TIME	30
+#define SHUTDOWN_1_TIME	60
 
 #define SHUTDOWN_GAUGE1_VBAT_EN 0
 #define SHUTDOWN_GAUGE1_VBAT 34000
@@ -80,7 +85,12 @@
 #define DIFF_SOC_SETTING 50	/* 0.01% */
 #define DIFF_BAT_TEMP_SETTING 1
 #define DIFF_BAT_TEMP_SETTING_C 10
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/28, Add for charger at low temprature*/
 #define DISCHARGE_TRACKING_TIME 10
+#else 
+#define DISCHARGE_TRACKING_TIME 40
+#endif /*VENDOR_EDIT*/
 #define CHARGE_TRACKING_TIME 60
 #define DIFFERENCE_FULLOCV_VTH	1000	/* 0.1mV */
 #define CHARGE_PSEUDO_FULL_LEVEL 8000
@@ -207,23 +217,43 @@
 
 /* using current to limit uisoc in 100% case*/
 /* UI_FULL_LIMIT_ITH0 3000 means 300ma */
-#define UI_FULL_LIMIT_EN 0
-#define UI_FULL_LIMIT_SOC0 9900
-#define UI_FULL_LIMIT_ITH0 2200
+#define UI_FULL_LIMIT_EN 1
 
-#define UI_FULL_LIMIT_SOC1 9900
-#define UI_FULL_LIMIT_ITH1 2200
+#ifndef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2017/09/12, commit the param of the high soc to smooth the charging line.
+#define UI_FULL_LIMIT_SOC0 9700
+#define UI_FULL_LIMIT_ITH0 3000
+
+#define UI_FULL_LIMIT_SOC1 9800
+#define UI_FULL_LIMIT_ITH1 2800
 
 #define UI_FULL_LIMIT_SOC2 9900
-#define UI_FULL_LIMIT_ITH2 2200
+#define UI_FULL_LIMIT_ITH2 2500
 
-#define UI_FULL_LIMIT_SOC3 9900
+#define UI_FULL_LIMIT_SOC3 9940
 #define UI_FULL_LIMIT_ITH3 2200
 
-#define UI_FULL_LIMIT_SOC4 9900
-#define UI_FULL_LIMIT_ITH4 2200
+#define UI_FULL_LIMIT_SOC4 10000
+#define UI_FULL_LIMIT_ITH4 2000
+#else /*VENDOR_EDIT*/
+#define UI_FULL_LIMIT_SOC0 9500
+#define UI_FULL_LIMIT_ITH0 4500
 
-#define UI_FULL_LIMIT_TIME 99999
+#define UI_FULL_LIMIT_SOC1 9600
+#define UI_FULL_LIMIT_ITH1 4000
+
+#define UI_FULL_LIMIT_SOC2 9700
+#define UI_FULL_LIMIT_ITH2 3500
+
+#define UI_FULL_LIMIT_SOC3 9800
+#define UI_FULL_LIMIT_ITH3 2800
+
+#define UI_FULL_LIMIT_SOC4 9900
+#define UI_FULL_LIMIT_ITH4 2000
+
+#endif /*VENDOR_EDIT*/
+
+#define UI_FULL_LIMIT_TIME 480
 
 
 /* using voltage to limit uisoc in 1% case */

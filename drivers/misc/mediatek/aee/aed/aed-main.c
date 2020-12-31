@@ -67,7 +67,7 @@ static int ke_log_available = 1;
 static struct proc_dir_entry *aed_proc_dir;
 
 #define MaxStackSize 8100
-#define MaxMapsSize 65536
+#define MaxMapsSize 16384
 
 /******************************************************************************
  * DEBUG UTILITIES
@@ -932,8 +932,8 @@ static void ee_gen_ind_msg(struct aed_eerec *eerec)
 		return;
 
 	rep_msg->cmdType = AE_IND;
-	rep_msg->cmdId = AE_IND_EXP_RAISED;
-	rep_msg->arg = AE_EE;
+    rep_msg->cmdId = AE_IND_EXP_RAISED;
+    rep_msg->arg = AE_EE;
 	rep_msg->len = 0;
 	rep_msg->dbOption = eerec->db_opt;
 
@@ -1915,6 +1915,7 @@ static void external_exception(const char *assert_type, const int *log, int log_
 
 	LOGD("%s : [%s] log ptr %p size %d, phy ptr %p size %d\n", __func__,
 	     assert_type, log, log_size, phy, phy_size);
+
 	if ((aee_mode >= AEE_MODE_CUSTOMER_USER) && (aee_force_exp == AEE_FORCE_EXP_NOT_SET))
 		return;
 	eerec = kzalloc(sizeof(struct aed_eerec), GFP_ATOMIC);

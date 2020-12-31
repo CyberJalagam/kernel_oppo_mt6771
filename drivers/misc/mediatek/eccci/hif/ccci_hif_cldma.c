@@ -460,6 +460,7 @@ static inline u32 cldma_reg_bit_scatter(u32 reg_g)
 }
 #endif
 
+
 /* may be called from workqueue or NAPI or tasklet (queue0) context, only NAPI and tasklet with blocking=false */
 static int cldma_gpd_rx_collect(struct md_cd_queue *queue, int budget, int blocking)
 {
@@ -799,7 +800,6 @@ static int cldma_gpd_bd_tx_collect(struct md_cd_queue *queue, int budget, int bl
 	struct sk_buff *skb_free;
 	int need_resume = 0;
 	int resume_done = 0;
-
 	while (1) {
 		spin_lock_irqsave(&queue->ring_lock, flags);
 		req = queue->tr_done;
@@ -964,6 +964,7 @@ static int cldma_gpd_tx_collect(struct md_cd_queue *queue, int budget, int block
 			md_ctrl->wakeup_count++;
 			CCCI_NOTICE_LOG(md_ctrl->md_id, TAG, "CLDMA_AP wakeup source:(%d/%d)(%u)\n",
 							queue->index, ccci_h->channel, md_ctrl->wakeup_count);
+
 		}
 		CCCI_DEBUG_LOG(md_ctrl->md_id, TAG, "harvest Tx msg (%x %x %x %x) txq=%d len=%d\n",
 			     ccci_h->data[0], ccci_h->data[1], *(((u32 *) ccci_h) + 2), ccci_h->reserved, queue->index,

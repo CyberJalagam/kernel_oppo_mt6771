@@ -29,9 +29,22 @@
 #include <linux/atomic.h>
 
 #include <xhci-mtk-driver.h>
-
+#ifdef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic 2017/11/22 add for otg
+#include <linux/of_gpio.h>
+#endif /* VENDOR_EDIT */
 #define RET_SUCCESS 0
 #define RET_FAIL 1
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+struct platform_device *musb_pltfm_dev = NULL;
+#define OTGID_GPIO_MODE 1
+#define OTGID_IRQ_MODE  0
+static struct pinctrl *pinctrl;
+static struct pinctrl_state *pinctrl_iddig;
+int iddig_gpio_mode(int mode);
+extern bool get_otg_switch(void);
+#endif /* VENDOR_EDIT */
 
 static struct pinctrl *pinctrl;
 static struct pinctrl_state *pinctrl_iddig_init;
@@ -142,13 +155,20 @@ void mtk_disable_host(void)
 		mtk_xhci_driver_unload(true);
 	mtk_idpin_cur_stat = IDPIN_OUT;
 }
-
-
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/25, modify for otg */
+int otg_is_exist=0;
+#endif
 void mtk_xhci_mode_switch(struct work_struct *work)
 {
-	static bool is_load;
+	static bool is_load = false;
 	int ret = 0;
-
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/04/16, modify for otg */
+    if (get_otg_switch() ==false && is_load == false){
+        return ;
+    }
+#endif
 	mtk_xhci_mtk_printk(K_DEBUG, "mtk_xhci_mode_switch\n");
 
 	if (mtk_idpin_cur_stat == IDPIN_OUT) {
@@ -161,12 +181,19 @@ void mtk_xhci_mode_switch(struct work_struct *work)
 
 		if (mtk_idpin_cur_stat == IDPIN_IN_DEVICE)
 			goto done;
-
+		#ifdef VENDOR_EDIT
+		/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/25, modify for otg */	
+		otg_is_exist = 1;
+		#endif
 		ret = mtk_xhci_driver_load(true);
 		if (!ret)
 			is_load = true;
 	} else {
 		if (is_load) {
+			#ifdef VENDOR_EDIT
+			/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/25, modify for otg */
+			otg_is_exist = 0;
+			#endif
 			mtk_xhci_driver_unload(true);
 			is_load = false;
 		}
@@ -217,11 +244,95 @@ static int mtk_xhci_eint_iddig_irq_en(void)
 	return retval;
 }
 
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+int iddig_gpio_mode(int mode)
+{
+	int retval;
+      if(musb_pltfm_dev != NULL) {
+	      if(mode == OTGID_GPIO_MODE) {
+		  	printk("iddig_gpio_mode OTGID_GPIO_MODE\n");
+			free_irq(mtk_idpin_irqnum,NULL);
+			if(otg_is_exist == 1) {
+				schedule_delayed_work(&mtk_xhci_delaywork, msecs_to_jiffies(mtk_iddig_debounce));
+				mdelay(5);
+			}
+               pinctrl = devm_pinctrl_get(&musb_pltfm_dev->dev);
+               if (IS_ERR(pinctrl))
+                    dev_err(&musb_pltfm_dev->dev, "Cannot find usb pinctrl!\n");
+               else {
+                    pinctrl_iddig = pinctrl_lookup_state(pinctrl, "iddig_output_low");
+                    if (IS_ERR(pinctrl_iddig))
+                           dev_err(&musb_pltfm_dev->dev, "Cannot find usb pinctrl iddig_output_low\n");
+                    else
+                           pinctrl_select_state(pinctrl, pinctrl_iddig);
+
+                   }
+
+	     } else if(mode == OTGID_IRQ_MODE) {
+	     	enable_irq(mtk_idpin_irqnum);
+			if(otg_is_exist == 1) {
+				retval = request_irq(mtk_idpin_irqnum, xhci_eint_iddig_isr, IRQF_TRIGGER_HIGH, "iddig_eint",NULL);
+			} else {
+				retval = request_irq(mtk_idpin_irqnum, xhci_eint_iddig_isr, IRQF_TRIGGER_LOW, "iddig_eint",NULL);
+			}
+			mdelay(5);
+		       pinctrl = devm_pinctrl_get(&musb_pltfm_dev->dev);
+	           if (IS_ERR(pinctrl))
+		              dev_err(&musb_pltfm_dev->dev, "Cannot find usb pinctrl!\n");
+	           else {
+		              pinctrl_iddig = pinctrl_lookup_state(pinctrl, "iddig_init");
+		              if (IS_ERR(pinctrl_iddig))
+			               dev_err(&musb_pltfm_dev->dev, "Cannot find usb pinctrl iddig_init\n");
+		              else
+		                   pinctrl_select_state(pinctrl, pinctrl_iddig);
+	          }
+	    }
+	    return 0;
+    } else {
+            return -1;
+    }
+}
+/*
+int mtk_eint_iddig_init(void)
+{
+	 int retval = 0;
+	 enable_irq(iddig_eint_num);
+	 retval = request_irq(iddig_eint_num, mt_usb_ext_iddig_int, IRQF_TRIGGER_LOW, "USB_IDDIG", NULL);
+	 printk("mtk_eint_iddig_init\n");
+	 //INIT_DELAYED_WORK(&mtk_xhci_delaywork, mtk_xhci_mode_switch);
+ 
+	 return retval;
+}
+ 
+void mtk_eint_iddig_deinit(void)
+{
+	 free_irq(iddig_eint_num, NULL);
+	 if(iddig_req_host == 1) {
+		 iddig_req_host = 0;
+		 printk("mtk_eint_iddig_deinit\n");
+		 queue_delayed_work(mtk_musb->st_wq, &mtk_musb->host_work, msecs_to_jiffies(sw_deboun_time));
+	 }
+ 
+	 //cancel_delayed_work(&mtk_xhci_delaywork);
+ }
+ */
+
+void mtk_xhci_eint_iddig_gpio_mode(void)
+{
+    iddig_gpio_mode(1);
+}
+#endif /* VENDOR_EDIT */
 static int otg_iddig_probe(struct platform_device *pdev)
 {
 	int retval = 0;
 	struct device *dev = &pdev->dev;
+#ifndef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic 2017/11/22 modify for otg
 	struct device_node *node = dev->of_node;
+#else
+	struct device_node *node = NULL;
+#endif /* VENDOR_EDIT */
 	int iddig_gpio, iddig_debounce;
 	u32 ints[2] = {0, 0};
 
@@ -229,10 +340,23 @@ static int otg_iddig_probe(struct platform_device *pdev)
 	g_pdev = pdev;
 #endif
 
+#ifndef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic 2017/11/22 modify for otg
 	mtk_idpin_irqnum = irq_of_parse_and_map(node, 0);
 	if (mtk_idpin_irqnum < 0)
 		return -ENODEV;
-
+#else
+	printk("otg_iddig_probe\n");
+	node = of_find_matching_node(node, otg_iddig_of_match);
+	if(node != NULL) {
+		mtk_idpin_irqnum = irq_of_parse_and_map(node, 0);
+	}
+	else {
+		printk("otg_iddig_probe_node is none\n");
+	}
+	printk("iddig gpio num = %d\n", mtk_idpin_irqnum);
+	musb_pltfm_dev = pdev;
+#endif /* VENDOR_EDIT */
 	pinctrl = devm_pinctrl_get(dev);
 	if (IS_ERR(pinctrl)) {
 		dev_err(&pdev->dev, "Cannot find usb pinctrl!\n");
@@ -240,11 +364,13 @@ static int otg_iddig_probe(struct platform_device *pdev)
 	}
 
 	pinctrl_iddig_init = pinctrl_lookup_state(pinctrl, "iddig_init");
+	#ifndef VENDOR_EDIT
+	/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/26, modefy for otg */
 	if (IS_ERR(pinctrl_iddig_init))
 		dev_err(&pdev->dev, "Cannot find usb pinctrl iddig_init\n");
 	else
 		pinctrl_select_state(pinctrl, pinctrl_iddig_init);
-
+	#endif /* VENDOR_EDIT */
 
 #ifdef CONFIG_USB_MTK_OTG_SWITCH
 	pinctrl_iddig_enable = pinctrl_lookup_state(pinctrl, "iddig_enable");
@@ -259,9 +385,17 @@ static int otg_iddig_probe(struct platform_device *pdev)
 #endif
 
 	retval = of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+	iddig_gpio = of_get_named_gpio(node, "deb-gpios", 0);
+#endif /* VENDOR_EDIT*/
 	if (!retval) {
 		iddig_gpio = ints[0];
 		iddig_debounce = ints[1];
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+		printk("iddig_gpio = %d\n", iddig_gpio);
+#endif /* VENDOR_EDIT */
 		mtk_xhci_mtk_printk(K_DEBUG, "iddig gpio num = %d\n", mtk_idpin_irqnum);
 		/*mt_gpio_set_debounce(iddig_gpio, iddig_debounce);*/
 	}
@@ -281,6 +415,11 @@ static int otg_iddig_probe(struct platform_device *pdev)
 #else
 	retval = mtk_xhci_eint_iddig_irq_en();
 #endif
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+	iddig_gpio_mode(OTGID_GPIO_MODE);
+	#endif /* VENDOR_EDIT */
+
 	return 0;
 }
 

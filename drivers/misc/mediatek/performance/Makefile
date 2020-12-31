@@ -40,6 +40,7 @@ ifeq ($(CONFIG_MTK_FPSGO), y)
 	ifeq ($(CONFIG_MACH_MT6771), y)
 		ccflags-y += -DCONFIG_MTK_FPSGO_V2
 		obj-y += fpsgo_v2/
+		obj-y += eara_thermal/
 	else ifeq ($(CONFIG_MACH_MT6775), y)
 		ccflags-y += -DCONFIG_MTK_FPSGO_V2
 		obj-y += fpsgo_v2/

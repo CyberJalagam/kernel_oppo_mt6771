@@ -242,6 +242,18 @@ int bat_temp_filter(int *arr, unsigned short size)
 	return (sum/(size - 2));
 }
 
+static void wk_auxadc_reset(void)
+{
+	pmic_set_register_value(PMIC_RG_AUXADC_RST, 1);
+	pmic_set_register_value(PMIC_RG_AUXADC_RST, 0);
+	pmic_set_register_value(PMIC_BANK_AUXADC_SWRST, 1);
+	pmic_set_register_value(PMIC_BANK_AUXADC_SWRST, 0);
+	/* avoid GPS can't receive AUXADC ready after reset, request again */
+	pmic_set_register_value(PMIC_AUXADC_RQST_CH7, 1);
+	pmic_set_register_value(PMIC_AUXADC_RQST_DCXO_BY_GPS, 1);
+	pr_notice("reset AUXADC done\n");
+}
+
 void wk_auxadc_dbg_dump(void)
 {
 	unsigned char reg_log[861] = "", reg_str[21] = "";
@@ -263,7 +275,10 @@ void wk_auxadc_dbg_dump(void)
 			snprintf(reg_str, 20, "Reg[0x%x]=0x%x, ", adc_dbg_addr[j], pmic_adc_dbg[dbg_stamp].reg[j]);
 			strncat(reg_log, reg_str, 860);
 		}
+#ifndef VENDOR_EDIT
+/////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 		pr_notice("[%s] %d %d %s\n", __func__, dbg_stamp, pmic_adc_dbg[dbg_stamp].ktime_sec, reg_log);
+#endif
 		strncpy(reg_log, "", 860);
 		dbg_stamp++;
 		if (dbg_stamp >= 4)
@@ -276,6 +291,7 @@ int wk_auxadc_battmp_dbg(int bat_temp)
 	unsigned short i;
 	int vbif = 0, bat_temp2 = 0, bat_temp3 = 0, bat_id = 0;
 	int arr_bat_temp[5];
+	int bat = 0, bat_cur = 0, is_charging = 0;
 
 	if (dbg_flag)
 		HKLOG("Another dbg is running\n");
@@ -291,8 +307,11 @@ int wk_auxadc_battmp_dbg(int bat_temp)
 	vbif = pmic_get_auxadc_value(AUXADC_LIST_VBIF);
 	bat_temp3 = pmic_get_auxadc_value(AUXADC_LIST_BATTEMP);
 	bat_id = pmic_get_auxadc_value(AUXADC_LIST_BATID);
+#ifndef VENDOR_EDIT
+////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 	pr_notice("BAT_TEMP1: %d, BAT_TEMP2:%d, VBIF:%d, BAT_TEMP3:%d, BATID:%d\n",
 		bat_temp, bat_temp2, vbif, bat_temp3, bat_id);
+#endif
 
 	if (bat_temp < 200 ||
 		(battmp != 0 && (bat_temp - battmp > 100 || battmp - bat_temp > 100))) {
@@ -300,6 +319,29 @@ int wk_auxadc_battmp_dbg(int bat_temp)
 		for (i = 0; i < 5; i++)
 			arr_bat_temp[i] = pmic_get_auxadc_value(AUXADC_LIST_BATTEMP);
 		bat_temp = bat_temp_filter(arr_bat_temp, 5);
+		pr_notice("%d,%d,%d,%d,%d, BAT_TEMP_NEW:%d\n",
+			arr_bat_temp[0], arr_bat_temp[1], arr_bat_temp[2],
+			arr_bat_temp[3], arr_bat_temp[4], bat_temp);
+
+		/* Reset AuxADC to observe VBAT/IBAT/BAT_TEMP */
+		wk_auxadc_reset();
+		/* set CH3 AVG to 128 */
+		pmic_set_register_value(PMIC_AUXADC_AVG_NUM_CH3, 0x6);
+		for (i = 0; i < 5; i++) {
+			bat = pmic_get_auxadc_value(AUXADC_LIST_BATADC);
+#if (CONFIG_MTK_GAUGE_VERSION == 30)
+			is_charging = gauge_get_current(&bat_cur);
+#endif
+			if (is_charging == 0)
+				bat_cur = 0 - bat_cur;
+			arr_bat_temp[i] = pmic_get_auxadc_value(AUXADC_LIST_BATTEMP);
+			pr_notice("[CH3_DBG] %d,%d,%d\n",
+				  bat, bat_cur, arr_bat_temp[i]);
+		}
+		bat_temp = bat_temp_filter(arr_bat_temp, 5);
+		pr_notice("Final BAT_TEMP_NEW:%d\n", bat_temp);
+		/* restore CH3 AVG to 8 */
+		pmic_set_register_value(PMIC_AUXADC_AVG_NUM_CH3, 0x2);
 	}
 	dbg_flag = 0;
 	return bat_temp;
@@ -419,7 +461,10 @@ void mt6358_auxadc_monitor_mts_regs(void)
 		return;
 	mts_timestamp = mts_timestamp_cur;
 	mts_adc_tmp = pmic_get_register_value(PMIC_AUXADC_ADC_OUT_MDRT);
+#ifndef VENDOR_EDIT
+/////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 	pr_notice("[MTS_ADC] OLD = 0x%x, NOW = 0x%x, CNT = %d\n", mts_adc, mts_adc_tmp, mts_count);
+#endif
 
 	if (mts_adc ==  mts_adc_tmp)
 		mts_count++;
@@ -509,8 +554,7 @@ int mts_kthread(void *x)
 			if (polling_cnt == 156) { /* 156 * 32ms ~= 5s*/
 				pr_notice("[MTS_ADC] (%d) reset AUXADC\n",
 					polling_cnt);
-				pmic_set_register_value(PMIC_RG_AUXADC_RST, 1);
-				pmic_set_register_value(PMIC_RG_AUXADC_RST, 0);
+				wk_auxadc_reset();
 			}
 			if (polling_cnt >= 624) { /* 624 * 32ms ~= 20s*/
 				mt6358_mts_reg_dump();
@@ -675,20 +719,29 @@ int mt6358_get_auxadc_value(u8 channel)
 #endif
 			if (is_charging == 0)
 				bat_cur = 0 - bat_cur;
+#ifndef VENDOR_EDIT
+////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 			pr_notice("[%s] ch_idx = %d, channel = %d, bat_cur = %d, reg_val = 0x%x, adc_result = %d\n",
 				__func__, channel, auxadc_channel->ch_num,
 				bat_cur, reg_val, adc_result);
+#endif
 		} else if (channel == AUXADC_LIST_BATADC) {
 			vthr = pmic_get_auxadc_value(AUXADC_LIST_CHIP_TEMP);
 			vbat_cali = DIV_ROUND_CLOSEST(wk_vbat_cali(adc_result * 10, vthr), 10);
+#ifndef VENDOR_EDIT
+////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 			pr_notice("[%s] ch_idx = %d, channel = %d, reg_val = 0x%x, old_vbat = %d, vthr = %d, adc_result = %d\n",
 				__func__, channel, auxadc_channel->ch_num,
 				reg_val, adc_result, vthr, vbat_cali);
+#endif
 			adc_result = vbat_cali;
 		} else {
+#ifndef VENDOR_EDIT
+///tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 			pr_notice("[%s] ch_idx = %d, channel = %d, reg_val = 0x%x, adc_result = %d\n",
 				__func__, channel, auxadc_channel->ch_num,
 				reg_val, adc_result);
+#endif
 		}
 	} else {
 		HKLOG("[%s] ch_idx = %d, channel = %d, reg_val = 0x%x, adc_result = %d\n",
@@ -701,7 +754,10 @@ int mt6358_get_auxadc_value(u8 channel)
 		if (battmp != 0 &&
 		    (adc_result < 200 || ((adc_result - battmp) > 100) || ((battmp - adc_result) > 100))) {
 			/* dump debug log when VBAT being abnormal */
+#ifndef VENDOR_EDIT
+////tongfeng.Huang@BSP.BaseDrv.CHG.Basic, 2018/02/19  mark for delete debug log
 			pr_notice("old: %d, new: %d\n", battmp, adc_result);
+#endif
 			adc_result = wk_auxadc_battmp_dbg(adc_result);
 #if AEE_DBG
 			if (aee_count < 2)

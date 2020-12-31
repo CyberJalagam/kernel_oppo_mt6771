@@ -573,24 +573,6 @@ source "drivers/misc/mediatek/es_reg/Kconfig"
 source "drivers/misc/mediatek/cmo/Kconfig"
 source "drivers/misc/mediatek/tkcore/Kconfig"
 source "drivers/misc/mediatek/Kconfig.default"
-
-config MTK_FD_LEAK_DETECT
-	bool "Enable MTK fd leak detection"
-	help
-	  This feature is for detecting fd leak.
-	  When kernel can not alloc fd, will print error information.
-	  This feature should be enbled only on Engineer load; User/Userdebug
-	  load should be enabled by demand.
-
-config MTK_FD_LEAK_SPECIFIC_DEBUG
-	bool "Specific demand in fd leak debug"
-	default n
-	help
-	  Specific demand in fd leak debug.
-	  Eg,
-	  For some specific processes, may need backtrace, coredump
-	  and other debug information.
-
 config MTK_DM_VERITY_OFF
 	bool "Disable dm-verity"
 	default n
@@ -598,12 +580,6 @@ config MTK_DM_VERITY_OFF
 config MTK_IRIS_SUPPORT
 	bool "Biometric authentication - iris secure camera"
 	default n
-
-config MTK_DYNAMIC_LOAD_STORE_BYPASS_WA
-	bool "Support Mediatek dynamic workaround for CA75 load-store-bypassing"
-	default n
-	help
-	  Disable load-store-bypassing in user-space
 
 endmenu    # Misc
 

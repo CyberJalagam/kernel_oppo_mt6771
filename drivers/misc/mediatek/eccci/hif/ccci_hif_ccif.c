@@ -487,6 +487,11 @@ static int ccif_rx_collect(struct md_ccif_queue *queue, int budget, int blocking
 				c2k_mem_dump(data_ptr, pkg_size);
 			}
 		}
+		if (atomic_cmpxchg(&md_ctrl->wakeup_src, 1, 0) == 1) {
+			md_ctrl->wakeup_count++;
+			CCCI_NOTICE_LOG(md_ctrl->md_id, TAG, "CCIF_MD wakeup source:(%d/%d/%x)(%u)\n",
+				queue->index, ccci_h->channel, ccci_h->reserved, md_ctrl->wakeup_count);
+		}
 
 		if (ccci_h->channel == CCCI_C2K_LB_DL)
 			atomic_set(&lb_dl_q, queue->index);

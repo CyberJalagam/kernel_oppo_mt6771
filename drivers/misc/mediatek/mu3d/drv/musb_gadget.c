@@ -1623,6 +1623,11 @@ static void musb_pullup(struct musb *musb, int is_on)
 		mu3d_hal_u3dev_dis();
 #endif
 		mu3d_hal_u2dev_disconn();
+		{
+			extern void u3d_clear_all_irq(void);
+
+			u3d_clear_all_irq();
+		}
 	}
 
 	dev_notice(musb->controller, "gadget D+ pullup %s\n", is_on ? "on" : "off");

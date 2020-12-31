@@ -209,6 +209,7 @@ char *spm_vcorefs_dump_dvfs_regs(char *p)
 		p += sprintf(p, "SPM_DVFS_CMD0~1        : 0x%x, 0x%x\n",
 							spm_read(SPM_DVFS_CMD0), spm_read(SPM_DVFS_CMD1));
 		p += sprintf(p, "PCM_IM_PTR             : 0x%x (%u)\n", spm_read(PCM_IM_PTR), spm_read(PCM_IM_LEN));
+		p += sprintf(p, "SPM_SW_RSV_3           : 0x%x\n", spm_read(SPM_SW_RSV_3));
 
 		/* BW Info */
 		p += sprintf(p, "BW_TOTAL: %d (AVG: %d) thres: 0x%x, 0x%x seg: 0x%x\n",
@@ -290,7 +291,7 @@ char *spm_vcorefs_dump_dvfs_regs(char *p)
 		spm_vcorefs_warn("SPM_DVFS_CMD0~1        : 0x%x, 0x%x\n",
 							spm_read(SPM_DVFS_CMD0), spm_read(SPM_DVFS_CMD1));
 		spm_vcorefs_warn("PCM_IM_PTR             :: 0x%x (%u)\n", spm_read(PCM_IM_PTR), spm_read(PCM_IM_LEN));
-
+		spm_vcorefs_warn("SPM_SW_RSV_3           : 0x%x\n", spm_read(SPM_SW_RSV_3));
 		/* BW Info */
 		spm_vcorefs_warn("BW_TOTAL: %d (AVG: %d) thres: 0x%x, 0x%x seg: 0x%x\n",
 				dvfsrc_get_bw(QOS_TOTAL), dvfsrc_get_bw(QOS_TOTAL_AVE),

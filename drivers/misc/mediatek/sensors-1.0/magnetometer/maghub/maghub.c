@@ -223,17 +223,66 @@ static ssize_t show_regiter_map(struct device_driver *ddri, char *buf)
 
 	return _tLength;
 }
+
+#ifdef VENDOR_EDIT
+/*Fei.Mo@EXP.BSP.Sensor, 2017/06/29, Add for msensor auto test */
+static int selftest_result = 0;
+static ssize_t show_test_id(struct device_driver *ddri, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", 1);
+}
+static ssize_t show_magnet_close(struct device_driver *ddri, char *buf)
+{
+	int result = 1;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", result);
+}
+static ssize_t show_magnet_leave(struct device_driver *ddri, char *buf)
+{
+	ssize_t _tLength = 0;
+	int res;
+	res = sensor_set_cmd_to_hub(ID_MAGNETIC, CUST_ACTION_SELFTEST, &selftest_result);
+	MAGN_LOG("selftest_result = %d\n",selftest_result);
+
+	_tLength = snprintf(buf, PAGE_SIZE, "%d\n", selftest_result);
+	return _tLength;
+}
+
+static ssize_t show_chip_selftest(struct device_driver *ddri, char *buf)
+{
+	ssize_t _tLength = 0;
+	int res;
+	res = sensor_set_cmd_to_hub(ID_MAGNETIC, CUST_ACTION_SELFTEST, &selftest_result);
+
+	_tLength = snprintf(buf, PAGE_SIZE, "%d\n", selftest_result);
+	return _tLength;
+}
+#endif /* VENDOR_EDIT */
 static DRIVER_ATTR(chipinfo, S_IRUGO, show_chipinfo_value, NULL);
 static DRIVER_ATTR(sensordata, S_IRUGO, show_sensordata_value, NULL);
 static DRIVER_ATTR(trace, S_IRUGO | S_IWUSR, show_trace_value, store_trace_value);
 static DRIVER_ATTR(orientation, S_IWUSR | S_IRUGO, show_chip_orientation, store_chip_orientation);
 static DRIVER_ATTR(regmap, S_IRUGO, show_regiter_map, NULL);
+#ifdef VENDOR_EDIT
+/*Fei.Mo@EXP.BSP.Sensor, 2017/06/29, Add for msensor auto test */
+static DRIVER_ATTR(magnet_close, S_IRUGO, show_magnet_close, NULL);
+static DRIVER_ATTR(magnet_leave, S_IRUGO, show_magnet_leave, NULL);
+static DRIVER_ATTR(test_id, S_IRUGO, show_test_id, NULL);
+static DRIVER_ATTR(selftest, S_IWUSR | S_IRUGO, show_chip_selftest, NULL);
+#endif /* VENDOR_EDIT */
 static struct driver_attribute *maghub_attr_list[] = {
 	&driver_attr_chipinfo,
 	&driver_attr_sensordata,
 	&driver_attr_trace,
 	&driver_attr_orientation,
 	&driver_attr_regmap,
+#ifdef VENDOR_EDIT
+/*Fei.Mo@EXP.BSP.Sensor, 2017/06/29, Add for msensor auto test */
+	&driver_attr_magnet_close,
+	&driver_attr_magnet_leave,
+	&driver_attr_test_id,
+	&driver_attr_selftest,
+#endif /* VENDOR_EDIT */
 };
 static int maghub_create_attr(struct device_driver *driver)
 {
@@ -649,7 +698,12 @@ static int maghub_resume(struct platform_device *pdev)
 }
 static void maghub_shutdown(struct platform_device *pdev)
 {
-	maghub_enable(0);
+	int i;
+	for (i = 0; i < 2; i++)
+	{
+		MAGN_PR_ERR("%s::i=%d\n", __func__, i);
+		maghub_enable(0);
+	}
 }
 
 static struct platform_device maghub_device = {

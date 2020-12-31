@@ -15,6 +15,11 @@
 #include <accel.h>
 #include <SCP_sensorHub.h>
 #include "SCP_power_monitor.h"
+#ifdef VENDOR_EDIT
+/*Fei.Mo@PSW.BSP.Sensor, 2017/12/17, Add for get sensor_devinfo*/
+#include "../../oppo_sensor_devinfo/sensor_devinfo.h"
+#include <timed_output.h>
+#endif
 
 #define DEBUG 1
 #define SW_CALIBRATION
@@ -335,12 +340,38 @@ static ssize_t store_test_cali(struct device_driver *ddri, const char *buf, size
 	return tCount;
 }
 
+#ifdef VENDOR_EDIT
+//zhihong.lu@BSP.sensor,2018/1/31,add selftest node to set STC debounce
+static int selftest_result = 0;
+static ssize_t show_factory_step_debounce(struct device_driver *ddri, char *buf)
+{
+	ssize_t _tLength = 0;
+	int res;
+	res = sensor_set_cmd_to_hub(ID_ACCELEROMETER, CUST_ACTION_SELFTEST, &selftest_result);
+
+	_tLength = snprintf(buf, PAGE_SIZE, "%d\n", selftest_result);
+
+	GSE_LOG("step counter selftest_result = %d\n", selftest_result);
+
+	return _tLength;
+}
+#endif /* VENDOR_EDIT */
+
+
 static DRIVER_ATTR(chipinfo, S_IRUGO, show_chipinfo_value, NULL);
 static DRIVER_ATTR(sensordata, S_IRUGO, show_sensordata_value, NULL);
 static DRIVER_ATTR(cali, S_IWUSR | S_IRUGO, show_cali_value, NULL);
 static DRIVER_ATTR(trace, S_IWUSR | S_IRUGO, NULL, store_trace_value);
 static DRIVER_ATTR(orientation, S_IWUSR | S_IRUGO, show_chip_orientation, store_chip_orientation);
 static DRIVER_ATTR(test_cali, S_IWUSR | S_IRUGO, NULL, store_test_cali);
+
+#ifdef VENDOR_EDIT
+//zhihong.lu@BSP.sensor,2018/1/31,add selftest node to set STC debounce
+
+static DRIVER_ATTR(factory_step_debounce, S_IWUSR | S_IRUGO, show_factory_step_debounce, NULL);
+#endif /* VENDOR_EDIT */
+
+
 
 static struct driver_attribute *accelhub_attr_list[] = {
 	&driver_attr_chipinfo,	/*chip information */
@@ -349,6 +380,10 @@ static struct driver_attribute *accelhub_attr_list[] = {
 	&driver_attr_trace,	/*trace log */
 	&driver_attr_orientation,
 	&driver_attr_test_cali,
+	#ifdef VENDOR_EDIT
+//zhihong.lu@BSP.sensor,2018/1/31,add selftest node to set STC debounce
+	&driver_attr_factory_step_debounce,
+	#endif /* VENDOR_EDIT */
 };
 
 static int accelhub_create_attr(struct device_driver *driver)
@@ -390,6 +425,10 @@ static void scp_init_work_done(struct work_struct *work)
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	int32_t cfg_data[6] = {0};
 #endif
+#ifdef VENDOR_EDIT
+	int cali_data[3] = {0};
+	get_sensor_parameter(ID_ACCELEROMETER, cali_data);
+#endif
 
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		GSE_LOG("scp is not ready to send cmd\n");
@@ -407,9 +446,19 @@ static void scp_init_work_done(struct work_struct *work)
 	cfg_data[1] = obj->dynamic_cali[1];
 	cfg_data[2] = obj->dynamic_cali[2];
 
+#ifndef VENDOR_EDIT
 	cfg_data[3] = obj->static_cali[0];
 	cfg_data[4] = obj->static_cali[1];
 	cfg_data[5] = obj->static_cali[2];
+#else//VENDOR_EDIT
+	cfg_data[3] = cali_data[0];
+	cfg_data[4] = cali_data[1];
+	cfg_data[5] = cali_data[2];
+
+	obj->static_cali[0] = cfg_data[3];
+	obj->static_cali[1] = cfg_data[4];
+	obj->static_cali[2] = cfg_data[5];
+#endif//VENDOR_EDIT
 	spin_unlock(&calibration_lock);
 	err = sensor_cfg_to_hub(ID_ACCELEROMETER, (uint8_t *)cfg_data, sizeof(cfg_data));
 	if (err < 0)
@@ -417,20 +466,139 @@ static void scp_init_work_done(struct work_struct *work)
 #endif
 }
 
+#ifdef VENDOR_EDIT
+/*Fei.Mo@PSW.BSP.Sensor, 2017/12/17, Add for gsensor calibration*/
+#define LIBHWM_GRAVITY_EARTH 9806
+#define LIBHWM_ACC_NVRAM_SENSITIVITY 65536
+#define SENSOR_CALIBRATION_RATIO 1000
+#endif
+#define ACCELERATION_AVERAGE_FILTER
+#ifdef ACCELERATION_AVERAGE_FILTER
+#define FILTER_ORDER_NUM 12
+#define VIBRATOR_EFFECT_COUNT 12
+static int dataBuffer[FILTER_ORDER_NUM][3];
+static int sumData[3] = {0};
+static unsigned int sumCounter = 0;
+static int bufferFull = 0;
+static int vibr_state = 0;
+static int vibr_effect_count = 0;
+static int last_acc_data[3] = {0};
+
+static void filter_calculate(int *inbuff, int *outX, int *outY, int *outZ)
+{
+	int cycleLimit = 0;
+
+	sumData[0] -= dataBuffer[sumCounter%FILTER_ORDER_NUM][0];
+	sumData[1] -= dataBuffer[sumCounter%FILTER_ORDER_NUM][1];
+	sumData[2] -= dataBuffer[sumCounter%FILTER_ORDER_NUM][2];
+
+	dataBuffer[sumCounter%FILTER_ORDER_NUM][0] = inbuff[0];
+	dataBuffer[sumCounter%FILTER_ORDER_NUM][1] = inbuff[1];
+	dataBuffer[sumCounter%FILTER_ORDER_NUM][2] = inbuff[2];
+
+	sumData[0] += inbuff[0];
+	sumData[1] += inbuff[1];
+	sumData[2] += inbuff[2];
+
+	sumCounter++;
+
+	if (sumCounter >= FILTER_ORDER_NUM)
+	{
+		bufferFull = 1;
+		sumCounter = sumCounter % FILTER_ORDER_NUM;
+	}
+
+	if (bufferFull == 1)
+		cycleLimit = FILTER_ORDER_NUM;
+	else
+		cycleLimit = sumCounter;
+
+	*outX = sumData[0] / cycleLimit;
+	*outY = sumData[1] / cycleLimit;
+	*outZ = sumData[2] / cycleLimit;
+}
+static void vibr_notify_handle(int en)
+{
+	struct accelhub_ipi_data *obj = obj_ipi_data;
+
+	vibr_state = en;
+	if (READ_ONCE(obj->android_enable) == true)
+		vibr_effect_count = VIBRATOR_EFFECT_COUNT;
+}
+#endif//ACCELERATION_AVERAGE_FILTER
+
 static int gsensor_recv_data(struct data_unit_t *event, void *reserved)
 {
 	int err = 0;
+	#ifndef VENDOR_EDIT
+	/*Fei.Mo@PSW.BSP.Sensor, 2017/12/17, Add for gsensor calibration*/
+	int offset[3] = {0};
+	#endif
+#ifdef ACCELERATION_AVERAGE_FILTER
+	int inbuff[3] = {0};
+	int tmp_x,tmp_y,tmp_z;
+	int resultantForceSquare = 0;
+#endif
 	struct acc_data data;
 	struct accelhub_ipi_data *obj = obj_ipi_data;
 
-		data.x = event->accelerometer_t.x;
-		data.y = event->accelerometer_t.y;
-		data.z = event->accelerometer_t.z;
-		data.status = event->accelerometer_t.status;
-		data.timestamp = (int64_t)event->time_stamp;
-		data.reserved[0] = event->reserve[0];
+	data.x = event->accelerometer_t.x;
+	data.y = event->accelerometer_t.y;
+	data.z = event->accelerometer_t.z;
+	data.status = event->accelerometer_t.status;
+	data.timestamp = (int64_t)event->time_stamp;
+	data.reserved[0] = event->reserve[0];
 
-	if (event->flush_action == DATA_ACTION)
+	#ifndef VENDOR_EDIT
+	/*Fei.Mo@PSW.BSP.Sensor, 2017/12/17, Add for gsensor calibration*/
+	get_sensor_parameter(ID_ACCELEROMETER,offset);
+	//GSE_PR_ERR("before x %d y %d z %d\n",data.x,data.y,data.z);
+	data.x += offset[0] * LIBHWM_GRAVITY_EARTH / LIBHWM_ACC_NVRAM_SENSITIVITY;
+	data.y += offset[1] * LIBHWM_GRAVITY_EARTH / LIBHWM_ACC_NVRAM_SENSITIVITY;
+	data.z += offset[2] * LIBHWM_GRAVITY_EARTH / LIBHWM_ACC_NVRAM_SENSITIVITY;
+	//GSE_PR_ERR("after x %d y %d z %d\n",data.x,data.y,data.z);
+	#endif /*VENDOR_EDIT*/
+
+#ifdef ACCELERATION_AVERAGE_FILTER
+	if (get_sensor_name(ID_ACCELEROMETER) == GSENSOR_LIS3DH)
+	{
+		inbuff[0] = data.x;
+		inbuff[1] = data.y;
+		inbuff[2] = data.z;
+		filter_calculate(inbuff, &tmp_x, &tmp_y, &tmp_z);
+
+		if ((vibr_state == 1) || ((vibr_state == 0) && (vibr_effect_count > 0)))
+		{
+			vibr_effect_count--;
+			resultantForceSquare = (tmp_x * tmp_x + tmp_y * tmp_y + tmp_z * tmp_z)/(1000*1000);
+			if ((abs(resultantForceSquare - LIBHWM_GRAVITY_EARTH * LIBHWM_GRAVITY_EARTH/(1000*1000)) > 4)
+				 && (last_acc_data[0] != 0) && (last_acc_data[1] != 0) && (last_acc_data[2] != 0))
+			{
+				data.x = last_acc_data[0];
+				data.y = last_acc_data[1];
+				data.z = last_acc_data[2];
+			}
+			else
+			{
+				data.x = tmp_x;
+				data.y = tmp_y;
+				data.z = tmp_z;
+				last_acc_data[0] = data.x;
+				last_acc_data[1] = data.y;
+				last_acc_data[2] = data.z;
+			}
+		}
+		else
+		{
+			last_acc_data[0] = data.x;
+			last_acc_data[1] = data.y;
+			last_acc_data[2] = data.z;
+		}
+	}
+	//printk(KERN_EMERG"%s:vibr_state=%d:vibr_effect_count=%d::ori:%d %d %d; after:%d %d %d\n",__func__,vibr_state,vibr_effect_count,inbuff[0],inbuff[1],inbuff[2],data.x,data.y,data.z);
+#endif//ACCELERATION_AVERAGE_FILTER
+
+	if (event->flush_action == DATA_ACTION && READ_ONCE(obj->android_enable) == true)
 		err = acc_data_report(&data);
 	else if (event->flush_action == FLUSH_ACTION)
 		err = acc_flush_report();
@@ -507,7 +675,15 @@ static int gsensor_factory_clear_cali(void)
 		return -1;
 	}
 #endif
+#ifdef VENDOR_EDIT
+	int32_t tx_buff[6] = {0};
+	int ret;
+
+	ret = sensor_cfg_to_hub(ID_ACCELEROMETER, (uint8_t *)tx_buff, sizeof(tx_buff));
+	return ret;
+#else
 	return 0;
+#endif//VENDOR_EDIT
 }
 static int gsensor_factory_set_cali(int32_t data[3])
 {
@@ -520,14 +696,37 @@ static int gsensor_factory_set_cali(int32_t data[3])
 		return -1;
 	}
 #endif
+#ifdef VENDOR_EDIT
+	struct accelhub_ipi_data *obj = obj_ipi_data;
+	int32_t tx_buff[6] = {0};
+	int ret;
+	tx_buff[0] = 0;
+	tx_buff[1] = 0;
+	tx_buff[2] = 0;
+
+	tx_buff[3] = data[0];
+	tx_buff[4] = data[1];
+	tx_buff[5] = data[2];
+	update_sensor_parameter(ID_ACCELEROMETER, data);
+	obj->static_cali[0] = data[0];
+	obj->static_cali[1] = data[1];
+	obj->static_cali[2] = data[2];
+
+	ret = sensor_cfg_to_hub(ID_ACCELEROMETER, (uint8_t *)tx_buff, sizeof(tx_buff));
+	GSE_PR_ERR("gsensor cali: %d %d %d, ret=%d\n", data[0],data[1],data[2],ret);
+	return ret;
+#else
 	return 0;
+#endif//VENDOR_EDIT
 }
 static int gsensor_factory_get_cali(int32_t data[3])
 {
-	int err = 0;
+	//int err = 0;
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	struct accelhub_ipi_data *obj = obj_ipi_data;
+#ifndef VENDOR_EDIT
 	uint8_t status = 0;
+#endif
 #endif
 
 #ifdef MTK_OLD_FACTORY_CALIBRATION
@@ -537,22 +736,26 @@ static int gsensor_factory_get_cali(int32_t data[3])
 		return -1;
 	}
 #else
+#ifndef VENDOR_EDIT
 	init_completion(&obj->calibration_done);
 	err = wait_for_completion_timeout(&obj->calibration_done, msecs_to_jiffies(3000));
 	if (!err) {
 		GSE_PR_ERR("gsensor_factory_get_cali fail!\n");
 		return -1;
 	}
+#endif
 	spin_lock(&calibration_lock);
 	data[ACCELHUB_AXIS_X] = obj->static_cali[ACCELHUB_AXIS_X];
 	data[ACCELHUB_AXIS_Y] = obj->static_cali[ACCELHUB_AXIS_Y];
 	data[ACCELHUB_AXIS_Z] = obj->static_cali[ACCELHUB_AXIS_Z];
-	status = obj->static_cali_status;
 	spin_unlock(&calibration_lock);
+#ifndef VENDOR_EDIT
+	status = obj->static_cali_status;
 	if (status != 0) {
 		GSE_LOG("gsensor static cali detect shake!\n");
 		return -2;
 	}
+#endif
 #endif
 	return 0;
 }
@@ -600,6 +803,13 @@ static int gsensor_enable_nodata(int en)
 			GSE_PR_ERR("scp_gsensor_enable_nodata fail!\n");
 			return -1;
 		}
+#ifdef ACCELERATION_AVERAGE_FILTER
+		memset(dataBuffer, 0, (FILTER_ORDER_NUM * 3 * sizeof(int)));
+		memset(sumData, 0, 3 * sizeof(int));
+		memset(last_acc_data, 0, 3 * sizeof(int));
+		bufferFull = 0;
+		sumCounter = 0;
+#endif//ACCELERATION_AVERAGE_FILTER
 	}
 
 	GSE_LOG("scp_gsensor_enable_nodata OK!!!\n");
@@ -645,15 +855,29 @@ static int gsensor_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct accelhub_ipi_data *obj = obj_ipi_data;
+#ifdef VENDOR_EDIT
+	int cali_data[3] = {0};
+	get_sensor_parameter(ID_ACCELEROMETER, cali_data);
+#endif
+	GSE_PR_ERR("gsensor_set_cali::cali_data::%d %d %d\n",cali_data[0],cali_data[1],cali_data[2]);
 
 	spin_lock(&calibration_lock);
 	obj->dynamic_cali[0] = buf[0];
 	obj->dynamic_cali[1] = buf[1];
 	obj->dynamic_cali[2] = buf[2];
-
+#ifndef VENDOR_EDIT
 	obj->static_cali[0] = buf[3];
 	obj->static_cali[1] = buf[4];
 	obj->static_cali[2] = buf[5];
+#else
+	obj->static_cali[0] = cali_data[0];
+	obj->static_cali[1] = cali_data[1];
+	obj->static_cali[2] = cali_data[2];
+
+	buf[3] = cali_data[0];
+	buf[4] = cali_data[1];
+	buf[5] = cali_data[2];
+#endif
 	spin_unlock(&calibration_lock);
 
 	return sensor_cfg_to_hub(ID_ACCELEROMETER, data, count);
@@ -778,6 +1002,9 @@ static int accelhub_probe(struct platform_device *pdev)
 	}
 	gsensor_init_flag = 0;
 	GSE_LOG("%s: OK\n", __func__);
+#ifdef ACCELERATION_AVERAGE_FILTER
+	register_vibrator_notify(vibr_notify_handle);
+#endif//ACCELERATION_AVERAGE_FILTER
 	return 0;
 
  exit_create_attr_failed:

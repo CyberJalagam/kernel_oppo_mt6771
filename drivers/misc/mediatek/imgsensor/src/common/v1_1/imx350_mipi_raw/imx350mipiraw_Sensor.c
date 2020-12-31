@@ -59,6 +59,9 @@
 
 #define LOG_INF(format, args...) pr_debug(PFX "[%s] " format, __func__, ##args)
 
+#define H_FOV 63
+#define V_FOV 49
+
 /*******************************************************************************
  * Proifling
  *****************************************************************************/
@@ -2797,6 +2800,10 @@ static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
 #else
 	sensor_info->HDR_Support = 2;	/*0: NO HDR, 1: iHDR, 2:mvHDR, 3:zHDR */
 #endif
+
+	sensor_info->SensorHorFOV = H_FOV;
+	sensor_info->SensorVerFOV = V_FOV;
+
 	sensor_info->SensorMIPILaneNumber = imgsensor_info.mipi_lane_num;
 	sensor_info->SensorClockFreq = imgsensor_info.mclk;
 	sensor_info->SensorClockDividCount = 3;	/* not use */

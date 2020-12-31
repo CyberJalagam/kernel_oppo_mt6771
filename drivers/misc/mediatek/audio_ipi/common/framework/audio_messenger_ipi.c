@@ -36,6 +36,22 @@
 #include <audio_playback_msg_id.h>
 #endif
 
+
+
+
+/*
+ * =============================================================================
+ *                     log
+ * =============================================================================
+ */
+
+#ifdef pr_fmt
+#undef pr_fmt
+#endif
+#define pr_fmt(fmt) "[IPI][MSG] %s(), " fmt "\n", __func__
+
+
+
 /*
  * =============================================================================
  *                     MACRO
@@ -93,67 +109,57 @@ uint16_t get_message_buf_size(const struct ipi_msg_t *p_ipi_msg)
 int check_msg_format(const struct ipi_msg_t *p_ipi_msg, unsigned int len)
 {
 	if (p_ipi_msg->magic != IPI_MSG_MAGIC_NUMBER) {
-		pr_notice("%s(), magic 0x%x error!!\n",
-			  __func__, p_ipi_msg->magic);
+		pr_notice("magic 0x%x error!!", p_ipi_msg->magic);
 		return -1;
 	}
 
 	if (p_ipi_msg->task_scene >= TASK_SCENE_SIZE) {
-		pr_notice("%s(), task_scene %d error!!\n",
-			  __func__, p_ipi_msg->task_scene);
+		pr_notice("task_scene %d error!!", p_ipi_msg->task_scene);
 		return -1;
 	}
 
 	if (p_ipi_msg->source_layer >= AUDIO_IPI_LAYER_FROM_SIZE) {
-		pr_notice("%s(), source_layer %d error!!\n",
-			  __func__, p_ipi_msg->source_layer);
+		pr_notice("source_layer %d error!!", p_ipi_msg->source_layer);
 		return -1;
 	}
 
 	if (p_ipi_msg->target_layer >= AUDIO_IPI_LAYER_TO_SIZE) {
-		pr_notice("%s(), target_layer %d error!!\n",
-			  __func__, p_ipi_msg->target_layer);
+		pr_notice("target_layer %d error!!", p_ipi_msg->target_layer);
 		return -1;
 	}
 
 	if (p_ipi_msg->data_type >= AUDIO_IPI_TYPE_SIZE) {
-		pr_notice("%s(), data_type %d error!!\n",
-			  __func__, p_ipi_msg->data_type);
+		pr_notice("data_type %d error!!", p_ipi_msg->data_type);
 		return -1;
 	}
 
 	if (p_ipi_msg->ack_type > AUDIO_IPI_MSG_DIRECT_SEND &&
 	    p_ipi_msg->ack_type != AUDIO_IPI_MSG_CANCELED) {
-		pr_notice("%s(), ack_type %d error!!\n",
-			  __func__, p_ipi_msg->ack_type);
+		pr_notice("ack_type %d error!!", p_ipi_msg->ack_type);
 		return -1;
 	}
 
-	if (get_message_buf_size(p_ipi_msg) != len) {
-		pr_notice("%s(), len 0x%x error!!\n", __func__, len);
+	if (get_message_buf_size(p_ipi_msg) > len) {
+		pr_notice("len 0x%x error!!", len);
 		return -1;
 	}
 
 	if (p_ipi_msg->data_type == AUDIO_IPI_PAYLOAD) {
 		if (p_ipi_msg->payload_size == 0 ||
 		    p_ipi_msg->payload_size > MAX_IPI_MSG_PAYLOAD_SIZE) {
-			pr_notice("%s(), payload_size %u error!!\n",
-				  __func__, p_ipi_msg->payload_size);
+			DUMP_IPI_MSG("payload_size error!!", p_ipi_msg);
 			return -1;
 		}
 	}
 
 	if (p_ipi_msg->data_type == AUDIO_IPI_DMA) {
-		if (p_ipi_msg->dma_info.hal_buf.addr == NULL) {
-			pr_notice("%s(), dma addr null!!\n", __func__);
+		if (p_ipi_msg->dma_addr == NULL) {
+			DUMP_IPI_MSG("dma addr null!!", p_ipi_msg);
 			return -1;
 		}
 		if (p_ipi_msg->dma_info.data_size == 0 &&
 		    p_ipi_msg->dma_info.hal_buf.data_size == 0) {
-			pr_notice("%s(), dma data_size %u, %u error!!\n",
-				  __func__,
-				  p_ipi_msg->dma_info.data_size,
-				  p_ipi_msg->dma_info.hal_buf.data_size);
+			DUMP_IPI_MSG("dma data_size error!!", p_ipi_msg);
 			return -1;
 		}
 	}
@@ -162,46 +168,36 @@ int check_msg_format(const struct ipi_msg_t *p_ipi_msg, unsigned int len)
 }
 
 
-void print_msg_info(
-	const char *func_name,
-	const char *description,
-	const struct ipi_msg_t *p_ipi_msg)
+bool check_print_msg_info(const struct ipi_msg_t *p_ipi_msg)
 {
-	/* error handling */
-	if (func_name == NULL || description == NULL || p_ipi_msg == NULL)
-		return;
+	if (p_ipi_msg == NULL)
+		return false;
 
-	if (p_ipi_msg->data_type == AUDIO_IPI_MSG_ONLY) {
-		pr_info("%s(), %s, task: %d, id: 0x%x, ack: %d, p1: 0x%x, p2: 0x%x\n",
-			func_name,
-			description,
-			p_ipi_msg->task_scene,
-			p_ipi_msg->msg_id,
-			p_ipi_msg->ack_type,
-			p_ipi_msg->param1,
-			p_ipi_msg->param2);
-	} else if (p_ipi_msg->data_type == AUDIO_IPI_PAYLOAD) {
-		pr_info("%s(), %s, task: %d, id: 0x%x, ack: %d, data_size: 0x%x, p2: 0x%x\n",
-			func_name,
-			description,
-			p_ipi_msg->task_scene,
-			p_ipi_msg->msg_id,
-			p_ipi_msg->ack_type,
-			p_ipi_msg->payload_size,
-			p_ipi_msg->param2);
-	} else if (p_ipi_msg->data_type == AUDIO_IPI_DMA) {
-		pr_info("%s(), %s, task: %d, id: 0x%x, ack: %d, data_size: 0x%x, p2: 0x%x, sz: %u, idx: %u\n",
-			func_name,
-			description,
-			p_ipi_msg->task_scene,
-			p_ipi_msg->msg_id,
-			p_ipi_msg->ack_type,
-			p_ipi_msg->param1,
-			p_ipi_msg->param2,
-			p_ipi_msg->dma_info.data_size,
-			p_ipi_msg->dma_info.rw_idx);
-	}
+#ifdef CONFIG_SND_SOC_MTK_AUDIO_DSP
+	if (p_ipi_msg->task_scene == TASK_SCENE_PRIMARY &&
+	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
+		return false;
+
+	if (p_ipi_msg->task_scene == TASK_SCENE_DEEPBUFFER &&
+	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
+		return false;
+
+	if (p_ipi_msg->task_scene == TASK_SCENE_VOIP &&
+	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
+		return false;
+
+	if (p_ipi_msg->task_scene == TASK_SCENE_CAPTURE_UL1 &&
+	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_ULCOPY)
+		return false;
+#endif
+
+	if (p_ipi_msg->ack_type == AUDIO_IPI_MSG_NEED_ACK ||
+	    p_ipi_msg->ack_type == AUDIO_IPI_MSG_ACK_BACK)
+		return true;
+	return false;
 }
+
+
 
 /*
  * =============================================================================
@@ -214,25 +210,26 @@ static void audio_ipi_msg_dispatcher(int id, void *data, unsigned int len)
 	struct ipi_msg_t *p_ipi_msg = NULL;
 	struct ipi_queue_handler_t *handler = NULL;
 
-	AUD_LOG_V("%s(), data = %p, len = %u\n", __func__, data, len);
+	AUD_LOG_V("data = %p, len = %u", data, len);
 
 	if (data == NULL) {
-		pr_info("%s(), drop msg due to data = NULL\n", __func__);
+		pr_info("drop msg due to data = NULL");
 		return;
 	}
 	if (len < IPI_MSG_HEADER_SIZE || len > MAX_IPI_MSG_BUF_SIZE) {
-		pr_info("%s(), drop msg due to len(%u) error!!\n",
-			__func__, len);
+		pr_info("drop msg due to len(%u) error!!", len);
 		return;
 	}
 
 	p_ipi_msg = (struct ipi_msg_t *)data;
 	if (check_msg_format(p_ipi_msg, len) != 0) {
-		pr_info("%s(), drop msg due to ipi fmt err\n", __func__);
+		pr_info("drop msg due to ipi fmt err");
 		return;
 	}
 
 	if (p_ipi_msg->ack_type == AUDIO_IPI_MSG_ACK_BACK) {
+		if (check_print_msg_info(p_ipi_msg) == true)
+			DUMP_IPI_MSG("ack back", p_ipi_msg);
 		handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 		if (handler != NULL)
 			send_message_ack(handler, p_ipi_msg);
@@ -240,15 +237,13 @@ static void audio_ipi_msg_dispatcher(int id, void *data, unsigned int len)
 		   p_ipi_msg->target_layer == AUDIO_IPI_LAYER_TO_HAL)
 		audio_ipi_dma_msg_to_hal(p_ipi_msg);
 	else {
-		if (recv_message_array[p_ipi_msg->task_scene] == NULL) {
-			pr_info("%s(), recv_message_array[%d] = NULL, drop msg. msg_id = 0x%x\n",
-				__func__,
-				p_ipi_msg->task_scene,
-				p_ipi_msg->msg_id);
-		} else
+		if (recv_message_array[p_ipi_msg->task_scene] == NULL)
+			DUMP_IPI_MSG("task not reg cbk!!", p_ipi_msg);
+		else
 			recv_message_array[p_ipi_msg->task_scene](p_ipi_msg);
 	}
 }
+
 
 
 /*
@@ -275,7 +270,7 @@ void audio_messenger_ipi_init(void)
 			  audio_ipi_msg_dispatcher,
 			  "audio");
 	if (ret_scp != 0)
-		pr_notice("%s(), scp_ipi_registration fail!!\n", __func__);
+		pr_notice("scp_ipi_registration fail!!");
 #endif
 
 #ifdef CONFIG_MTK_AUDIODSP_SUPPORT
@@ -284,7 +279,7 @@ void audio_messenger_ipi_init(void)
 			   audio_ipi_msg_dispatcher,
 			   "audio");
 	if (ret_adsp != 0)
-		pr_notice("%s(), adsp_ipi_registration fail!!\n", __func__);
+		pr_notice("adsp_ipi_registration fail!!");
 #endif
 
 	for (i = 0; i < TASK_SCENE_SIZE; i++)
@@ -295,8 +290,7 @@ void audio_messenger_ipi_init(void)
 void audio_reg_recv_message(uint8_t task_scene, recv_message_t recv_message)
 {
 	if (task_scene >= TASK_SCENE_SIZE) {
-		pr_info("%s(), not support task_scene %d!!\n",
-			__func__, task_scene);
+		pr_info("not support task_scene %d!!", task_scene);
 		return;
 	}
 
@@ -322,13 +316,13 @@ int audio_send_ipi_msg(
 	int ret = 0;
 
 	if (p_ipi_msg == NULL) {
-		pr_notice("%s(), p_ipi_msg = NULL, return\n", __func__);
+		pr_notice("p_ipi_msg = NULL, return");
 		return -1;
 	}
 
 	if (target_layer != AUDIO_IPI_LAYER_TO_DSP) {
-		pr_notice("%s(), target_layer %d in kernel...\n",
-			  __func__, target_layer);
+		pr_notice("target_layer %d in kernel", target_layer);
+		return -1;
 	}
 
 
@@ -346,13 +340,12 @@ int audio_send_ipi_msg(
 
 	if (p_ipi_msg->data_type == AUDIO_IPI_PAYLOAD) {
 		if (data_buffer == NULL) {
-			pr_notice("%s(), payload data_buffer NULL, return\n",
-				  __func__);
+			pr_notice("payload data_buffer NULL, return");
 			return -1;
 		}
 		if (p_ipi_msg->payload_size > MAX_IPI_MSG_PAYLOAD_SIZE) {
-			pr_notice("%s(), payload_size %u error!!\n",
-				  __func__, p_ipi_msg->payload_size);
+			pr_notice("payload_size %u error!!",
+				  p_ipi_msg->payload_size);
 			return -1;
 		}
 
@@ -361,8 +354,7 @@ int audio_send_ipi_msg(
 		       p_ipi_msg->payload_size);
 	} else if (p_ipi_msg->data_type == AUDIO_IPI_DMA) {
 		if (data_buffer == NULL) {
-			pr_notice("%s(), dma data_buffer NULL, return\n",
-				  __func__);
+			pr_notice("dma data_buffer NULL, return");
 			return -1;
 		}
 		p_ipi_msg->dma_addr = (char *)data_buffer;
@@ -380,20 +372,20 @@ int audio_send_ipi_msg(
 	}
 
 	if (ret != 0) {
-		print_msg_info(__func__, "dma fail!!", p_ipi_msg);
+		DUMP_IPI_MSG("dma fail!!", p_ipi_msg);
 		return ret;
 	}
 
 	ipi_msg_len = get_message_buf_size(p_ipi_msg);
 
 	if (check_msg_format(p_ipi_msg, ipi_msg_len) != 0) {
-		pr_info("%s(), drop msg due to ipi fmt err\n", __func__);
+		pr_info("drop msg due to ipi fmt err");
 		return -1;
 	}
 
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
-		AUD_LOG_E("%s(), handler = NULL, return\n", __func__);
+		pr_notice("handler = NULL, return");
 		return -1;
 	}
 
@@ -406,45 +398,23 @@ int audio_send_ipi_filled_msg(struct ipi_msg_t *p_ipi_msg)
 	struct ipi_queue_handler_t *handler = NULL;
 
 	if (p_ipi_msg == NULL) {
-		pr_notice("%s(), p_ipi_msg = NULL, return\n", __func__);
+		pr_notice("p_ipi_msg = NULL, return");
 		return -1;
 	}
 	if (check_msg_format(p_ipi_msg, get_message_buf_size(p_ipi_msg)) != 0) {
-		pr_info("%s(), drop msg due to ipi fmt err\n", __func__);
+		pr_info("drop msg due to ipi fmt err");
 		return -1;
 	}
 
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
-		AUD_LOG_E("%s(), handler = NULL, return\n", __func__);
+		AUD_LOG_E("handler = NULL, return");
 		return -1;
 	}
 
 	return send_message(handler, p_ipi_msg);
 }
 
-static bool check_print_msg_info(const struct ipi_msg_t *p_ipi_msg)
-{
-	if (p_ipi_msg == NULL)
-		return false;
-#ifdef CONFIG_SND_SOC_MTK_AUDIO_DSP
-	if (p_ipi_msg->task_scene == TASK_SCENE_PRIMARY &&
-	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
-		return false;
-
-	if (p_ipi_msg->task_scene == TASK_SCENE_DEEPBUFFER &&
-	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
-		return false;
-
-	if (p_ipi_msg->task_scene == TASK_SCENE_VOIP &&
-	    p_ipi_msg->msg_id == AUDIO_DSP_TASK_DLCOPY)
-		return false;
-#endif
-
-	if (p_ipi_msg->ack_type == AUDIO_IPI_MSG_NEED_ACK)
-		return true;
-	return false;
-}
 
 int send_message_to_scp(const struct ipi_msg_t *p_ipi_msg)
 {
@@ -455,16 +425,16 @@ int send_message_to_scp(const struct ipi_msg_t *p_ipi_msg)
 	uint32_t ipi_id = 0;
 
 
-	AUD_LOG_V("%s(+)\n", __func__);
-
 	/* error handling */
 	if (p_ipi_msg == NULL) {
-		pr_notice("%s(), p_ipi_msg = NULL, return\n", __func__);
+		pr_notice("p_ipi_msg = NULL, return");
 		return -1;
 	}
 
-	/* wait at most 5 ms until IPC done */
-	wait_ms = (p_ipi_msg->ack_type == AUDIO_IPI_MSG_DIRECT_SEND) ? 0 : 5;
+	/* wait until IPC done */
+	wait_ms = (p_ipi_msg->ack_type == AUDIO_IPI_MSG_DIRECT_SEND)
+		  ? 0
+		  : ADSP_IPI_QUEUE_DEFAULT_WAIT_MS;
 
 	opendsp_id = audio_get_opendsp_id(p_ipi_msg->task_scene);
 	ipi_id = audio_get_ipi_id(p_ipi_msg->task_scene);
@@ -477,13 +447,10 @@ int send_message_to_scp(const struct ipi_msg_t *p_ipi_msg)
 			      wait_ms);
 
 	if (send_status != 0) {
-		pr_notice("%s(), scp_ipi_send error %d\n",
-			  __func__, send_status);
-		print_msg_info(__func__, "fail", p_ipi_msg);
-	} else if (check_print_msg_info(p_ipi_msg) == true)
-		print_msg_info(__func__, "pass", p_ipi_msg);
+		pr_notice("scp_ipi_send error %d", send_status);
+		DUMP_IPI_MSG("fail", p_ipi_msg);
+	}
 
-	AUD_LOG_V("%s(-), %d\n", __func__, send_status);
 	return send_status;
 }
 

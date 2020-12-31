@@ -88,7 +88,12 @@ static atomic_t g_pwm_is_change_state[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(0), 
 #ifndef CONFIG_FPGA_EARLY_PORTING
 static atomic_t g_pwm_backlight[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(-1) };
 static atomic_t g_pwm_en[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(-1) };
+#ifndef VENDOR_EDIT
+/*Yongpeng.Yi@PSW.MultiMedia.Display.Machine, 2018/10/8,modify for multibits backlight.*/
 static atomic_t g_pwm_max_backlight[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(1023) };
+#else
+static atomic_t g_pwm_max_backlight[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(2047) };
+#endif
 static atomic_t g_pwm_is_power_on[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(0) };
 static atomic_t g_pwm_value_before_power_off[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(0) };
 static atomic_t g_pwm_is_change_state[PWM_TOTAL_MODULE_NUM] = { ATOMIC_INIT(0) };

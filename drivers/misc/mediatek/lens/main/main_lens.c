@@ -33,7 +33,9 @@
 #if !defined(CONFIG_MTK_LEGACY)
 #include <linux/regulator/consumer.h>
 #endif
-
+#ifdef VENDOR_EDIT
+#include<soc/oppo/oppo_project.h>
+#endif
 /* OIS/EIS Timer & Workqueue */
 #include <linux/init.h>
 #include <linux/hrtimer.h>
@@ -56,7 +58,7 @@
 
 
 #if I2C_CONFIG_SETTING == 1
-#define LENS_I2C_BUSNUM 0
+#define LENS_I2C_BUSNUM 4
 #define I2C_REGISTER_ID            0x28
 #endif
 
@@ -90,7 +92,9 @@ static struct stAF_OisPosInfo OisPosInfo;
 /* ------------------------- */
 
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
+	{1, AFDRV_LC898229AF, LC898229AF_SetI2Cclient, LC898229AF_Ioctl, LC898229AF_Release, NULL},
 	{1, AFDRV_AK7371AF, AK7371AF_SetI2Cclient, AK7371AF_Ioctl, AK7371AF_Release, NULL},
+	{1, AFDRV_AK7374AF, AK7374AF_SetI2Cclient, AK7374AF_Ioctl, AK7374AF_Release, NULL},
 	{1, AFDRV_BU6424AF, BU6424AF_SetI2Cclient, BU6424AF_Ioctl, BU6424AF_Release, NULL},
 	{1, AFDRV_BU6429AF, BU6429AF_SetI2Cclient, BU6429AF_Ioctl, BU6429AF_Release, NULL},
 	{1, AFDRV_BU64748AF, bu64748af_SetI2Cclient_Main, bu64748af_Ioctl_Main, bu64748af_Release_Main, NULL},
@@ -163,7 +167,12 @@ void AFRegulatorCtrl(int Stage)
 				if (strncmp(CONFIG_ARCH_MTK_PROJECT, "k71v1_64_bsp_fhdp", 17) == 0)
 					regVCAMAF = regulator_get(lens_device, "vldo28");
 				else
+					#ifndef VENDOR_EDIT
+					/*Caohua.Lin@Camera.Driver 20180815 add for af power up*/
 					regVCAMAF = regulator_get(lens_device, "vcamaf");
+					#else
+					regVCAMAF = regulator_get(lens_device, "vldo28");
+					#endif
 
 				LOG_INF("[Init] regulator_get %p\n", regVCAMAF);
 
@@ -232,6 +241,11 @@ void AF_PowerDown(void)
 		#ifdef CONFIG_MTK_LENS_AK7371AF_SUPPORT
 		AK7371AF_SetI2Cclient(g_pstAF_I2Cclient, &g_AF_SpinLock, &g_s4AF_Opened);
 		AK7371AF_PowerDown();
+		#endif
+
+		#ifdef CONFIG_MTK_LENS_AK7374AF_SUPPORT
+		AK7374AF_SetI2Cclient(g_pstAF_I2Cclient, &g_AF_SpinLock, &g_s4AF_Opened);
+		AK7374AF_PowerDown();
 		#endif
 
 		#ifdef CONFIG_MTK_LENS_DW9800WAF_SUPPORT

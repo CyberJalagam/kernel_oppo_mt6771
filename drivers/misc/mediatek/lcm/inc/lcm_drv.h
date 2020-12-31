@@ -24,6 +24,34 @@
 
 /* --------------------------------------------------------------------------- */
 
+#ifdef VENDOR_EDIT
+/* LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for porting 17331 lcd driver */
+#define LM3697_EXPONENTIAL 1
+#define MP3188_EXPONENTIAL 1
+
+#ifdef VENDOR_EDIT
+/*
+ * Guoqiang.jiang@MM.Display.LCD.Machine, 2018/03/13,
+ * add for backlight IC KTD3136
+ */
+#define KTD3136_EXPONENTIAL 1
+#endif /*VENDOR_EDIT*/
+
+extern int is_lm3697;
+extern long lcd_bl_en_setting(unsigned int value);
+extern long lcd_enn_bias_setting(unsigned int value);
+extern long lcd_enp_bias_setting(unsigned int value);
+extern long lcd_rst_setting(unsigned int value);
+extern long lcd_1p8_en_setting(unsigned int value);
+/* ZhongWenjie@PSW.BSP.TP.FUNCTION, 2018/6/7, Add for no-flash TP */
+extern long spi_csn_en_setting(unsigned int value);
+/* LiPing-m@PSW.MM.Display.LCD.Machine, 2017/12/27, Add for 17197 lcd driver */
+extern long lcd_vci_setting(unsigned int value);
+extern long lcd_vpoc_setting(unsigned int value);
+extern long lcd_mipi_err_setting(unsigned int value);
+extern long lcd_ldo_setting(unsigned int value);
+#endif /* VENDOR_EDIT */
+
 /* common enumerations */
 
 typedef enum {
@@ -857,6 +885,26 @@ typedef struct {
 	unsigned int (*get_pwm)(unsigned int divider);
 	void (*set_backlight_mode)(unsigned int mode);
 	/* ///////////////////////// */
+#ifdef VENDOR_EDIT
+/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Machine, 2018/09/10, Add for Porting cabc interface */
+	void (*set_cabc_mode_cmdq)(void *handle, unsigned int level);
+	/*
+	* liping-m@PSW.MM.Display.LCD.Stability, 2018/07/20,
+	* add power seq api for ulps
+	*/
+	void (*poweron_before_ulps)(void);
+	void (*poweroff_after_ulps)(void);
+	/*
+	* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/01/16,
+	* add for samsung lcd hbm node
+	*/
+	void (*set_hbm_mode_cmdq)(void *handle, unsigned int level);
+	/*
+	* Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/09/26,
+	* add for Aod feature
+	*/
+	void (*aod_doze_resume)(void);
+#endif /* VENDOR_EDIT */
 
 	int (*adjust_fps)(void *cmdq, int fps, LCM_PARAMS *params);
 	void (*validate_roi)(int *x, int *y, int *width, int *height);
@@ -908,6 +956,13 @@ extern int display_bias_enable(void);
 extern int display_bias_disable(void);
 extern int display_bias_regulator_init(void);
 
+#ifdef VENDOR_EDIT
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Feature, 2018/01/16,
+* add for Aod feature
+*/
+extern unsigned int aod_mode;
+#endif /* VENDOR_EDIT */
 
 
 #endif /* __LCM_DRV_H__ */

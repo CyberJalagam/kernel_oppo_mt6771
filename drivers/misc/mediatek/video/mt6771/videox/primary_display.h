@@ -270,6 +270,7 @@ struct display_primary_path_context {
 	int request_fps;
 #endif
 	enum mtkfb_power_mode pm;
+	enum mtkfb_power_mode prev_pm;
 	enum lcm_power_state lcm_ps;
 };
 
@@ -389,6 +390,10 @@ int primary_display_setbacklight(unsigned int level);
 int primary_display_pause(PRIMARY_DISPLAY_CALLBACK callback, unsigned int user_data);
 int primary_display_switch_dst_mode(int mode);
 int primary_display_get_lcm_index(void);
+#ifdef VENDOR_EDIT
+/* Xinqin.Yang@Cam.Tuning.Display, 2018/11/17, add for multi-lcms */
+int _ioctl_get_lcm_module_info(unsigned long arg);
+#endif /* VENDOR_EDIT */
 int primary_display_force_set_fps(unsigned int keep, unsigned int skip);
 int primary_display_set_fps(int fps);
 int primary_display_get_lcm_max_refresh_rate(void);
@@ -413,6 +418,15 @@ int do_primary_display_switch_mode(int sess_mode, unsigned int session, int need
 int primary_display_check_test(void);
 void _primary_path_switch_dst_lock(void);
 void _primary_path_switch_dst_unlock(void);
+
+#ifdef VENDOR_EDIT
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/02/27,
+* add for face fill light node
+*/
+void ffl_set_init(void);
+void ffl_set_enable(unsigned int enable);
+#endif /* VENDOR_EDIT */
 
 /* AOD */
 enum lcm_power_state primary_display_set_power_state(enum lcm_power_state new_state);

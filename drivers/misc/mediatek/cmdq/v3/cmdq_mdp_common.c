@@ -409,13 +409,24 @@ static void cmdq_mdp_isp_begin_task_virtual(struct TaskStruct *cmdq_task, struct
 		return;
 	}
 	/* implement for pass2 only task */
+	#ifdef VENDOR_EDIT
+	/* Henry.Chang@Camera.Driver add for age test*/
+	CMDQ_MSG("%s start task:0x%p engine:0x%llx thread:%d\n",
+		__func__, cmdq_task, cmdq_task->engineFlag, cmdq_task->thread);
+	#else
 	CMDQ_MSG("enter %s task:0x%p engine:0x%llx\n", __func__, cmdq_task, cmdq_task->engineFlag);
+	#endif
 	pmqos_curr_record = kzalloc(sizeof(struct mdp_pmqos_record), GFP_KERNEL);
 	cmdq_task->user_private = pmqos_curr_record;
 	do_gettimeofday(&curr_time);
 
+	#ifdef VENDOR_EDIT
+	if (!cmdq_task->prop_addr || cmdq_task->thread < MDP_THREAD_START)
+		return;
+	#else
 	if (!cmdq_task->prop_addr)
 		return;
+	#endif
 
 	isp_curr_pmqos = (struct mdp_pmqos *)cmdq_task->prop_addr;
 	pmqos_curr_record->submit_tm = curr_time;
@@ -490,11 +501,17 @@ static void cmdq_mdp_begin_task_virtual(struct TaskStruct *cmdq_task, struct Tas
 	cmdq_task->user_private = pmqos_curr_record;
 
 	do_gettimeofday(&curr_time);
-
+	#ifdef VENDOR_EDIT
+	CMDQ_MSG("%s start task:0x%p engine:0x%llx thread:%d\n",
+		__func__, cmdq_task, cmdq_task->engineFlag, cmdq_task->thread);
+	if (!cmdq_task->prop_addr || cmdq_task->thread < MDP_THREAD_START)
+		return;
+	#else
 	CMDQ_MSG("enter %s with task:0x%p engine:0x%llx\n", __func__, cmdq_task, cmdq_task->engineFlag);
 
 	if (!cmdq_task->prop_addr)
 		return;
+	#endif
 
 	mdp_curr_pmqos = (struct mdp_pmqos *)cmdq_task->prop_addr;
 	pmqos_curr_record->submit_tm = curr_time;
@@ -711,10 +728,18 @@ static void cmdq_mdp_isp_end_task_virtual(struct TaskStruct *cmdq_task, struct T
 		return;
 	}
 
+	#ifdef VENDOR_EDIT
+	if (!cmdq_task->prop_addr || cmdq_task->thread < MDP_THREAD_START)
+		return;
+
+	CMDQ_MSG("%s start task:0x%p engine:0x%llx thread:%d\n",
+		__func__, cmdq_task, cmdq_task->engineFlag, cmdq_task->thread);
+	#else
 	if (!cmdq_task->prop_addr)
 		return;
 
 	CMDQ_MSG("enter %s with task:0x%p engine:0x%llx\n", __func__, cmdq_task, cmdq_task->engineFlag);
+	#endif
 	isp_curr_pmqos = (struct mdp_pmqos *)cmdq_task->prop_addr;
 	kfree(cmdq_task->user_private);
 	cmdq_task->user_private = NULL;
@@ -756,10 +781,20 @@ static void cmdq_mdp_end_task_virtual(struct TaskStruct *cmdq_task, struct TaskS
 	smi_larb_mon_act_cnt();
 #endif
 	do_gettimeofday(&curr_time);
+	#ifdef VENDOR_EDIT
+	CMDQ_MSG("%s start task:0x%p engine:0x%llx size:%d thread:%d\n",
+		__func__, cmdq_task, cmdq_task->engineFlag, size,
+		cmdq_task->thread);
+
+	if (!cmdq_task->prop_addr || !cmdq_task->user_private ||
+		cmdq_task->thread < MDP_THREAD_START)
+		return;
+	#else
 	CMDQ_MSG("enter %s with task:0x%p engine:0x%llx size:%d\n", __func__, cmdq_task, cmdq_task->engineFlag, size);
 
 	if (!cmdq_task->prop_addr || !cmdq_task->user_private)
 		return;
+	#endif
 
 	mdp_curr_pmqos = (struct mdp_pmqos *)cmdq_task->prop_addr;
 	pmqos_curr_record = (struct mdp_pmqos_record *)cmdq_task->user_private;

@@ -214,7 +214,10 @@ static void start_cfp(void)
 	cc_is_ceiled = 1;
 	poll_ms = __cfp_polling_ms;
 
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+/*xing.xiong@BSP.Kernel.Debug, 2019/1/12, Modify for limiting kernel log*/
 	pr_debug("%s\n", __func__);
+#endif
 
 	cfp_unlock(__func__);
 	reg_ret = reg_loading_tracking(cfp_lt_callback, poll_ms);

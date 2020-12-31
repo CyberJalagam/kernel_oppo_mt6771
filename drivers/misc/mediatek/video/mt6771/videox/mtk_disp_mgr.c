@@ -80,6 +80,20 @@
 #include "ddp_irq.h"
 #include "ddp_rsz.h"
 
+#ifdef VENDOR_EDIT
+/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Feature, 2018/09/10, Add for sau and silence close backlight */
+#include <mt-plat/mtk_boot_common.h>
+/*
+ * YongPeng.Yi@PSW.MM.Display.LCD.Stability, 2018/09/06,
+ * add for lcd serial num
+ */
+#include <soc/oppo/oppo_project.h>
+/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+#include <linux/oppo_mm_kevent_fb.h>
+#include <linux/time.h>
+#include <linux/timekeeping.h>
+#endif /*VENDOR_EDIT*/
+
 #define DDP_OUTPUT_LAYID 4
 
 #ifdef MTK_FB_SHARE_WDMA0_SUPPORT
@@ -182,6 +196,22 @@ int disp_create_session(struct disp_session_config *config)
 	int is_session_inited = 0;
 	unsigned int session = MAKE_DISP_SESSION(config->type, config->device_id);
 	int i, idx = -1;
+
+	/* check input session info */
+	if (DISP_SESSION_DEV(session) > 0xF) {
+		DISPERR("%s invalid device %u\n",
+				__func__, DISP_SESSION_DEV(session));
+		return -1;
+	}
+
+	if (DISP_SESSION_TYPE(session) != DISP_SESSION_PRIMARY &&
+			DISP_SESSION_TYPE(session) != DISP_SESSION_EXTERNAL &&
+			DISP_SESSION_TYPE(session) != DISP_SESSION_MEMORY) {
+		DISPERR("%s invalid type %u\n",
+				__func__, DISP_SESSION_TYPE(session));
+		return -1;
+	}
+
 	/* 1.To check if this session exists already */
 	mutex_lock(&disp_session_lock);
 	for (i = 0; i < MAX_SESSION_COUNT; i++) {
@@ -1148,6 +1178,10 @@ int _ioctl_get_display_caps(unsigned long arg)
 	if (disp_helper_get_option(DISP_OPT_RPO))
 		caps_info.disp_feature |= DISP_FEATURE_RPO;
 
+	/* add read HW config to decide enable AOD or not */
+	if (disp_helper_get_option(DISP_OPT_AOD) == 0)
+		caps_info.disp_feature |= DISP_FEATURE_FORCE_DISABLE_AOD;
+
 	if (disp_helper_get_option(DISP_OPT_RSZ) ||
 	    disp_helper_get_option(DISP_OPT_RPO)) {
 		caps_info.rsz_in_max[0] = RSZ_TILE_LENGTH -
@@ -1346,7 +1380,6 @@ int _ioctl_get_ut_result(unsigned long arg)
 /*---------------- function for repaint start ------------------*/
 void trigger_repaint(int type)
 {
-#if 0
 	if (type > WAIT_FOR_REFRESH && type < REFRESH_TYPE_NUM) {
 		struct repaint_job_t *repaint_job;
 
@@ -1375,7 +1408,6 @@ void trigger_repaint(int type)
 		DISPMSG("[REPAINT] insert new repaint_job in queue, type: %d\n", type);
 		wake_up_interruptible(&repaint_wq);
 	}
-#endif
 }
 
 int _ioctl_wait_self_refresh_trigger(unsigned long arg)
@@ -1533,6 +1565,13 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		{
 			return _ioctl_get_display_caps(arg);
 		}
+#ifdef VENDOR_EDIT
+/* Xinqin.Yang@Cam.Tuning.Display, 2018/11/17, add for multi-lcms */
+	case DISP_IOCTL_GET_LCM_MODULE_INFO:
+		{
+			return _ioctl_get_lcm_module_info(arg);
+		}
+#endif /* VENDOR_EDIT */
 	case DISP_IOCTL_GET_VSYNC_FPS:
 		{
 			return _ioctl_get_vsync(arg);
@@ -1826,11 +1865,263 @@ static const struct file_operations mtk_disp_mgr_fops = {
 	.read = mtk_disp_mgr_read,
 };
 
+#ifdef VENDOR_EDIT
+/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Machine, 2018/09/10, Add for Porting cabc interface */
+unsigned long CABC_mode = 2;
+
+extern int primary_display_set_cabc_mode(unsigned int level);
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/02/01,
+* add dre only use for camera
+*/
+extern void disp_aal_set_dre_en(int enable);
+
+static ssize_t LCM_CABC_show(struct device *dev,
+                struct device_attribute *attr, char *buf)
+{
+    printk("%s CABC_mode=%ld\n", __func__, CABC_mode);
+    return sprintf(buf, "%ld\n", CABC_mode);
+}
+
+static ssize_t LCM_CABC_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t num)
+{
+    int ret = 0;
+
+    ret = kstrtoul(buf, 10, &CABC_mode);
+    if( CABC_mode > 3 ){
+        CABC_mode = 3;
+    }
+    printk("%s CABC_mode=%ld\n", __func__, CABC_mode);
+
+    /*
+    * Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/02/01,
+    * add dre only use for camera
+    */
+    if (CABC_mode == 0) {
+        disp_aal_set_dre_en(1);
+        printk("%s enable dre\n", __func__);
+
+    } else {
+        disp_aal_set_dre_en(0);
+        printk("%s disable dre\n", __func__);
+    }
+
+    /*
+    * Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/01/29,
+    * modify for oled not need set cabc
+    */
+    if (!is_project(OPPO_17197)) {
+        ret = primary_display_set_cabc_mode((unsigned int)CABC_mode);
+    }
+
+    return num;
+}
+
+static DEVICE_ATTR(LCM_CABC, 0644, LCM_CABC_show, LCM_CABC_store);
+
+/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Feature, 2018/09/10, Add for sau and silence close backlight */
+unsigned long silence_mode = 0;
+
+static ssize_t silence_show(struct device *dev,
+						struct device_attribute *attr, char *buf)
+{
+	printk("%s silence_mode=%ld\n", __func__, silence_mode);
+	return sprintf(buf, "%ld\n", silence_mode);
+}
+
+static ssize_t silence_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t num)
+{
+	int ret;
+
+	ret = kstrtoul(buf, 10, &silence_mode);
+
+	printk("%s silence_mode=%ld\n", __func__, silence_mode);
+
+	return num;
+}
+static DEVICE_ATTR(silence, 0644, silence_show, silence_store);
+
+
+/* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/09/06, add for samsung lcd hbm node*/
+unsigned long HBM_mode = 0;
+struct timespec hbm_time_on;
+struct timespec hbm_time_off;
+long hbm_on_start = 0;
+extern int primary_display_set_hbm_mode(unsigned int level);
+
+static ssize_t LCM_HBM_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	printk("%s HBM_mode=%ld\n", __func__, HBM_mode);
+	return sprintf(buf, "%ld\n", HBM_mode);
+}
+
+static ssize_t LCM_HBM_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t num)
+{
+	int ret;
+	unsigned char payload[100] = "";
+
+	ret = kstrtoul(buf, 10, &HBM_mode);
+
+	printk("%s HBM_mode=%ld\n", __func__, HBM_mode);
+
+	ret = primary_display_set_hbm_mode((unsigned int)HBM_mode);
+
+	if (HBM_mode > 0) {
+		get_monotonic_boottime(&hbm_time_on);
+		hbm_on_start = hbm_time_on.tv_sec;
+	} else {
+		get_monotonic_boottime(&hbm_time_off);
+		scnprintf(payload, sizeof(payload), "EventID@@%d$$hbm@@hbm state on time = %ld sec",
+			OPPO_MM_DIRVER_FB_EVENT_ID_HBM,(hbm_time_off.tv_sec - hbm_on_start));
+		upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
+	}
+
+	return num;
+}
+
+static DEVICE_ATTR(LCM_HBM, 0644, LCM_HBM_show, LCM_HBM_store);
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/01/16,
+* add for lcd serial num
+*/
+#define PANEL_SERIAL_NUM_REG 0xA1
+#define PANEL_REG_READ_LEN   16
+static uint64_t serial_number = 0x0;
+extern int primary_display_read_serial(char addr, uint64_t *buf, int lenth);
+extern int panel_serial_number_read(char cmd, uint64_t *buf, int num);
+int lcm_first_get_serial(void)
+{
+	int ret = 0;
+	if (is_project(OPPO_17197)) {
+		pr_err("lcm_first_get_serial\n");
+		ret = panel_serial_number_read(PANEL_SERIAL_NUM_REG, &serial_number,
+				PANEL_REG_READ_LEN);
+	}
+	return ret;
+}
+
+static ssize_t mdss_get_panel_serial_number(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int ret = 0;
+
+	if (is_project(OPPO_17197)) {
+		ret = primary_display_read_serial(PANEL_SERIAL_NUM_REG, &serial_number,
+				PANEL_REG_READ_LEN);
+		if (ret <= 0)
+			ret = scnprintf(buf, PAGE_SIZE, "Get serial number failed: %d\n",ret);
+		else
+			ret = scnprintf(buf, PAGE_SIZE, "Get panel serial number: %llx\n",serial_number);
+	} else {
+		ret = scnprintf(buf, PAGE_SIZE, "Unsupported panel!!\n");
+	}
+	return ret;
+}
+
+static ssize_t panel_serial_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+    DISPMSG("[soso] Lcm read 0xA1 reg = 0x%llx\n", serial_number);
+
+	return count;
+}
+
+static DEVICE_ATTR(panel_serial_number, 0644,
+					mdss_get_panel_serial_number, panel_serial_store);
+
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/01/26,
+* add lcm id info read
+*/
+unsigned char lcm_id_addr = 0;
+static uint32_t lcm_id_info = 0x0;
+#define LCM_ID_READ_LEN 1
+extern int primary_display_read_lcm_id(char cmd, uint32_t *buf, int num);
+static ssize_t lcm_id_info_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int ret = 0;
+	if (is_project(OPPO_17197) && (lcm_id_addr != 0)) {
+		ret = primary_display_read_lcm_id(lcm_id_addr, &lcm_id_info, LCM_ID_READ_LEN);
+		ret = scnprintf(buf, PAGE_SIZE, "LCM ID[%x]: 0x%x 0x%x\n", lcm_id_addr, lcm_id_info, 0);
+	} else {
+		ret = scnprintf(buf, PAGE_SIZE, "LCM ID[00]: 0x00 0x00\n");
+	}
+	lcm_id_addr = 0;
+	return ret;
+}
+
+static ssize_t lcm_id_info_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t num)
+{
+	int ret;
+
+	ret = kstrtou8(buf, 0, &lcm_id_addr);
+
+	printk("%s lcm_id_addr = 0x%x\n", __func__, lcm_id_addr);
+
+	return num;
+}
+
+static DEVICE_ATTR(lcm_id_info, 0644, lcm_id_info_show, lcm_id_info_store);
+
+/*
+* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/02/27,
+* add for face fill light node
+*/
+unsigned int ffl_set_mode = 0;
+unsigned int ffl_backlight_on = 0;
+extern bool ffl_trigger_finish;
+extern void ffl_set_enable(unsigned int enable);
+static ssize_t FFL_SET_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	printk("%s ffl_set_mode=%d\n", __func__, ffl_set_mode);
+	return sprintf(buf, "%d\n", ffl_set_mode);
+}
+
+static ssize_t FFL_SET_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t num)
+{
+	int ret;
+	unsigned char payload[32] = "";
+
+	ret = kstrtouint(buf, 10, &ffl_set_mode);
+
+	printk("%s ffl_set_mode=%d\n", __func__, ffl_set_mode);
+
+	if (ffl_trigger_finish && (ffl_backlight_on == 1) && (ffl_set_mode == 1)) {
+		ffl_set_enable(1);
+	}
+
+	if (ffl_set_mode == 1) {
+		ret = scnprintf(payload, sizeof(payload), "EventID@@%d$$fflset@@%d",OPPO_MM_DIRVER_FB_EVENT_ID_FFLSET,ffl_set_mode);
+		upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
+	}
+	return num;
+}
+
+static DEVICE_ATTR(FFL_SET, 0644, FFL_SET_show, FFL_SET_store);
+#endif /*VENDOR_EDIT*/
+
 static int mtk_disp_mgr_probe(struct platform_device *pdev)
 {
 	struct class_device;
 	struct class_device *class_dev = NULL;
 	int ret;
+#ifdef VENDOR_EDIT
+		/*
+		* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/01/16,
+		* add for lcd serial num
+		*/
+	struct device *dev =NULL;
+#endif /* VENDOR_EDIT */
 
 	pr_debug("mtk_disp_mgr_probe called!\n");
 
@@ -1852,6 +2143,66 @@ static int mtk_disp_mgr_probe(struct platform_device *pdev)
 	class_dev =
 	    (struct class_device *)device_create(mtk_disp_mgr_class, NULL, mtk_disp_mgr_devno, NULL,
 						 DISP_SESSION_DEVICE);
+#ifdef VENDOR_EDIT
+		/*
+		* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/01/16,
+		* add for lcd serial num
+		*/
+		dev =(struct device *) class_dev;
+		ret = device_create_file(dev, &dev_attr_LCM_CABC);
+		if (ret < 0)
+		{
+			printk("%s cabc device create file failed!\n", __func__);
+		}
+
+		if (is_project(OPPO_17197)) {
+			ret = device_create_file(dev, &dev_attr_panel_serial_number);
+			if (ret < 0) {
+				pr_err("%s dev_attr_panel_serial_number create file failed!\n",__func__);
+			}
+
+			/*
+			* Yongpeng.Yi@PSW.MM.Display.LCD.Stability, 2018/01/16,
+			* add for samsung lcd hbm node
+			*/
+			ret = device_create_file(dev, &dev_attr_LCM_HBM);
+			if (ret < 0) {
+				printk("%s device hbm create file failed!\n", __func__);
+			}
+
+			/*
+			* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/01/26,
+			* add lcm id info
+			*/
+			ret = device_create_file(dev, &dev_attr_lcm_id_info);
+			if (ret < 0) {
+				pr_err("%s dev_attr_lcm_id_info create file failed!\n",__func__);
+			}
+		}
+
+/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Feature, 2018/09/10, Add for sau and silence close backlight */
+	if ((oppo_boot_mode == OPPO_SILENCE_BOOT)
+			||(get_boot_mode() == OPPO_SAU_BOOT))
+	{
+		printk("%s OPPO_SILENCE_BOOT set silence_mode to 1\n", __func__);
+		silence_mode = 1;
+	}
+
+	ret = device_create_file(dev, &dev_attr_silence);
+	if (ret < 0)
+	{
+		printk("%s device create file failed!\n", __func__);
+	}
+	/*
+	* Yongpeng.Yi@PSW.MM.Display.LCD.Machine, 2018/09/07,
+	* add for face fill light node
+	*/
+	ret = device_create_file(dev, &dev_attr_FFL_SET);
+	if (ret < 0) {
+		printk("%s FFL_SET device create file failed!\n", __func__);
+	}
+#endif /*VENDOR_EDIT*/
+
 	disp_sync_init();
 
 	external_display_control_init();

@@ -146,6 +146,9 @@ int mtk_change_thermal_policy(int tp_index, int onoff)
 
 	return ret;
 }
+#ifdef VENDOR_EDIT
+EXPORT_SYMBOL_GPL(mtk_change_thermal_policy);
+#endif /* VENDOR_EDIT */
 
 
 static int tp_idx;

@@ -797,7 +797,6 @@ void set_mcdi_s_state(int state)
 
 	spin_unlock_irqrestore(&mcdi_feature_stat_spin_lock, flags);
 }
-EXPORT_SYMBOL(set_mcdi_s_state);
 
 void set_mcdi_buck_off_mask(unsigned int buck_off_mask)
 {

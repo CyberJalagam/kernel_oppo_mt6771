@@ -88,6 +88,16 @@ struct IMGSENSOR_HW_CFG *imgsensor_hw_get_cfg(enum IMGSENSOR_SENSOR_IDX sensor_i
 extern struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[];
 extern struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[];
 extern enum IMGSENSOR_RETURN (*hw_open[IMGSENSOR_HW_ID_MAX_NUM]) (struct IMGSENSOR_HW_DEVICE **);
+
+#ifdef VENDOR_EDIT
+/*Yijun.Tan@Camera.Driver  add for 17197  board 20180101*/
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_17197[];
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_18531[];
+/*Xiaoyang.Huang@RM.Camera add for 18611 board,20190304*/
+extern struct IMGSENSOR_HW_CFG imgsensor_custom_config_for_18611[];
+#endif
+
 extern struct IMGSENSOR_HW_CFG imgsensor_custom_config[];
+
 #endif
 

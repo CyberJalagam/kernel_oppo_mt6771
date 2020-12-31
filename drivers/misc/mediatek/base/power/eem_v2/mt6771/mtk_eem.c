@@ -344,8 +344,8 @@ static int get_devinfo(void)
 	}
 
 #ifdef CONFIG_EEM_AEE_RR_REC
-	aee_rr_rec_ptp_devinfo_1(turbocode || (turbo_bininfo.CPU_T_BIN >> 1) ||
-		(turbo_bininfo.GPU_OPP0_T_BIN >> 4) || (turbo_bininfo.GPU_OPP1_T_BIN >> 7));
+	aee_rr_rec_ptp_devinfo_1(turbocode | (turbo_bininfo.CPU_T_BIN << 1) |
+		(turbo_bininfo.GPU_OPP0_T_BIN << 4) | (turbo_bininfo.GPU_OPP1_T_BIN << 7));
 
 #if 0
 	eem_error("t:%d, tbin:%d, g0bin:%d, g1bin:%d, bin data: 0x%x",
@@ -1487,7 +1487,6 @@ static void eem_set_eem_volt(struct eem_det *det)
 	struct eem_det *org_det = det;
 	unsigned int init2chk = 0;
 #endif
-	unsigned int tmp_clamp_val;
 	int aging_val = 0;
 #if defined(CONFIG_ARM64) && \
 	defined(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES)
@@ -1572,10 +1571,6 @@ static void eem_set_eem_volt(struct eem_det *det)
 			break;
 
 		case EEM_CTRL_L:
-			tmp_clamp_val = det->volt_tbl_orig[i] + MARGIN_ADD_OFF_VER4;
-			if (tmp_clamp_val > LCPU_VMAX1050_PMIC_VAL)
-				tmp_clamp_val = LCPU_VMAX1050_PMIC_VAL;
-
 			if ((turbocode == 1) && (i == 0))
 				det->volt_tbl_pmic[i] = det->ops->volt_2_pmic(det, cpu_t_volt[turbo_bininfo.CPU_T_BIN]);
 			else
@@ -1586,7 +1581,7 @@ static void eem_set_eem_volt(struct eem_det *det)
 						low_temp_offset - aging_val)),
 					det->ops->eem_2_pmic(det, det->VMIN),
 					det->ops->eem_2_pmic(det, det->VMAX))),
-					tmp_clamp_val);
+					det->volt_tbl_orig[i]);
 
 			if ((turbocode == 1) && (i == 1)) {
 				if (det->volt_tbl_pmic[1] > det->volt_tbl_pmic[0])

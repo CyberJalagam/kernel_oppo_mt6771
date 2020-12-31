@@ -1655,9 +1655,10 @@ struct kbase_device {
 	/* See KBASE_JS_*_PRIORITY_MODE for details. */
 	u32 js_ctx_scheduling_mode;
 
-#if defined(CONFIG_MACH_MT6763)
-	void *mtk_config;
-#endif
+	struct {
+		u8 counter[BASE_JM_MAX_NR_SLOTS];
+		struct kbase_context *last_two_context_per_slot[BASE_JM_MAX_NR_SLOTS][SLOT_RB_SIZE];
+	} force_l2_flush;
 };
 
 /**

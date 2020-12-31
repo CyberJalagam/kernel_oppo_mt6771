@@ -193,6 +193,27 @@ typedef struct {
 	uint32_t state;  /* geofence [source, result, operation_mode] */
 } geofence_event_t;
 
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/10/15, Add for oppo algo*/
+typedef struct {
+	uint32_t value;
+	uint16_t report_count;
+}ffd_event_t;
+
+typedef struct {
+	uint32_t free_fall_time;
+	uint32_t angle;
+	uint16_t report_count;
+}free_fall_event_t;
+
+typedef struct {
+	uint32_t value;
+	uint16_t report_count;
+}pickup_motion_event_t;
+
+#endif /*VENDOR_EDIT*/
+
+
 typedef enum {
 	STILL,
 	STANDING,
@@ -246,6 +267,12 @@ struct data_unit_t {
 		activity_t activity_data_t;
 		gesture_t gesture_data_t;
 		fall_t fall_data_t;
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/10/15, Add for oppo algo*/
+		ffd_event_t ffd_data_t;
+		free_fall_event_t free_fall_data_t;
+		pickup_motion_event_t pickup_motion_data_t;
+#endif /*VENDOR_EDIT*/
 		tilt_event_t tilt_event;
 		in_pocket_event_t inpocket_event;
 		geofence_event_t geofence_data_t;
@@ -355,6 +382,12 @@ typedef enum {
 	CUST_ACTION_SHOW_ALSVAL,
 	CUST_ACTION_SET_FACTORY,
 	CUST_ACTION_GET_SENSOR_INFO,
+#ifdef VENDOR_EDIT
+//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
+	CUST_ACTION_SELFTEST,
+	CUST_ACTION_RW_REGISTER,
+	CUST_ACTION_SCP_SYNC_UTC,
+#endif//VENDOR_EDIT
 } CUST_ACTION;
 
 typedef struct {
@@ -437,6 +470,23 @@ enum {
 	USE_IN_FACTORY_MODE
 };
 
+#ifdef VENDOR_EDIT
+//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
+typedef struct {
+	CUST_ACTION    action;
+	union{
+		uint8_t buff[4];
+		int32_t testResult;
+	};
+} SCP_SENSOR_HUB_SHOW_SELFTEST;
+typedef struct {
+	CUST_ACTION    action;
+	union{
+		uint32_t u32_data[4];  //date hour minute second
+	};
+} SCP_SENSOR_HUB_SYNC_UTC;
+#endif//VENDOR_EDIT
+
 typedef struct {
 	uint8_t sensorType;
 	uint8_t action;
@@ -456,6 +506,11 @@ typedef struct {
 		SCP_SENSOR_HUB_SHOW_ALSVAL showAlsval;
 		SCP_SENSOR_HUB_SET_FACTORY	setFactory;
 		struct scp_sensor_hub_get_sensor_info getInfo;
+	#ifdef VENDOR_EDIT
+	//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
+		SCP_SENSOR_HUB_SHOW_SELFTEST showSelftest;
+		SCP_SENSOR_HUB_SYNC_UTC syncUTC;
+	#endif//VENDOR_EDIT
 	};
 } SCP_SENSOR_HUB_SET_CUST_REQ;
 
@@ -468,6 +523,10 @@ typedef struct {
 		uint32_t custData[9];
 		SCP_SENSOR_HUB_GET_RAW_DATA getRawData;
 		struct scp_sensor_hub_get_sensor_info getInfo;
+	#ifdef VENDOR_EDIT
+	//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
+		SCP_SENSOR_HUB_SHOW_SELFTEST showSelftest;
+	#endif//VENDOR_EDIT
 	};
 } SCP_SENSOR_HUB_SET_CUST_RSP;
 

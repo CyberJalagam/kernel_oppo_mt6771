@@ -58,6 +58,19 @@ static struct charger_device *primary_charger;
 #endif
 
 static struct wake_lock mtk_xhci_wakelock;
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
+//#include <linux/gpio.h>
+//extern int iddig_gpio_mode(int mode);
+extern int bq24190_otg_enable(void);
+extern int bq24190_otg_disable(void);
+extern int charger_ic_flag;
+extern int bq25890h_otg_enable(void);
+extern int bq25890h_otg_disable(void);
+extern int bq25601d_otg_enable(void);
+extern int bq25601d_otg_disable(void);
+//extern bool get_otg_switch(void);
+#endif /* VENDOR_EDIT */
 
 enum dualrole_state {
 	DUALROLE_DEVICE,
@@ -461,9 +474,22 @@ static int _mtk_xhci_driver_load(bool vbus_on)
 	switch_set_state(&mtk_otg_state, 1);
 #endif
 	mtk_dualrole_stat = DUALROLE_HOST;
-
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
 	if (vbus_on)
 		mtk_enable_otg_mode();
+#else
+	if (vbus_on) {
+		printk("vbus_on\n");
+		if (charger_ic_flag == 0) {
+			bq24190_otg_enable();
+		} else if(charger_ic_flag == 1){
+			bq25890h_otg_enable();
+		} else if (charger_ic_flag == 2) {
+			bq25601d_otg_enable();
+		}
+	}
+#endif /* VENDOR_EDIT */
 
 	if (host_plug_test_enable && !host_plug_test_triggered)
 		schedule_delayed_work(&host_plug_test_work, 0);
@@ -489,9 +515,21 @@ static void _mtk_xhci_driver_unload(bool vbus_off)
 	}
 
 	mtk_xhci_hcd_cleanup();
-
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for otg */
 	if (vbus_off)
 		mtk_disable_otg_mode();
+#else
+	if (vbus_off) {
+		if (charger_ic_flag == 0) {
+			bq24190_otg_disable();
+		} else if(charger_ic_flag == 1){
+			bq25890h_otg_disable();
+		} else if (charger_ic_flag == 2) {
+			bq25601d_otg_disable();
+		}
+	}
+#endif /* VENDOR_EDIT */
 
 	/* close clock/power setting and assert reset bit of mac */
 #ifdef CONFIG_PROJECT_PHY

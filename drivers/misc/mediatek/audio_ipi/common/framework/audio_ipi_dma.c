@@ -80,7 +80,7 @@
 #ifdef pr_fmt
 #undef pr_fmt
 #endif
-#define pr_fmt(fmt) "%s(), " fmt "\n", __func__
+#define pr_fmt(fmt) "[IPI][DMA] %s(), " fmt "\n", __func__
 
 
 /*
@@ -1060,7 +1060,7 @@ static void hal_dma_dump_msg_in_queue(struct hal_dma_queue_t *msg_queue)
 		/* get head msg */
 		p_ipi_msg = &msg_queue->msg[idx_dump];
 
-		print_msg_info(__func__, "dump queue list", p_ipi_msg);
+		DUMP_IPI_MSG("dump queue list", p_ipi_msg);
 
 		/* update dump index */
 		idx_dump++;
@@ -1316,9 +1316,8 @@ static int hal_dma_get_queue_msg(
 	int retval = 0;
 
 	uint32_t try_cnt = 0;
-	const uint32_t k_max_try_cnt = 150;
-	const uint32_t k_restart_sleep_ms = 20;
-
+	const uint32_t k_max_try_cnt = 10; /* retry 1 sec for -ERESTARTSYS */
+	const uint32_t k_restart_sleep_ms = 100; /* 100 ms */
 
 	spin_lock_irqsave(&msg_queue->queue_lock, flags);
 	is_empty = hal_dma_check_queue_empty(msg_queue);
@@ -1331,18 +1330,27 @@ static int hal_dma_get_queue_msg(
 					 msg_queue->queue_wq,
 					 !hal_dma_check_queue_empty(msg_queue));
 
-			if (retval == 0) /* got msg in queue */
+			if (hal_dma_check_queue_empty(msg_queue) == false) {
+				retval = 0;
 				break;
+			}
+			if (retval == 0) { /* got msg in queue */
+				pr_notice("wait ret 0, empty %d",
+					  hal_dma_check_queue_empty(msg_queue));
+				break;
+			}
 			if (retval == -ERESTARTSYS) {
-				pr_debug("%s(), -ERESTARTSYS, retval: %d\n",
-					 __func__, retval);
+				pr_info("-ERESTARTSYS, #%u, sleep ms: %u",
+					try_cnt, k_restart_sleep_ms);
 				retval = -EINTR;
 				msleep(k_restart_sleep_ms);
+				continue;
 			}
+			pr_notice("retval: %d not handle!!", retval);
 		}
 	}
 
-	if (retval == 0) {
+	if (hal_dma_check_queue_empty(msg_queue) == false) {
 		spin_lock_irqsave(&msg_queue->queue_lock, flags);
 		retval = hal_dma_front(msg_queue, pp_ipi_msg, p_idx_msg);
 		spin_unlock_irqrestore(&msg_queue->queue_lock, flags);
@@ -1370,12 +1378,12 @@ int audio_ipi_dma_msg_to_hal(struct ipi_msg_t *p_ipi_msg)
 	if (p_ipi_msg->data_type != AUDIO_IPI_DMA ||
 	    p_ipi_msg->target_layer != AUDIO_IPI_LAYER_TO_HAL ||
 	    p_ipi_msg->dma_info.data_size == 0) {
-		print_msg_info(__func__, "msg err", p_ipi_msg);
+		DUMP_IPI_MSG("msg err", p_ipi_msg);
 		return -EFAULT;
 	}
 
 #if 0
-	print_msg_info(__func__, "dma dsp -> kernel", p_ipi_msg);
+	DUMP_IPI_MSG("dma dsp -> kernel", p_ipi_msg);
 #endif
 
 	/* push message to queue */
@@ -1390,6 +1398,7 @@ int audio_ipi_dma_msg_to_hal(struct ipi_msg_t *p_ipi_msg)
 	}
 
 	/* notify queue thread to process it */
+	dsb(SY);
 	wake_up_interruptible(&msg_queue->queue_wq);
 
 	return 0;
@@ -1424,7 +1433,7 @@ size_t audio_ipi_dma_msg_read(void __user *buf, size_t count)
 	p_ipi_msg = &msg_queue->msg[idx_msg];
 
 #if 0
-	print_msg_info(__func__, "dma kernel -> hal", p_ipi_msg);
+	DUMP_IPI_MSG("dma kernel -> hal", p_ipi_msg);
 #endif
 
 	/* copy data */

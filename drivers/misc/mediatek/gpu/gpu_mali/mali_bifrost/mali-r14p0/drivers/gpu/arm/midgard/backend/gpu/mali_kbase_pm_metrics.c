@@ -242,7 +242,12 @@ u32 kbasep_get_gl_utilization(void)
 {
 	return g_current_sample_gl_utilization;
 }
+#ifdef VENDOR_EDIT
+//jie.cheng@Swdp.shanghai, 2017/06/03, export gpu load API
+EXPORT_SYMBOL(kbasep_get_gl_utilization);
+#else
 KBASE_EXPORT_TEST_API(kbasep_get_gl_utilization)
+#endif
 
 u32 kbasep_get_cl_js0_utilization(void)
 {

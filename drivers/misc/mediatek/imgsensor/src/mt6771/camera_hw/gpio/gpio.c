@@ -13,12 +13,27 @@
 
 #include "gpio.h"
 
+#ifndef VENDOR_EDIT
+#define VENDOR_EDIT
+#endif
+
+#ifdef VENDOR_EDIT
+/*Feng.Hu@Camera.Driver 20171213 add for evb and t0 board both work well*/
+#include<soc/oppo/oppo_project.h>
+#endif
+
 struct GPIO_PINCTRL gpio_pinctrl_list[GPIO_CTRL_STATE_MAX_NUM] = {
 	/* Main */
 	{"cam0_pnd1"},
 	{"cam0_pnd0"},
+	#ifndef VENDOR_EDIT
+	/*Feng.Hu@Camera.Driver 20171206 modify for TO board power up*/
 	{"cam0_rst1"},
 	{"cam0_rst0"},
+	#else
+	{"cam1_rst1"},
+	{"cam1_rst0"},
+	#endif
 	{"cam_ldo_vcama_1"},
 	{"cam_ldo_vcama_0"},
 	{"cam_ldo_vcamd_1"},
@@ -28,8 +43,14 @@ struct GPIO_PINCTRL gpio_pinctrl_list[GPIO_CTRL_STATE_MAX_NUM] = {
 	/* Sub */
 	{"cam1_pnd1"},
 	{"cam1_pnd0"},
+	#ifndef VENDOR_EDIT
+	/*Feng.Hu@Camera.Driver 20171206 modify for TO board power up*/
 	{"cam1_rst1"},
 	{"cam1_rst0"},
+	#else
+	{"cam2_rst1"},
+	{"cam2_rst0"},
+	#endif
 	{"cam_ldo_sub_vcama_1"},
 	{"cam_ldo_sub_vcama_0"},
 	{"cam_ldo_sub_vcamd_1"},
@@ -58,17 +79,6 @@ struct GPIO_PINCTRL gpio_pinctrl_list[GPIO_CTRL_STATE_MAX_NUM] = {
 	{"cam_ldo_sub2_vcamd_0"},
 	{"cam_ldo_sub2_vcamio_1"},
 	{"cam_ldo_sub2_vcamio_0"},
-	/*main3*/
-	{"cam4_pnd1"},
-	{"cam4_pnd0"},
-	{"cam4_rst1"},
-	{"cam4_rst0"},
-	{"cam_ldo_main3_vcama_1"},
-	{"cam_ldo_main3_vcama_0"},
-	{"cam_ldo_main3_vcamd_1"},
-	{"cam_ldo_main3_vcamd_0"},
-	{"cam_ldo_main3_vcamio_1"},
-	{"cam_ldo_main3_vcamio_0"},
 
 #ifdef MIPI_SWITCH
 	{"cam_mipi_switch_en_1"},
@@ -78,6 +88,117 @@ struct GPIO_PINCTRL gpio_pinctrl_list[GPIO_CTRL_STATE_MAX_NUM] = {
 #endif
 };
 
+#ifdef VENDOR_EDIT
+struct GPIO_PINCTRL gpio_pinctrl_list_17197[GPIO_CTRL_STATE_MAX_NUM] = {
+	/* Main */
+	{"cam0_pnd1"},
+	{"cam0_pnd0"},
+	{"cam0_rst1"},
+	{"cam0_rst0"},
+	{"cam_ldo_vcama_1"},
+	{"cam_ldo_vcama_0"},
+	{"cam_ldo_vcamd_1"},
+	{"cam_ldo_vcamd_0"},
+	{"cam_ldo_vcamio_1"},
+	{"cam_ldo_vcamio_0"},
+	/* Sub */
+	{"cam2_pnd1"},
+	{"cam2_pnd0"},
+	{"cam2_rst1"},
+	{"cam2_rst0"},
+	{"cam_ldo_sub_vcama_1"},
+	{"cam_ldo_sub_vcama_0"},
+	{"cam_ldo_sub_vcamd_1"},
+	{"cam_ldo_sub_vcamd_0"},
+	{"cam_ldo_sub_vcamio_1"},
+	{"cam_ldo_sub_vcamio_0"},
+	/* Main2 */
+	{"cam1_pnd1"},
+	{"cam1_pnd0"},
+	{"cam1_rst1"},
+	{"cam1_rst0"},
+	{"cam_ldo_main2_vcama_1"},
+	{"cam_ldo_main2_vcama_0"},
+	{"cam_ldo_main2_vcamd_1"},
+	{"cam_ldo_main2_vcamd_0"},
+	{"cam_ldo_main2_vcamio_1"},
+	{"cam_ldo_main2_vcamio_0"},
+	/* Sub2 */
+	{"cam3_pnd1"},
+	{"cam3_pnd0"},
+	{"cam3_rst1"},
+	{"cam3_rst0"},
+	{"cam_ldo_sub2_vcama_1"},
+	{"cam_ldo_sub2_vcama_0"},
+	{"cam_ldo_sub2_vcamd_1"},
+	{"cam_ldo_sub2_vcamd_0"},
+	{"cam_ldo_sub2_vcamio_1"},
+	{"cam_ldo_sub2_vcamio_0"},
+
+#ifdef MIPI_SWITCH
+	{"cam_mipi_switch_en_1"},
+	{"cam_mipi_switch_en_0"},
+	{"cam_mipi_switch_sel_1"},
+	{"cam_mipi_switch_sel_0"}
+#endif
+};
+
+
+/*Xiaoyang.Huang@RM.Camera add for 18611 board,20190304*/
+struct GPIO_PINCTRL gpio_pinctrl_list_18611[GPIO_CTRL_STATE_MAX_NUM] = {
+	/* Main */
+	{"cam0_pnd1"},
+	{"cam0_pnd0"},
+	{"cam0_rst1"},
+	{"cam0_rst0"},
+	{"cam_ldo_vcama_1"},
+	{"cam_ldo_vcama_0"},
+	{"cam_ldo_vcamd_1"},
+	{"cam_ldo_vcamd_0"},
+	{"cam_ldo_vcamio_1"},
+	{"cam_ldo_vcamio_0"},
+	/* Sub */
+	{"cam2_pnd1"},
+	{"cam2_pnd0"},
+	{"cam2_rst1"},
+	{"cam2_rst0"},
+	{"cam_ldo_sub_vcama_1"},
+	{"cam_ldo_sub_vcama_0"},
+	{"cam_ldo_sub_vcamd_1"},
+	{"cam_ldo_sub_vcamd_0"},
+	{"cam_ldo_sub_vcamio_1"},
+	{"cam_ldo_sub_vcamio_0"},
+	/* Main2 */
+	{"cam1_pnd1"},
+	{"cam1_pnd0"},
+	{"cam1_rst1"},
+	{"cam1_rst0"},
+	{"cam_ldo_main2_vcama_1"},
+	{"cam_ldo_main2_vcama_0"},
+	{"cam_ldo_main2_vcamd_1"},
+	{"cam_ldo_main2_vcamd_0"},
+	{"cam_ldo_main2_vcamio_1"},
+	{"cam_ldo_main2_vcamio_0"},
+	/* Sub2 */
+	{"cam3_pnd1"},
+	{"cam3_pnd0"},
+	{"cam3_rst1"},
+	{"cam3_rst0"},
+	{"cam_ldo_sub2_vcama_1"},
+	{"cam_ldo_sub2_vcama_0"},
+	{"cam_ldo_sub2_vcamd_1"},
+	{"cam_ldo_sub2_vcamd_0"},
+	{"cam_ldo_sub2_vcamio_1"},
+	{"cam_ldo_sub2_vcamio_0"},
+
+#ifdef MIPI_SWITCH
+	{"cam_mipi_switch_en_1"},
+	{"cam_mipi_switch_en_0"},
+	{"cam_mipi_switch_sel_1"},
+	{"cam_mipi_switch_sel_0"}
+#endif
+};
+#endif
 static struct GPIO gpio_instance;
 
 static enum IMGSENSOR_RETURN gpio_init(
@@ -88,7 +209,22 @@ static enum IMGSENSOR_RETURN gpio_init(
 	struct GPIO            *pgpio            = (struct GPIO *)pinstance;
 	struct GPIO_PINCTRL    *pgpio_pinctrl    = gpio_pinctrl_list;
 	enum   IMGSENSOR_RETURN ret              = IMGSENSOR_RETURN_SUCCESS;
+	#ifdef VENDOR_EDIT
+	/*Feng.Hu@Camera.Driver 20171213 add for evb and t0 board both work well*/
 
+	if (is_project(OPPO_17197))
+	{
+		PK_PR_ERR("This is 17197 board\n");
+		pgpio_pinctrl    = gpio_pinctrl_list_17197;
+	}
+
+	/*Yongzhi.Wang@RM.Camera add the driver of sensor,20190202*/
+	if (is_project(OPPO_18611)) {
+		PK_PR_ERR("This is 18611 board GPIO\n");
+		pgpio_pinctrl    = gpio_pinctrl_list_18611;
+	}
+
+	#endif
 	pgpio->pgpio_mutex = &pcommon->pinctrl_mutex;
 
 	pgpio->ppinctrl = devm_pinctrl_get(&pcommon->pplatform_device->dev);
@@ -98,9 +234,11 @@ static enum IMGSENSOR_RETURN gpio_init(
 	}
 
 	for (i = 0; i < GPIO_CTRL_STATE_MAX_NUM; i++, pgpio_pinctrl++) {
-		if (pgpio_pinctrl->ppinctrl_lookup_names)
+		if (pgpio_pinctrl->ppinctrl_lookup_names) {
 			pgpio->ppinctrl_state[i] =
 				pinctrl_lookup_state(pgpio->ppinctrl, pgpio_pinctrl->ppinctrl_lookup_names);
+				//PK_PR_ERR("%s : pinctrl_name, %s\n", __func__, pgpio_pinctrl->ppinctrl_lookup_names);
+		}
 
 		if (pgpio->ppinctrl_state[i] == NULL ||	IS_ERR(pgpio->ppinctrl_state[i])) {
 			PK_PR_ERR("%s : pinctrl err, %s\n", __func__, pgpio_pinctrl->ppinctrl_lookup_names);
@@ -119,8 +257,13 @@ static enum IMGSENSOR_RETURN gpio_release(void *pinstance)
 
 	for (i = GPIO_CTRL_STATE_CAM0_PDN_L; i < GPIO_CTRL_STATE_MAX_NUM; i += 2) {
 		ppinctrl_state = pgpio->ppinctrl_state[i];
+
+		mutex_lock(pgpio->pgpio_mutex);
+
 		if (ppinctrl_state != NULL && !IS_ERR(ppinctrl_state))
 			pinctrl_select_state(pgpio->ppinctrl, ppinctrl_state);
+
+		mutex_unlock(pgpio->pgpio_mutex);
 	}
 
 	return IMGSENSOR_RETURN_SUCCESS;
@@ -169,6 +312,8 @@ static enum IMGSENSOR_RETURN gpio_set(
 	}
 
 	mutex_lock(pgpio->pgpio_mutex);
+	//PK_PR_ERR("%s : pinctrl err, PinIdx %d, Val %d\n", __func__, pin, pin_state);
+
 
 	if (ppinctrl_state != NULL && !IS_ERR(ppinctrl_state))
 		pinctrl_select_state(pgpio->ppinctrl, ppinctrl_state);

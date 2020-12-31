@@ -38,6 +38,7 @@
 #include <linux/atomic.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <linux/memblock.h>
 #include <linux/memory.h>
 #include <linux/ftrace.h>
 #ifdef CMDQ_MET_READY
@@ -50,6 +51,11 @@
 #include <linux/pm_runtime.h>
 #include "cmdq_record_private.h"
 #include "smi_public.h"
+
+#ifdef VENDOR_EDIT
+/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+#include <linux/oppo_mm_kevent_fb.h>
+#endif /*VENDOR_EDIT*/
 
 /* #define CMDQ_PROFILE_COMMAND_TRIGGER_LOOP */
 /* #define CMDQ_ENABLE_BUS_ULTRA */
@@ -205,6 +211,7 @@ static atomic_t g_pool_buffer_count;
 #ifdef CMDQ_DUMP_FIRSTERROR
 struct DumpFirstErrorStruct gCmdqFirstError;
 #endif
+static const char *cmdq_first_err_mod;
 
 static struct DumpCommandBufferStruct gCmdqBufferDump;
 
@@ -3350,6 +3357,119 @@ static struct TaskStruct *cmdq_core_find_free_task(void)
 
 	return pTask;
 }
+static bool cmdq_core_check_gpr_valid(const uint32_t gpr, const bool val)
+{
+	if (val)
+		switch (gpr) {
+		case CMDQ_DATA_REG_JPEG:
+		case CMDQ_DATA_REG_PQ_COLOR:
+		case CMDQ_DATA_REG_2D_SHARPNESS_0:
+		case CMDQ_DATA_REG_2D_SHARPNESS_1:
+		case CMDQ_DATA_REG_DEBUG:
+			return true;
+		default:
+			return false;
+		}
+	else
+		switch (gpr >> 16) {
+		case CMDQ_DATA_REG_JPEG_DST:
+		case CMDQ_DATA_REG_PQ_COLOR_DST:
+		case CMDQ_DATA_REG_2D_SHARPNESS_0:
+		case CMDQ_DATA_REG_2D_SHARPNESS_0_DST:
+		case CMDQ_DATA_REG_2D_SHARPNESS_1_DST:
+		case CMDQ_DATA_REG_DEBUG_DST:
+			return true;
+		default:
+			return false;
+		}
+	return false;
+}
+
+static bool cmdq_core_check_dma_addr_valid(const unsigned long pa)
+{
+	struct WriteAddrStruct *pWriteAddr = NULL;
+	unsigned long flagsWriteAddr = 0L;
+	phys_addr_t start = memblock_start_of_DRAM();
+	bool ret = false;
+
+	spin_lock_irqsave(&gCmdqWriteAddrLock, flagsWriteAddr);
+	list_for_each_entry(pWriteAddr, &gCmdqContext.writeAddrList, list_node)
+		if (pa < start || pa - (unsigned long)pWriteAddr->pa <
+			pWriteAddr->count << 2) {
+			ret = true;
+			break;
+		}
+	spin_unlock_irqrestore(&gCmdqWriteAddrLock, flagsWriteAddr);
+	return ret;
+}
+
+static bool cmdq_core_check_instr_valid(const uint64_t instr)
+{
+	u32 op = instr >> 56, option = (instr >> 53) & 0x7;
+	u32 argA = (instr >> 32) & 0x1FFFFF, argB = instr & 0xFFFFFFFF;
+
+	switch (op) {
+	case CMDQ_CODE_WRITE:
+		if (!option)
+			return true;
+		if (option == 0x4 && cmdq_core_check_gpr_valid(argA, false))
+			return true;
+	case CMDQ_CODE_READ:
+		if (option == 0x2 && cmdq_core_check_gpr_valid(argB, true))
+			return true;
+		if (option == 0x6 && cmdq_core_check_gpr_valid(argA, false) &&
+			cmdq_core_check_gpr_valid(argB, true))
+			return true;
+		break;
+	case CMDQ_CODE_MOVE:
+		if (!option && !argA)
+			return true;
+		if (option == 0x4 && cmdq_core_check_gpr_valid(argA, false) &&
+			cmdq_core_check_dma_addr_valid(argB))
+			return true;
+		break;
+	case CMDQ_CODE_JUMP:
+		if (!argA && argB == 0x8)
+			return true;
+		break;
+	case CMDQ_CODE_READ_S:
+	case CMDQ_CODE_WRITE_S:
+	case CMDQ_CODE_WRITE_S_W_MASK:
+	case CMDQ_CODE_LOGIC:
+	case CMDQ_CODE_JUMP_C_ABSOLUTE:
+	case CMDQ_CODE_JUMP_C_RELATIVE:
+		break;
+	default:
+		return true;
+	}
+	return false;
+}
+
+static int32_t cmdq_core_check_task_valid(struct TaskStruct *pTask)
+{
+
+	struct CmdBufferStruct *cmd_buffer = NULL;
+	int32_t cmd_size = CMDQ_CMD_BUFFER_SIZE;
+	uint64_t *va;
+	bool ret = true;
+
+	list_for_each_entry(cmd_buffer, &pTask->cmd_buffer_list, listEntry) {
+		if (list_is_last(&cmd_buffer->listEntry,
+			&pTask->cmd_buffer_list))
+			cmd_size -= pTask->buf_available_size;
+
+		for (va = (uint64_t *)cmd_buffer->pVABase; ret &&
+			(unsigned long)(va + 1) <
+			(unsigned long)cmd_buffer->pVABase + cmd_size; va++)
+			ret &= cmdq_core_check_instr_valid(*va);
+
+		if (ret && (*va >> 56) != CMDQ_CODE_JUMP)
+			ret &= cmdq_core_check_instr_valid(*va);
+		if (!ret)
+			break;
+	}
+	return ret;
+}
 
 u32 cmdq_core_get_reg_extra_size(struct TaskStruct *task,
 	struct cmdqCommandStruct *desc)
@@ -3470,6 +3590,8 @@ static int32_t cmdq_core_insert_read_reg_command(struct TaskStruct *pTask,
 		"[CMD] line:%d CMDEnd:%p cmdSize:%d bufferSize:%u block size:%u\n",
 		__LINE__, pTask->pCMDEnd, pTask->commandSize,
 		pTask->bufferSize, pCommandDesc->blockSize);
+	if (userSpaceRequest && !cmdq_core_check_task_valid(pTask))
+		return -EFAULT;
 
 	/* If no read request, no post-process needed. Do verify and stop */
 	if (!postInstruction) {
@@ -5388,6 +5510,10 @@ static void cmdq_core_dump_summary(const struct TaskStruct *pTask, s32 thread,
 	/* Do summary ! */
 	cmdq_core_parse_error(pNGTask, thread, &module, &irqFlag, &instA, &instB);
 	CMDQ_ERR("** [Module] %s **\n", module);
+
+	if (!cmdq_first_err_mod)
+		cmdq_first_err_mod = module;
+
 	if (pTask != pNGTask) {
 		CMDQ_ERR
 		    ("** [Note] PC is not in first error task (0x%p) but in previous task (0x%p) **\n",
@@ -7001,51 +7127,6 @@ static struct TaskStruct *cmdq_core_search_task_by_pc(uint32_t threadPC,
 	return pTask;
 }
 
-static void cmdq_core_reset_dsi(struct TaskStruct *pTask, s32 thread)
-{
-#ifdef CMDQ_DISP_DSI_DEBUG
-	uint32_t *pcVA = NULL, pcPA = 0;
-	uint32_t insts[4] = { 0 };
-	char parsedInstruction[128] = { 0 };
-
-	if (pTask->scenario != CMDQ_SCENARIO_DISP_ESD_CHECK &&
-		pTask->scenario != CMDQ_SCENARIO_PRIMARY_DISP)
-		return;
-
-	CMDQ_MSG("ready to verify pre-dump!!\n");
-
-	pcVA = cmdq_core_get_pc(pTask, thread, insts, &pcPA);
-	if (pcVA) {
-		const uint32_t op = (insts[3] & 0xFF000000) >> 24;
-
-		cmdq_core_parse_instruction(pcVA, parsedInstruction,
-			sizeof(parsedInstruction));
-
-		/* for WFE, we specifically dump the event value */
-		if (op == CMDQ_CODE_WFE) {
-			uint32_t regValue = 0;
-			const uint32_t eventID = 0x3FF & insts[3];
-
-			CMDQ_REG_SET32(CMDQ_SYNC_TOKEN_ID, eventID);
-			regValue = CMDQ_REG_GET32(CMDQ_SYNC_TOKEN_VAL);
-			/* DECLAR_EVENT(CMDQ_EVENT_MUTEX0_STREAM_EOF, stream_done_0) */
-			/* stream_done_0 = <130> */
-			if (eventID == 130) {
-				CMDQ_LOG(
-					"Thread %d PC:0x%p(0x%08x) 0x%08x:0x%08x => %s value:%d",
-					thread, pcVA,
-					pcPA, insts[2],
-					insts[3],
-					parsedInstruction,
-					regValue);
-				CMDQ_LOG("call display to reset dsi\n");
-				ddp_dump_and_reset_dsi0();
-			}
-		}
-	}
-#endif
-}
-
 /* Implementation of wait task done
  * Return:
  *     wait time of wait_event_timeout() kernel API
@@ -7065,6 +7146,10 @@ static int32_t cmdq_core_wait_task_done_with_timeout_impl(
 	s32 delay_id = cmdq_get_delay_id_by_scenario(pTask->scenario);
 	s32 slot = -1, i = 0;
 	u32 tpr_mask = 0;
+	#ifdef VENDOR_EDIT
+	/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+	unsigned char payload[100] = "";
+	#endif
 
 	pThread = &(gCmdqContext.thread[thread]);
 	retry_count = 0;
@@ -7097,9 +7182,6 @@ static int32_t cmdq_core_wait_task_done_with_timeout_impl(
 
 		CMDQ_LOG("======= [CMDQ] SW timeout Pre-dump(%d) task:0x%p slot:%d =======\n",
 			retry_count, pTask, slot);
-
-		/* reset dsi if primary display or esd thread entered pre-dump */
-		cmdq_core_reset_dsi(pTask, thread);
 
 		tpr_mask = CMDQ_REG_GET32(CMDQ_TPR_MASK);
 		if (retry_count == 0) {
@@ -7135,6 +7217,12 @@ static int32_t cmdq_core_wait_task_done_with_timeout_impl(
 			} else {
 				CMDQ_LOG("delay id:%d tpr mask:0x%08x\n", delay_id, tpr_mask);
 			}
+			#ifdef VENDOR_EDIT
+			/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+			scnprintf(payload, sizeof(payload), "EventID@@%d$$CMDQSWtimeout@@task:0x%p slot:%d",
+				OPPO_MM_DIRVER_FB_EVENT_ID_MTK_CMDQ, pTask, slot);
+			upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
+			#endif
 		} else {
 			/* dump simple status only */
 			CMDQ_PROF_SPIN_LOCK(gCmdqExecLock, flags, wait_task_dump);
@@ -9796,6 +9884,11 @@ int32_t cmdq_core_save_first_dump(const char *string, ...)
 #else
 	return -EFAULT;
 #endif
+}
+
+const char *cmdq_core_query_first_err_mod(void)
+{
+	return cmdq_first_err_mod;
 }
 
 #ifdef CMDQ_DUMP_FIRSTERROR

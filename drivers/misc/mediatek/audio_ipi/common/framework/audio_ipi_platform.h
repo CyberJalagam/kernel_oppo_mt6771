@@ -24,6 +24,7 @@ enum opendsp_id {
 	AUDIO_OPENDSP_ID_INVALID
 };
 
+bool audio_opendsp_id_ready(const uint8_t opendsp_id);
 
 bool audio_opendsp_ready(const uint8_t task);
 uint32_t audio_get_opendsp_id(const uint8_t task);

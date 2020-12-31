@@ -607,6 +607,7 @@ void scp_aed_reset_inplace(enum scp_excep_id type,
 		enum scp_core_id id)
 {
 	pr_debug("[SCP]scp_aed_reset_inplace\n");
+
 	if (scp_ee_enable)
 		scp_aed(type, id);
 	else

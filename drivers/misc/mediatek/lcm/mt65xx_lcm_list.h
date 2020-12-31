@@ -16,6 +16,37 @@
 
 #include <lcm_drv.h>
 
+#ifdef VENDOR_EDIT
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/10/22, Add for lcm ic tm himax83112a*/
+extern LCM_DRIVER oppo18531_tm_himax83112a_2_1080p_dsi_vdo_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/10/15, Add for lcm ic dpt_jdi himax83112a*/
+extern LCM_DRIVER oppo18531_dpt_jdi_himax83112a_2_1080p_dsi_vdo_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/10/15, Add for lcm ic dsjm jdi td4330*/
+extern LCM_DRIVER oppo18531_dsjm_jdi_td4330_1080p_dsi_cmd_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/10/25, Add for lcm ic dpt jdi td4330*/
+extern LCM_DRIVER oppo18531_dpt_jdi_td4330_1080p_dsi_cmd_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/10/29, Add for lcm ic tm nt36670a*/
+extern LCM_DRIVER oppo18531_tm_nt36670a_1080p_dsi_cmd_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/11/01, Add for lcm ic dsjm himax83112b*/
+extern LCM_DRIVER oppo18531_dsjm_jdi_himax83112b_1080p_dsi_cmd_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2018/11/05, Add for lcm ic tianma td4330*/
+extern LCM_DRIVER oppo18531_tianma_td4330_1080p_dsi_cmd_lcm_drv;
+/* LiPing-m@PSW.MM.Display.LCD.Machine 2018/07/19, Add for lcm ic samsung ams628nw */
+extern LCM_DRIVER oppo_samsung_ams628nw_1080p_dsi_cmd_lcm_drv;
+/* Yongpeng.Yi@PSW.MM.Display.LCD.Machine 2018/8/28, Add for lcm ic samsung ams628nw lsi */
+extern LCM_DRIVER oppo_samsung_ams628nw_lsi_1080p_dsi_cmd_lcm_drv;
+/* LiPing-m@PSW.MM.Display.LCD.Machine 2018/6/8, Add for lcm ic dsjm himax83112a */
+extern LCM_DRIVER oppo18311_dsjm_himax83112a_1080p_dsi_vdo_lcm_drv;
+/* LiPing-m@PSW.MM.Display.LCD.Machine 2018/7/9, Add for lcm ic truly td4320 */
+extern LCM_DRIVER oppo18311_truly_td4320_1080p_dsi_vdo_lcm_drv;
+/* YongPeng.Yi@PSW.MM.Display.LCD.Machine 2019/1/02, Add for lcm ic djn himax83112b*/
+extern LCM_DRIVER oppo18561_djn_jdi_himax83112b_1080p_dsi_cmd_lcm_drv;
+/* Shizeke@PSW.MM.Display.LCD.Machine 2018/8/24, Add for lcm ic dsjm himax83112a */
+extern LCM_DRIVER oppo18611_dsjm_himax83112a_1080p_dsi_vdo_lcm_drv;
+/* Shizeke@PSW.MM.Display.LCD.Machine 2018/8/24, Add for lcm ic truly auo NT36672 */
+extern LCM_DRIVER oppo_truly_nt36672_auo_1080p_dsi_vdo_lcm_drv;
+extern LCM_DRIVER oppo_jdi_td4310_1080p_dsi_vdo_lcm_drv;
+#endif /* VENDOR_EDIT */
 extern LCM_DRIVER otm1282a_hd720_dsi_vdo_60hz_lcm_drv;
 extern LCM_DRIVER otm1282a_hd720_dsi_vdo_lcm_drv;
 extern LCM_DRIVER nt35595_fhd_dsi_cmd_truly_8163_lcm_drv;
@@ -274,7 +305,6 @@ extern LCM_DRIVER nt35695_fhd_dsi_cmd_auo_nt50358_laneswap_mt6799_lcm_drv;
 extern LCM_DRIVER nt35695_fhd_dsi_vdo_auo_nt50358_laneswap_mt6799_lcm_drv;
 extern LCM_DRIVER nt35695B_fhd_dsi_cmd_auo_rt5081_lcm_drv;
 extern LCM_DRIVER nt35695B_fhd_dsi_cmd_auo_rt5081_720p_lcm_drv;
-extern LCM_DRIVER nt35695B_fhd_dsi_cmd_auo_rt5081_hdp_lcm_drv;
 extern LCM_DRIVER nt35695B_fhd_dsi_cmd_auo_rt5081_qhd_lcm_drv;
 extern LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_lcm_drv;
 extern LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_720p_lcm_drv;
@@ -301,6 +331,7 @@ extern LCM_DRIVER otm1901a_fhd_dsi_vdo_tpv_lcm_drv;
 extern LCM_DRIVER st7789h2_dbi_c_3wire_lcm_drv;
 extern LCM_DRIVER ssd2858_kd097d05_qxga_dsi_vdo_lcm_drv;
 extern LCM_DRIVER es6311_anx6585_zigzag_wxga_lcm_drv;
+
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);
 #endif

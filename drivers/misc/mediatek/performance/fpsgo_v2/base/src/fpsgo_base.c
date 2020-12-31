@@ -39,6 +39,7 @@
 #define TIME_1S  1000000000ULL
 
 static struct rb_root render_pid_tree;
+static struct rb_root BQ_id_list;
 
 static DEFINE_MUTEX(fpsgo_render_lock);
 
@@ -287,6 +288,28 @@ int fpsgo_has_bypass(void)
 	return result;
 }
 
+static void fpsgo_check_BQid_status(void)
+{
+	struct rb_node *n;
+	struct rb_node *next;
+	struct BQ_id *pos;
+	int tgid = 0;
+
+	fpsgo_lockprove(__func__);
+
+	for (n = rb_first(&BQ_id_list); n; n = next) {
+		next = rb_next(n);
+
+		pos = rb_entry(n, struct BQ_id, entry);
+		tgid = fpsgo_get_tgid(pos->pid);
+		if (tgid)
+			continue;
+
+		rb_erase(n, &BQ_id_list);
+		kfree(pos);
+	}
+}
+
 void fpsgo_check_thread_status(void)
 {
 	unsigned long long ts = fpsgo_get_time();
@@ -346,6 +369,8 @@ void fpsgo_check_thread_status(void)
 		}
 	}
 
+	fpsgo_check_BQid_status();
+
 	fpsgo_render_tree_unlock(__func__);
 
 	fpsgo_fstb2comp_check_connect_api();
@@ -397,6 +422,142 @@ void fpsgo_clear(void)
 	fpsgo_base2com_clear_ui_pid_info();
 
 	fpsgo_render_tree_unlock(__func__);
+}
+
+static struct BQ_id *fpsgo_get_BQid_by_key(unsigned long long key,
+		int add, int pid, long long identifier)
+{
+	struct rb_node **p = &BQ_id_list.rb_node;
+	struct rb_node *parent = NULL;
+	struct BQ_id *pos;
+
+	fpsgo_lockprove(__func__);
+
+	while (*p) {
+		parent = *p;
+		pos = rb_entry(parent, struct BQ_id, entry);
+
+		if (key < pos->key)
+			p = &(*p)->rb_left;
+		else if (key > pos->key)
+			p = &(*p)->rb_right;
+		else
+			return pos;
+	}
+
+	if (!add)
+		return NULL;
+
+	pos = kzalloc(sizeof(*pos), GFP_KERNEL);
+	if (!pos)
+		return NULL;
+
+	pos->key = key;
+	pos->pid = pid;
+	pos->identifier = identifier;
+	rb_link_node(&pos->entry, parent, p);
+	rb_insert_color(&pos->entry, &BQ_id_list);
+
+	FPSGO_LOGI("add BQid key 0x%llx, pid %d, id 0x%llx\n",
+		   key, pid, identifier);
+	return pos;
+}
+
+static inline void fpsgo_del_BQid_by_pid(int pid)
+{
+	FPSGO_LOGI("%s should not be used, deleting pid %d\n", __func__, pid);
+}
+
+static unsigned long long fpsgo_gen_unique_key(int pid, int tgid, long long identifier)
+{
+	unsigned long long key;
+
+	if (!tgid) {
+		tgid = fpsgo_get_tgid(pid);
+		if (!tgid)
+			return 0ULL;
+	}
+	key = ((identifier & 0xFFFFFFFFFFFF) | ((unsigned long long)tgid << 48));
+	return key;
+}
+
+struct BQ_id *fpsgo_find_BQ_id(int pid, int tgid, long long identifier, int action, unsigned long long buffer_id)
+{
+	struct rb_node *n;
+	struct rb_node *next;
+	struct BQ_id *pos;
+	unsigned long long key;
+	int done = 0;
+
+	fpsgo_lockprove(__func__);
+
+	switch (action) {
+	case ACTION_FIND:
+	case ACTION_FIND_ADD:
+		key = fpsgo_gen_unique_key(pid, tgid, identifier);
+		if (key == 0ULL)
+			return NULL;
+		FPSGO_LOGI("find %s pid %d, id %llu, key %llu\n",
+			(action == ACTION_FIND_ADD)?"add":"", pid, identifier, key);
+
+		return fpsgo_get_BQid_by_key(key, action == ACTION_FIND_ADD,
+					     pid, identifier);
+
+	case ACTION_FIND_DEL:
+		key = fpsgo_gen_unique_key(pid, tgid, identifier);
+		if (key == 0ULL)
+			return NULL;
+
+		for (n = rb_first(&BQ_id_list); n; n = next) {
+			next = rb_next(n);
+
+			pos = rb_entry(n, struct BQ_id, entry);
+			if (pos->key == key) {
+				FPSGO_LOGI("find del pid %d, id %llu, key %llu\n",
+					   pid, identifier, key);
+				rb_erase(n, &BQ_id_list);
+				kfree(pos);
+				done = 1;
+				break;
+			} else if (pos->buffer_id == buffer_id &&
+				   pos->identifier == identifier) {
+				FPSGO_LOGI("find del pid %d, id %llu, BQ %llu\n",
+					   pid, identifier, buffer_id);
+				rb_erase(n, &BQ_id_list);
+				kfree(pos);
+				done = 1;
+				break;
+			}
+		}
+		if (!done)
+			FPSGO_LOGE("[ERROR] del fail key %llu\n", key);
+		return NULL;
+	case ACTION_DEL_PID:
+		FPSGO_LOGI("del BQid pid %d\n", pid);
+		fpsgo_del_BQid_by_pid(pid);
+		return NULL;
+	default:
+		FPSGO_LOGE("[ERROR] unknown action %d\n", action);
+		return NULL;
+	}
+}
+
+int fpsgo_get_BQid_pair(int pid, int tgid, long long identifier,
+		unsigned long long *buffer_id, int *queue_SF)
+{
+	struct BQ_id *pair;
+
+	fpsgo_lockprove(__func__);
+
+	pair = fpsgo_find_BQ_id(pid, tgid, identifier, ACTION_FIND, 0LL);
+
+	if (pair) {
+		*buffer_id = pair->buffer_id;
+		*queue_SF = pair->queue_SF;
+		return 1;
+	}
+
+	return 0;
 }
 
 static int fpsgo_systrace_mask_show(struct seq_file *m, void *unused)
@@ -545,9 +706,39 @@ static ssize_t fpsgo_force_onoff_write(struct file *flip,
 FPSGO_DEBUGFS_ENTRY(force_onoff);
 
 
+static int fpsgo_BQid_show(struct seq_file *m, void *unused)
+{
+	struct rb_node *n;
+	struct BQ_id *pos;
+
+	fpsgo_render_tree_lock(__func__);
+
+	for (n = rb_first(&BQ_id_list); n; n = rb_next(n)) {
+		pos = rb_entry(n, struct BQ_id, entry);
+		seq_printf(m, "pid %d, tgid %d, key %llu, buffer_id %llu, queue_SF %d\n",
+			   pos->pid, fpsgo_get_tgid(pos->pid), pos->key,
+			   pos->buffer_id, pos->queue_SF);
+	}
+
+	fpsgo_render_tree_unlock(__func__);
+
+	return 0;
+}
+
+static ssize_t fpsgo_BQid_write(struct file *flip,
+			const char *ubuf, size_t cnt, loff_t *data)
+{
+	return 0;
+}
+
+FPSGO_DEBUGFS_ENTRY(BQid);
+
+
 int init_fpsgo_common(void)
 {
 	render_pid_tree = RB_ROOT;
+
+	BQ_id_list = RB_ROOT;
 
 	fpsgo_debugfs_dir = debugfs_create_dir("fpsgo", NULL);
 	if (!fpsgo_debugfs_dir)
@@ -581,6 +772,14 @@ int init_fpsgo_common(void)
 			    debugfs_common_dir,
 			    NULL,
 			    &fpsgo_render_info_fops);
+
+
+	debugfs_create_file("BQid",
+			    S_IRUGO | S_IWUSR,
+			    debugfs_common_dir,
+			    NULL,
+			    &fpsgo_BQid_fops);
+
 
 	mark_addr = kallsyms_lookup_name("tracing_mark_write");
 	fpsgo_systrace_mask = FPSGO_DEBUG_MANDATORY;

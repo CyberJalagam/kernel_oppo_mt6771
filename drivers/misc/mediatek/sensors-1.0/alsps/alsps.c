@@ -23,8 +23,11 @@ int last_als_report_data = -1;
 static struct alsps_init_info *alsps_init_list[MAX_CHOOSE_ALSPS_NUM] = {0};
 atomic_t prox_state;
 enum ProxState {
-	PROX_STATE_NEAR,
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/11/20, Add for change prox state*/
 	PROX_STATE_FAR,
+	PROX_STATE_NEAR,
+#endif /*VENDOR_EDIT*/
 };
 
 int als_data_report(int value, int status)
@@ -47,7 +50,8 @@ int als_data_report(int value, int status)
 			pr_err_ratelimited("event buffer full, so drop this data\n");
 		cxt->is_get_valid_als_data_after_enable = true;
 	}
-	if (value != last_als_report_data) {
+	//if (value != last_als_report_data)
+	{
 		event.handle = ID_LIGHT;
 		event.flush_action = DATA_ACTION;
 		event.word[0] = value;
@@ -114,6 +118,11 @@ int rgbw_flush_report(void)
 	return err;
 }
 
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/11/20, Add for prox report count*/
+extern uint32_t kernel_prox_report_count;
+#endif /*VENDOR_EDIT*/
+
 int ps_data_report(int value, int status)
 {
 	int err = 0;
@@ -122,9 +131,15 @@ int ps_data_report(int value, int status)
 	memset(&event, 0, sizeof(struct sensor_event));
 
 	__pm_wakeup_event(&alsps_context_obj->ps_wake_lock, msecs_to_jiffies(100));
-	pr_notice("[ALS/PS]ps_data_report! %d, %d\n", value, status);
+
 	event.flush_action = DATA_ACTION;
 	event.word[0] = value + 1;
+#ifdef VENDOR_EDIT
+/*zhq@PSW.BSP.Sensor, 2018/11/20, Add for prox report count*/
+	event.word[1] = kernel_prox_report_count;
+
+	pr_notice("[ALS/PS] ps_data_report! value %d, count %d\n", value, event.word[1]);
+#endif /*VENDOR_EDIT*/
 	atomic_set(&prox_state, value);
 	event.status = status;
 	err = sensor_input_event(alsps_context_obj->ps_mdev.minor, &event);
@@ -745,12 +760,20 @@ static ssize_t ps_store_batch(struct device *dev, struct device_attribute *attr,
 		err = cxt->ps_ctl.batch(0, cxt->ps_delay_ns, cxt->ps_latency_ns);
 	else
 		err = cxt->ps_ctl.batch(0, cxt->ps_delay_ns, 0);
+
+#ifndef VENDOR_EDIT
+//zhq@PSW.BSP.Sensor, 2018-11-26, remove PS report default status
 	ps_data_report(1, SENSOR_STATUS_ACCURACY_HIGH);
+#endif
 #else
 	err = ps_enable_and_batch();
 #endif
+
 	pr_debug("prox_state:%d\n", atomic_read(&prox_state));
+#ifndef VENDOR_EDIT
+//zhye@PSW.BSP.Sensor, 2018-11-26, remove PS report default status
 	ps_data_report(atomic_read(&prox_state), SENSOR_STATUS_ACCURACY_HIGH);
+#endif
 	mutex_unlock(&alsps_context_obj->alsps_op_mutex);
 	ALSPS_LOG("ps_store_batch done: %d\n", cxt->is_ps_batch_enable);
 	if (err)

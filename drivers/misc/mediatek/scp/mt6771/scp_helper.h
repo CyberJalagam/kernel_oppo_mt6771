@@ -119,6 +119,9 @@ enum scp_reserve_mem_id_t {
 #ifdef CONFIG_MTK_VOW_BARGE_IN_SUPPORT
 	VOW_BARGEIN_MEM_ID,
 #endif
+#ifdef SCP_PARAMS_TO_SCP_SUPPORT
+	SCP_DRV_PARAMS_MEM_ID,
+#endif
 	NUMS_MEM_ID,
 };
 
@@ -149,6 +152,8 @@ struct scp_region_info_st {
 	uint32_t TaskContext_ptr;
 	uint32_t Il1c_con;
 	uint32_t Dl1c_con;
+	uint32_t scpctl;
+	uint32_t ap_params_start;
 };
 
 /* scp device attribute */
@@ -228,4 +233,8 @@ extern struct scp_region_info_st *scp_region_info;
 extern void __iomem *scp_l1c_start_virt;
 
 #endif
+
+__attribute__((weak))
+int sensor_params_to_scp(phys_addr_t addr_vir, size_t size);
+
 #endif

@@ -22,7 +22,10 @@
 #ifdef CONFIG_PROJECT_PHY
 #include "mtk-phy-asic.h"
 #endif
-
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/16, mtk patch for otg eye picture*/
+#include <soc/oppo/oppo_project.h>
+#endif /* VENDOR_EDIT */
 #define USBPHY_READ8(offset) \
 U3PhyReadReg8((u3phy_addr_t)(uintptr_t)(SSUSB_SIFSLV_U2PHY_COM_BASE+offset))
 #define USBPHY_WRITE8(offset, value) \
@@ -607,8 +610,53 @@ static const struct file_operations rg_usb20_rev6_fops = {
 };
 
 /* fill in corresponding experiment result here */
+extern int otg_is_exist;
 void mtk_usb_phy_tuning(void)
 {
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/16, mtk patch for otg eye picture*/
+	if (!is_project(OPPO_UNKOWN)) {
+		if(otg_is_exist ==1) {
+			/* USB_DRIVING_CAPABILITY */
+			usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_TERM_VREF_SEL, SHFT_RG_USB20_TERM_VREF_SEL,
+						       "100");
+			usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_VRT_VREF_SEL, SHFT_RG_USB20_VRT_VREF_SEL,
+						       "101");
+
+			/* RG_USB20_HSTX_SRCTRL */
+			usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_HSTX_SRCTRL, SHFT_RG_USB20_HSTX_SRCTRL, "100");
+
+			/* RG_USB20_ENHANCEMENT */
+			usb20_phy_debugfs_rev6_write(OFFSET_RG_USB20_PHY_REV6, SHFT_RG_USB20_PHY_REV6, "01");
+		} else {
+			/* USB_DRIVING_CAPABILITY */
+			usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_TERM_VREF_SEL, SHFT_RG_USB20_TERM_VREF_SEL,
+							   "111");
+				usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_VRT_VREF_SEL, SHFT_RG_USB20_VRT_VREF_SEL,
+							   "111");
+
+			/* RG_USB20_HSTX_SRCTRL */
+			usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_HSTX_SRCTRL, SHFT_RG_USB20_HSTX_SRCTRL, "111");
+
+			/* RG_USB20_ENHANCEMENT */
+			usb20_phy_debugfs_rev6_write(OFFSET_RG_USB20_PHY_REV6, SHFT_RG_USB20_PHY_REV6, "01");
+
+		}
+	}
+	else {
+		/* USB_DRIVING_CAPABILITY */
+		usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_TERM_VREF_SEL, SHFT_RG_USB20_TERM_VREF_SEL,
+					       "100");
+		usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_VRT_VREF_SEL, SHFT_RG_USB20_VRT_VREF_SEL,
+					       "101");
+
+		/* RG_USB20_HSTX_SRCTRL */
+		usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_HSTX_SRCTRL, SHFT_RG_USB20_HSTX_SRCTRL, "100");
+
+		/* RG_USB20_ENHANCEMENT */
+		usb20_phy_debugfs_rev6_write(OFFSET_RG_USB20_PHY_REV6, SHFT_RG_USB20_PHY_REV6, "01");
+	}
+	#else
 	/* USB_DRIVING_CAPABILITY */
 	usb20_phy_debugfs_write_width3(OFFSET_RG_USB20_TERM_VREF_SEL, SHFT_RG_USB20_TERM_VREF_SEL,
 				       "100");
@@ -620,6 +668,7 @@ void mtk_usb_phy_tuning(void)
 
 	/* RG_USB20_ENHANCEMENT */
 	usb20_phy_debugfs_rev6_write(OFFSET_RG_USB20_PHY_REV6, SHFT_RG_USB20_PHY_REV6, "01");
+	#endif /* VENDOR_EDIT */
 }
 
 int usb20_phy_init_debugfs(void)

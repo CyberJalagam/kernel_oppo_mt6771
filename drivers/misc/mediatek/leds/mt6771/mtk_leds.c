@@ -44,6 +44,11 @@
 #include <mt-plat/met_drv.h>
 #endif
 
+#ifdef VENDOR_EDIT
+/* LiPing-M@PSW.MultiMedia.Display.LCD.Feature.DD17&DD16, 2017/12/07, Add for sau and silence close backlight */
+#include <mt-plat/mtk_boot_common.h>
+extern unsigned long silence_mode;
+#endif /*VENDOR_EDIT*/
 /* for LED&Backlight bringup, define the dummy API */
 #ifndef CONFIG_MTK_PMIC_NEW_ARCH
 u16 pmic_set_register_value(u32 flagname, u32 val)
@@ -810,6 +815,15 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 #endif
 	static bool button_flag;
 
+
+
+#ifdef VENDOR_EDIT
+	/* Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Feature.DD17&DD16, 2018/09/10, Add for sau and silence close backlight */
+	if (silence_mode) {
+		printk("%s silence_mode is %ld, set backlight to 0\n",__func__, silence_mode);
+		level = 0;
+	}
+#endif /*VENDOR_EDIT*/
 	switch (cust->mode) {
 #ifdef CONFIG_MTK_PWM
 	case MT65XX_LED_MODE_PWM:
@@ -928,6 +942,7 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 					    255;
 				}
 				backlight_debug_log(led_data->level, level);
+				#ifndef VENDOR_EDIT
 				disp_pq_notify_backlight_changed((((1 <<
 								     MT_LED_INTERNAL_LEVEL_BIT_CNT)
 								    - 1) * level +
@@ -936,6 +951,17 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 								     MT_LED_INTERNAL_LEVEL_BIT_CNT)
 								    - 1) * level +
 								   127) / 255);
+				#else
+				/*
+				Yongpeng.Yi@PSW.MultiMedia.Display.LCD.Feature, 2018/09/10,
+				modify for silence mode.
+				*/
+				if (silence_mode) {
+					printk("%s silence_mode is %ld, set backlight to 0\n",__func__, silence_mode);
+					level = 0;
+				}
+				disp_aal_notify_backlight_changed(level);
+				#endif
 			}
 		}
 	} else {

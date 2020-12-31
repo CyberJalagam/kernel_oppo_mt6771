@@ -31,6 +31,7 @@
 #define ASFC_THRESHOLD_NS 20000000ULL
 #define ASFC_THRESHOLD_PERCENTAGE 30
 #define SECOND_CHANCE_CAPACITY 80
+#define RESET_TOLERENCE 3
 
 static int max_fps_limit = CFG_MAX_FPS_LIMIT;
 static int dfps_ceiling = CFG_MAX_FPS_LIMIT;
@@ -39,6 +40,7 @@ static int fps_error_threshold = 10;
 static int QUANTILE = 50;
 static long long FRAME_TIME_WINDOW_SIZE_US = 1000000;
 static long long ADJUST_INTERVAL_US = 1000000;
+static int margin_mode;
 
 extern int (*fbt_notifier_cpu_frame_time_fps_stabilizer)(
 	int pid,
@@ -57,6 +59,7 @@ struct FSTB_FRAME_INFO {
 
 	int pid;
 	int target_fps;
+	int target_fps_margin;
 	int queue_fps;
 	int frame_type;
 	int render_method;
@@ -65,6 +68,9 @@ struct FSTB_FRAME_INFO {
 	int asfc_flag;
 	int check_asfc;
 	int new_info;
+
+	long long gpu_time;
+	int gpu_freq;
 
 	unsigned long long queue_time_ts[FRAME_TIME_BUFFER_SIZE]; /*timestamp*/
 	int queue_time_begin;

@@ -16,7 +16,11 @@
 
 static struct step_c_context *step_c_context_obj;
 static struct step_c_init_info *step_counter_init_list[MAX_CHOOSE_STEP_C_NUM] = { 0 };
-
+#ifdef VENDOR_EDIT
+//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
+static unsigned int step_first_data = 0;
+static uint32_t last_step_counter = 0;
+#endif
 static void step_c_work_func(struct work_struct *work)
 {
 
@@ -123,7 +127,11 @@ static struct step_c_context *step_c_context_alloc_object(void)
 		STEP_C_PR_ERR("Alloc step_c object error!\n");
 		return NULL;
 	}
+#ifndef VENDOR_EDIT
 	atomic_set(&obj->delay, 2000);	/*0.5Hz */
+#else
+	atomic_set(&obj->delay, 200); //5Hz
+#endif
 	atomic_set(&obj->wake, 0);
 	INIT_WORK(&obj->report, step_c_work_func);
 	init_timer(&obj->timer);
@@ -323,6 +331,11 @@ static int step_c_enable_data(int enable)
 				cxt->is_polling_run = true;
 			}
 		}
+#ifdef VENDOR_EDIT
+//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
+		step_first_data = 1;
+		step_c_data_report(last_step_counter, 3);
+#endif
 	}
 	if (enable == 0) {
 		STEP_C_LOG("STEP_C disable\n");
@@ -392,8 +405,14 @@ int step_c_enable_nodata(int enable)
 	}
 
 	if (enable == 1)
+	{
 		cxt->is_active_nodata = true;
-
+#ifdef VENDOR_EDIT
+//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
+		step_first_data = 1;
+		step_c_data_report(last_step_counter, 3);
+#endif
+	}
 	if (enable == 0)
 		cxt->is_active_nodata = false;
 	step_c_real_enable(enable);
@@ -899,8 +918,18 @@ int step_c_data_report(uint32_t new_counter, int status)
 	static uint32_t last_step_counter;
 
 	memset(&event, 0, sizeof(struct sensor_event));
-
+#ifdef VENDOR_EDIT
+//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
+	if ((new_counter > last_step_counter) || (step_first_data == 1)) {
+		if (step_first_data == 1)
+		{
+			new_counter = last_step_counter;
+			step_first_data = 0;
+		}
+		STEP_C_PR_ERR("step_counter=%d\n",new_counter);
+#else//VENDOR_EDIT
 	if (last_step_counter != new_counter) {
+#endif//VENDOR_EDIT
 		event.flush_action = DATA_ACTION;
 		event.handle = ID_STEP_COUNTER;
 		event.word[0] = new_counter;

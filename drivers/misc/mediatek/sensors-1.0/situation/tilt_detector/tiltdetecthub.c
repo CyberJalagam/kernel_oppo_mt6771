@@ -75,7 +75,8 @@ static int tilt_detect_recv_data(struct data_unit_t *event, void *reserved)
 		situation_flush_report(ID_TILT_DETECTOR);
 	else if (event->flush_action == DATA_ACTION) {
 		__pm_wakeup_event(&tilt_wake_lock, msecs_to_jiffies(100));
-		situation_data_report(ID_TILT_DETECTOR, event->tilt_event.state);
+		situation_data_report(ID_TILT_DETECTOR, !event->tilt_event.state);
+		TILTDETHUB_PR_ERR("Tilt value = %d\n", !event->tilt_event.state);
 	}
 	return 0;
 }

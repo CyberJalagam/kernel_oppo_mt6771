@@ -26,6 +26,15 @@ extern long AK7371AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, uns
 extern int AK7371AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int AK7371AF_PowerDown(void);
 
+#define AK7374AF_SetI2Cclient AK7374AF_SetI2Cclient_Main
+#define AK7374AF_Ioctl AK7374AF_Ioctl_Main
+#define AK7374AF_Release AK7374AF_Release_Main
+#define AK7374AF_PowerDown AK7374AF_PowerDown_Main
+extern int AK7374AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened);
+extern long AK7374AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned long a_u4Param);
+extern int AK7374AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
+extern int AK7374AF_PowerDown(void);
+
 #define BU6424AF_SetI2Cclient BU6424AF_SetI2Cclient_Main
 #define BU6424AF_Ioctl BU6424AF_Ioctl_Main
 #define BU6424AF_Release BU6424AF_Release_Main
@@ -90,6 +99,13 @@ extern int DW9718AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int DW9718SAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened);
 extern long DW9718SAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned long a_u4Param);
 extern int DW9718SAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
+
+#define LC898229AF_SetI2Cclient LC898229AF_SetI2Cclient_Main
+#define LC898229AF_Ioctl LC898229AF_Ioctl_Main
+#define LC898229AF_Release LC898229AF_Release_Main
+extern int LC898229AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened);
+extern long LC898229AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned long a_u4Param);
+extern int LC898229AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 
 #define DW9719TAF_SetI2Cclient DW9719TAF_SetI2Cclient_Main
 #define DW9719TAF_Ioctl DW9719TAF_Ioctl_Main

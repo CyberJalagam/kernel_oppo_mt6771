@@ -66,6 +66,20 @@
 #endif
 
 
+
+/*
+ * =============================================================================
+ *                     log
+ * =============================================================================
+ */
+
+#ifdef pr_fmt
+#undef pr_fmt
+#endif
+#define pr_fmt(fmt) "[IPI][DRV] %s(), " fmt "\n", __func__
+
+
+
 /*
  * =============================================================================
  *                     MACRO
@@ -83,7 +97,6 @@
 
 #define AUDIO_IPI_IOCTL_INIT_DSP     _IOW(AUDIO_IPI_IOC_MAGIC, 20, unsigned int)
 #define AUDIO_IPI_IOCTL_REG_DMA      _IOW(AUDIO_IPI_IOC_MAGIC, 21, unsigned int)
-#define AUDIO_IPI_IOCTL_ADSP_REG_FEA _IOW(AUDIO_IPI_IOC_MAGIC, 22, unsigned int)
 
 
 
@@ -131,7 +144,7 @@ inline uint32_t msg_len_of_type(const uint8_t data_type)
 		msg_len = IPI_MSG_HEADER_SIZE + IPI_MSG_DMA_INFO_SIZE;
 		break;
 	default:
-		pr_info("%s(), %d not support!!", __func__, data_type);
+		pr_info("%d not support!!", data_type);
 		msg_len = IPI_MSG_HEADER_SIZE;
 	}
 
@@ -168,8 +181,8 @@ static int parsing_ipi_msg_from_user_space(
 	/* get message size to read */
 	msg_len = msg_len_of_type(data_type);
 	if (msg_len > sizeof(struct ipi_msg_t))  {
-		pr_notice("%s(), msg_len %u > %zu!!\n",
-			  __func__, msg_len, sizeof(struct ipi_msg_t));
+		pr_notice("msg_len %u > %zu!!",
+			  msg_len, sizeof(struct ipi_msg_t));
 		retval = -1;
 		goto parsing_exit;
 	}
@@ -177,13 +190,11 @@ static int parsing_ipi_msg_from_user_space(
 	memset(&ipi_msg, 0, sizeof(struct ipi_msg_t));
 	retval = copy_from_user(&ipi_msg, user_data_ptr, msg_len);
 	if (retval != 0) {
-		pr_notice("%s(), msg copy_from_user retval %d\n",
-			  __func__, retval);
+		pr_notice("msg copy_from_user retval %d", retval);
 		goto parsing_exit;
 	}
 	if (ipi_msg.data_type != data_type) { /* double check */
-		pr_notice("%s(), data_type %d != %d\n",
-			  __func__, ipi_msg.data_type, data_type);
+		pr_notice("data_type %d != %d", ipi_msg.data_type, data_type);
 		retval = -1;
 		goto parsing_exit;
 	}
@@ -210,8 +221,7 @@ static int parsing_ipi_msg_from_user_space(
 				 (void __user *)dma_info->hal_buf.addr,
 				 hal_data_size);
 		if (retval != 0) {
-			pr_notice("%s(), dma copy_from_user retval %d\n",
-				  __func__, retval);
+			pr_notice("dma copy_from_user retval %d", retval);
 			goto parsing_exit;
 		}
 
@@ -222,7 +232,7 @@ static int parsing_ipi_msg_from_user_space(
 				 hal_data_size,
 				 &dma_info->rw_idx);
 		if (retval != 0) {
-			pr_notice("%s(), dma write region error!!\n", __func__);
+			pr_notice("dma write region error!!");
 			goto parsing_exit;
 		}
 
@@ -240,22 +250,20 @@ static int parsing_ipi_msg_from_user_space(
 
 			/* force need ack to get scp info */
 			if (ipi_msg.ack_type != AUDIO_IPI_MSG_NEED_ACK) {
-				pr_notice("%s(), task %d msg 0x%x need ack!!\n",
-					  __func__,
+				pr_notice("task %d msg 0x%x need ack!!",
 					  ipi_msg.task_scene, ipi_msg.msg_id);
 				ipi_msg.ack_type = AUDIO_IPI_MSG_NEED_ACK;
 			}
 		}
 #if 0 /* debug only */
-		print_msg_info(__func__, "dma", &ipi_msg);
+		DUMP_IPI_MSG("dma", &ipi_msg);
 #endif
 	}
 
 	/* sent message */
 	retval = audio_send_ipi_filled_msg(&ipi_msg);
 	if (retval != 0) {
-		pr_notice("%s(), audio_send_ipi_filled_msg error!!\n",
-			  __func__);
+		pr_notice("audio_send_ipi_filled_msg error!!");
 		goto parsing_exit;
 	}
 
@@ -268,12 +276,12 @@ static int parsing_ipi_msg_from_user_space(
 	    wb_dram->addr_val != 0 &&
 	    ipi_msg.scp_ret == 1) {
 		if (wb_dram->data_size > hal_wb_buf_size) {
-			pr_notice("wb_dram->data_size %u > hal_wb_buf_size %u!!\n",
+			pr_notice("wb_dram->data_size %u > hal_wb_buf_size %u!!",
 				  wb_dram->data_size,
 				  hal_wb_buf_size);
 			ipi_msg.scp_ret = 0;
 		} else if (wb_dram->data_size == 0) {
-			pr_notice("ipi wb data sz = 0!! check adsp write\n");
+			pr_notice("ipi wb data sz = 0!! check adsp write");
 			ipi_msg.scp_ret = 0;
 		} else {
 			retval = copy_to_user(
@@ -282,8 +290,8 @@ static int parsing_ipi_msg_from_user_space(
 						 wb_dram->addr_val),
 					 wb_dram->data_size);
 			if (retval) {
-				pr_info("%s(), copy_to_user dma err, id = 0x%x\n",
-					__func__, ipi_msg.msg_id);
+				pr_info("copy_to_user dma err, id = 0x%x",
+					ipi_msg.msg_id);
 				ipi_msg.scp_ret = 0;
 			}
 		}
@@ -298,8 +306,7 @@ static int parsing_ipi_msg_from_user_space(
 			      &ipi_msg,
 			      sizeof(struct ipi_msg_t));
 	if (retval) {
-		pr_info("%s(), copy_to_user err, id = 0x%x\n",
-			__func__, ipi_msg.msg_id);
+		pr_info("copy_to_user err, id = 0x%x", ipi_msg.msg_id);
 		retval = -EFAULT;
 	}
 
@@ -330,7 +337,7 @@ static long audio_ipi_driver_ioctl(
 #endif
 	int retval = 0;
 
-	AUD_LOG_V("%s(), cmd = %u, arg = %lu\n", __func__, cmd, arg);
+	AUD_LOG_V("cmd = %u, arg = %lu", cmd, arg);
 
 	switch (cmd) {
 	case AUDIO_IPI_IOCTL_SEND_MSG_ONLY: {
@@ -349,15 +356,13 @@ static long audio_ipi_driver_ioctl(
 		break;
 	}
 	case AUDIO_IPI_IOCTL_LOAD_SCENE: {
-		pr_debug("%s(), AUDIO_IPI_IOCTL_LOAD_SCENE(%d)\n",
-			 __func__, (uint8_t)arg);
+		pr_debug("AUDIO_IPI_IOCTL_LOAD_SCENE(%d)", (uint8_t)arg);
 		audio_load_task((uint8_t)arg);
 		break;
 	}
 #if defined(CONFIG_MTK_AUDIODSP_SUPPORT)
 	case AUDIO_IPI_IOCTL_INIT_DSP: {
-		pr_debug("%s(), AUDIO_IPI_IOCTL_INIT_DSP(%d)\n",
-			 __func__, (uint8_t)arg);
+		pr_debug("AUDIO_IPI_IOCTL_INIT_DSP(%d)", (uint8_t)arg);
 		audio_ipi_dma_init_dsp();
 		break;
 	}
@@ -371,13 +376,11 @@ static long audio_ipi_driver_ioctl(
 				 (void __user *)arg,
 				 sizeof(struct audio_ipi_reg_dma_t));
 		if (retval != 0) {
-			pr_notice("%s(), dma reg copy_from_user retval %d\n",
-				  __func__, retval);
+			pr_notice("dma reg copy_from_user retval %d", retval);
 			break;
 		}
 
-		pr_debug("%s(), AUDIO_IPI_IOCTL_REG_DMA(%d,%d,0x%x,0x%x)\n",
-			 __func__,
+		pr_debug("AUDIO_IPI_IOCTL_REG_DMA(%d,%d,0x%x,0x%x)",
 			 dma_reg.task,
 			 dma_reg.reg_flag,
 			 dma_reg.a2d_size,
@@ -388,32 +391,6 @@ static long audio_ipi_driver_ioctl(
 							    dma_reg.d2a_size);
 		else
 			retval = audio_ipi_dma_free_region(dma_reg.task);
-
-		break;
-	}
-	case AUDIO_IPI_IOCTL_ADSP_REG_FEA: {
-		if (((void __user *)arg) == NULL) {
-			retval = -1;
-			break;
-		}
-		retval = copy_from_user(
-				 &feat_reg,
-				 (void __user *)arg,
-				 sizeof(struct audio_ipi_reg_feature_t));
-		if (retval != 0) {
-			pr_notice("%s(), feature reg copy_from_user retval %d\n",
-				  __func__, retval);
-			break;
-		}
-		pr_debug("%s(), AUDIO_IPI_IOCTL_ADSP_REG_FEA(%s,%d)\n",
-			 __func__,
-			 feat_reg.reg_flag ? "enable" : "disable",
-			 feat_reg.feature_id);
-
-		if (feat_reg.reg_flag)
-			retval = adsp_register_feature(feat_reg.feature_id);
-		else
-			retval = adsp_deregister_feature(feat_reg.feature_id);
 
 		break;
 	}
@@ -430,7 +407,7 @@ static long audio_ipi_driver_compat_ioctl(
 	struct file *file, unsigned int cmd, unsigned long arg)
 {
 	if (!file->f_op || !file->f_op->unlocked_ioctl) {
-		pr_notice("op null\n");
+		pr_notice("op null");
 		return -ENOTTY;
 	}
 	return file->f_op->unlocked_ioctl(file, cmd, arg);
@@ -495,7 +472,7 @@ static int __init audio_ipi_driver_init(void)
 
 	ret = misc_register(&audio_ipi_device);
 	if (unlikely(ret != 0)) {
-		pr_notice("[SCP] misc register failed\n");
+		pr_notice("misc register failed");
 		return ret;
 	}
 

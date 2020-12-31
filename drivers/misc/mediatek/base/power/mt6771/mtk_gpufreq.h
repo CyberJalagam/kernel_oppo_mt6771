@@ -46,6 +46,7 @@ extern void mt_gpufreq_thermal_protect(unsigned int limited_power);
 extern void mt_gpufreq_restore_default_volt(void);
 extern void mt_gpufreq_enable_by_ptpod(void);
 extern void mt_gpufreq_disable_by_ptpod(void);
+extern struct mt_gpufreq_power_table_info *mt_gpufreq_get_power_table(void);
 extern unsigned int mt_gpufreq_get_max_power(void);
 extern unsigned int mt_gpufreq_get_min_power(void);
 extern unsigned int mt_gpufreq_get_thermal_limit_index(void);

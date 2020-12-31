@@ -50,6 +50,7 @@ int fpsgo_fbt2fstb_update_cpu_frame_info(
 	unsigned int Target_fps);
 int fpsgo_fbt2fstb_query_fps(int pid);
 int fpsgo_fbt2fstb_query_fteh_list(int pid);
+int fpsgo_comp2fstb_enq_end(int pid, unsigned long long enq);
 
 #else
 static inline int fpsgo_fstb2fbt_reset_asfc(int level) { return 0; }

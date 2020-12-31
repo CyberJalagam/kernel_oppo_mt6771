@@ -39,6 +39,11 @@
 
 #include "mali_kbase_dma_fence.h"
 
+#ifdef VENDOR_EDIT
+/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+#include <linux/oppo_mm_kevent_fb.h>
+#endif /*VENDOR_EDIT*/
+
 #define beenthere(kctx, f, a...)  dev_dbg(kctx->kbdev->dev, "%s:" f, __func__, ##a)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
@@ -1245,6 +1250,11 @@ void kbase_jd_done_worker(struct work_struct *data)
 	base_jd_core_req core_req = katom->core_req;
 	enum kbase_atom_coreref_state coreref_state = katom->coreref_state;
 
+	#ifdef VENDOR_EDIT
+	/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
+	unsigned char payload[100] = "";
+	#endif
+
 	/* Soft jobs should never reach this function */
 	KBASE_DEBUG_ASSERT((katom->core_req & BASE_JD_REQ_SOFT_JOB) == 0);
 
@@ -1290,12 +1300,27 @@ void kbase_jd_done_worker(struct work_struct *data)
 		return;
 	}
 
+	#ifndef VENDOR_EDIT
+	/* Ling.Guo@PSW.MM.Display.LCD.Machine, 2018/12/03,add for mm kevent fb. */
 	if ((katom->event_code != BASE_JD_EVENT_DONE) &&
 			(!kbase_ctx_flag(katom->kctx, KCTX_DYING)))
 		dev_err(kbdev->dev,
 			"t6xx: GPU fault 0x%02lx from job slot %d\n",
 					(unsigned long)katom->event_code,
 								katom->slot_nr);
+	#else
+	if ((katom->event_code != BASE_JD_EVENT_DONE) &&
+			(!kbase_ctx_flag(katom->kctx, KCTX_DYING))) {
+		dev_err(kbdev->dev,
+			"t6xx: GPU fault 0x%02lx from job slot %d\n",
+					(unsigned long)katom->event_code,
+								katom->slot_nr);
+
+		scnprintf(payload, sizeof(payload), "EventID@@%d$$GPU_fault@@t6xx: GPU fault 0x%02lx from job slot %d",
+			OPPO_MM_DIRVER_FB_EVENT_ID_MTK_GPU_FAULT,(unsigned long)katom->event_code,katom->slot_nr);
+		upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
+	}
+	#endif
 
 	if (kbase_hw_has_issue(kbdev, BASE_HW_ISSUE_8316))
 		kbase_as_poking_timer_release_atom(kbdev, kctx, katom);

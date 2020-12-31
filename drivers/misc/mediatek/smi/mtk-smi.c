@@ -1203,7 +1203,6 @@ static long smi_ioctl(struct file *pFile, unsigned int cmd, unsigned long param)
 
 			break;
 		}
-		/* GMP start */
 	case MTK_IOC_SMI_BWC_INFO_SET:{
 			smi_set_mm_info_ioctl_wrapper(pFile, cmd, param);
 			break;
@@ -1212,28 +1211,8 @@ static long smi_ioctl(struct file *pFile, unsigned int cmd, unsigned long param)
 			smi_get_mm_info_ioctl_wrapper(pFile, cmd, param);
 			break;
 		}
-		/* GMP end */
-
-	case MTK_IOC_SMI_DUMP_LARB:{
-			unsigned int larb_index;
-
-			ret = copy_from_user(&larb_index, (void *)param, sizeof(unsigned int));
-			if (ret)
-				return -EFAULT;
-
-			smi_dumpLarb(larb_index);
-		}
-		break;
-
-	case MTK_IOC_SMI_DUMP_COMMON:{
-			unsigned int arg;
-
-			ret = copy_from_user(&arg, (void *)param, sizeof(unsigned int));
-			if (ret)
-				return -EFAULT;
-
-			smi_dumpCommon();
-		}
+	case MTK_IOC_SMI_DUMP_LARB:
+	case MTK_IOC_SMI_DUMP_COMMON:
 		break;
 
 #ifdef MMDVFS_HOOK
