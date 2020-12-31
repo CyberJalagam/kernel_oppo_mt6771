@@ -408,11 +408,75 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
+#ifdef  VENDOR_EDIT
+#LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
+KBUILD_CFLAGS +=   -DVENDOR_EDIT
+KBUILD_CPPFLAGS += -DVENDOR_EDIT
+CFLAGS_KERNEL +=   -DVENDOR_EDIT
+CFLAGS_MODULE +=   -DVENDOR_EDIT
+#endif /* VENDOR_EDIT */
+
+
+
+
+
+#ifdef VENDOR_EDIT
+#Wen.Luo@Bsp.Kernel.Stability, 2018/12/05, Add for Debug Config, slub/kmemleak/kasan config
+ifeq ($(OPPO_SLUB_CONFIG),1)
+OPPO_SLUB_TEST := true
+endif
+
+ifeq ($(OPPO_KASAN_CONFIG),1)
+OPPO_KASAN_TEST := true
+OPPO_SLUB_TEST := true
+endif
+
+ifeq ($(OPPO_KMEMLEAK_CONFIG),1)
+OPPO_KMEMLEAK_TEST := true
+endif
+
+ifeq ($(OPPO_BUILD_TYPE),release)
+    $(info  wendebug kernel release)
+    ifneq ($(SPECIAL_OPPO_CONFIG),1)
+        OPPO_SLUB_TEST :=
+        OPPO_KASAN_TEST :=
+        OPPO_KMEMLEAK_TEST :=
+    endif
+endif
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+#Qiao.Hu@BSP.CHG.Basic, 2017/12/18,add for recogonizing release build
+ifeq ($(OPPO_BUILD_TYPE),release)
+KBUILD_CFLAGS += -DCONFIG_OPPO_REALEASE_BUILD
+KBUILD_CPPFLAGS += -DCONFIG_OPPO_REALEASE_BUILD
+endif
+#endif /* VENDOR_EDIT */
+
+
+
+#Guohua.Zhong@BSP.Storage.Sdcard 2018/01/18 ,add for recogonizing release build
+ifneq ($(filter release cts cta,$(OPPO_BUILD_TYPE)),)
+KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
+KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
+endif
+ifneq ($(filter cmcctest cmccfield allnetcttest,$(NET_BUILD_TYPE)),)
+KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
+KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
+endif
+#endif /* VENDOR_EDIT */
+
+#endif//VENDOR_EDIT
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
 KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
 
-export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
+#ifdef VENDOR_EDIT
+#Wen.Luo@Bsp.Kernel.Stability, 2018/12/05, Add for aging test, slub debug config
+export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION OPPO_SLUB_TEST OPPO_KASAN_TEST OPPO_KMEMLEAK_TEST OPPO_AGING_TEST
+#else
+#export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
+#endif
 export ARCH SRCARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
 export CPP AR NM STRIP OBJCOPY OBJDUMP
 export MAKE AWK GENKSYMS INSTALLKERNEL PERL PYTHON UTS_MACHINE

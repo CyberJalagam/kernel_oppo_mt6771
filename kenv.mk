@@ -34,6 +34,22 @@ for i in `grep -h '\.ko' /dev/null $(2)/.tmp_versions/*.mod`; do \
 done
 endef
 
+#ifdef VENDOR_EIDT
+#Xiao.Li@PSW.CN.WiFi.Network.1471780, 2018/06/26,
+#Add for limit speed function
+define move-limit-speed-kernel-module-files
+mkdir -p $(2)/lib/modules/;\
+imq=`find $(1) -type f -name imq.ko`;\
+if [ "$$imq" != "" ];then\
+cp -Rf $(1)/drivers/net/imq.ko $(2)/lib/modules/;\
+fi
+xtIMQ=`find $(1) -type f -name xt_IMQ.ko`;\
+if [ "$$xtIMQ" != "" ];then\
+cp -Rf $(1)/net/netfilter/xt_IMQ.ko $(2)/lib/modules/;\
+fi
+endef
+#endif
+
 define clean-kernel-module-dirs
 rm -rf $(1)/lib/modules/$(if $(2),`cat $(2)/include/config/kernel.release`,*/)
 endef
