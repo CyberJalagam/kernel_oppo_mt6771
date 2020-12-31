@@ -43,6 +43,7 @@
 #include "mtk/mtk_ion.h"
 #include "mtk/ion_drv_priv.h"
 
+
 #define DEBUG_HEAP_SHRINKER
 
 bool ion_buffer_fault_user_mappings(struct ion_buffer *buffer)
@@ -662,7 +663,9 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
 		return -ENODEV;
 	}
 	mutex_unlock(&client->lock);
+	mutex_lock(&buffer->lock);
 	ret = buffer->heap->ops->phys(buffer->heap, buffer, addr, len);
+	mutex_unlock(&buffer->lock);
 
 	/*avoid camelcase, will modify in a letter*/
 	mmprofile_log_ex(ion_mmp_events[PROFILE_GET_PHYS], MMPROFILE_FLAG_END, buffer->size, (unsigned long)*addr);

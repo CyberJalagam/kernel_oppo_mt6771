@@ -363,7 +363,13 @@ int mtk_irq_domain_xlate_fourcell(struct irq_domain *d, struct device_node *ctrl
 	eint->eintmux = mode;
 	eint->eintnum = intspec[0];
 
+#ifndef VENDOR_EDIT
+/*
+ * YongPeng.Yi@PSW.MM.Display.LCD.Stability, 2018/12/25,
+ * remove for disable too many log
+ */
 	pr_debug("%s: mtk_pin[%d], eint=%d, mode=%d\n", __func__, gpio, eint->eintnum, eint->eintmux);
+#endif /*VENDOR_EDIT*/
 
 	return 0;
 }

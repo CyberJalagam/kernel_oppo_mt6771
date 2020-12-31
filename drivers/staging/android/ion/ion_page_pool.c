@@ -94,7 +94,6 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high)
 		page = list_first_entry(&pool->low_items, struct page, lru);
 		pool->low_count--;
 	}
-
 	list_del(&page->lru);
 	return page;
 }

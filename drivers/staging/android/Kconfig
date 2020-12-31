@@ -116,10 +116,6 @@ config MTK_ENABLE_AGO
 	select HZ_300
 	select UID_CPUTIME
 	select SDCARD_FS
-	select F2FS_FS
-	select F2FS_FS_SECURITY
-	select F2FS_FS_ENCRYPTION
-	select DM_ANDROID_VERITY_AT_MOST_ONCE_DEFAULT_ENABLED
 	---help---
 	Enable/Disable GMO related feautre
 	Do not use this options in Kernel directly
@@ -135,8 +131,6 @@ config ANDROID_VSOC
 	  a QEmu ivshmem device. If built as a module, it will be called vsoc.
 
 source "drivers/staging/android/ion/Kconfig"
-
-source "drivers/staging/android/fiq_debugger/Kconfig"
 
 endif # if ANDROID
 

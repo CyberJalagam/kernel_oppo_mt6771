@@ -549,8 +549,11 @@ static int kwdt_thread(void *arg)
 					 */
 					if (msg_buf[5] != 'k')
 						pr_debug("%s", msg_buf);
+					#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+					/*xing.xiong@BSP.Kernel.Debug, 2018/12/26, Modify for limiting kernel log*/
 					else
 						printk_deferred("%s", msg_buf);
+					#endif
 
 #ifdef CONFIG_LOCAL_WDT
 					printk_deferred("[wdk] cpu:%d, kick local wdt,RT[%lld]\n",

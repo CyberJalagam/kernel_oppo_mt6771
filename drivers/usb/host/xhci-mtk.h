@@ -130,6 +130,11 @@ struct xhci_hcd_mtk {
 	int num_phys;
 	int wakeup_src;
 	bool lpm_support;
+
+#ifdef VENDOR_EDIT
+/* Yichun.Chen  PSW.BSP.CHG  2019-02-02  for host tune test mode */
+	struct dentry *debugfs_root;
+#endif
 };
 
 static inline struct xhci_hcd_mtk *hcd_to_mtk(struct usb_hcd *hcd)

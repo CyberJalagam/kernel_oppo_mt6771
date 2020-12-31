@@ -186,6 +186,14 @@ static unsigned long cur_debug_eint;
 static unsigned long cur_debug_deint;
 #endif
 
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2018/04/23, Add for print wakeup source */
+#define LOG_BUF_SIZE		256
+extern	unsigned int g_eint_pmic_num;
+extern	char wakeup_source_buf[LOG_BUF_SIZE];
+extern   int pmic_int_check(char * wakeup_name);
+#endif /* VENDOR_EDIT */
+
 static int is_bulitin_eint_hw_deb(u32 eint_num)
 {
 
@@ -2412,6 +2420,56 @@ void mt_eint_dump_status(unsigned int eint)
 		);
 }
 
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2018/04/23, Add for print wakeup source */
+#define EINT_WIDTH       32
+#define EINT_REG_NUMBER  18
+u64 eint_wakesrc_x_count[EINT_REG_NUMBER][EINT_WIDTH] = {
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+	 { 0 },
+};
+
+/*
+ * mt_eint_print_status: clear the wakeup src count.
+ */
+void mt_eint_clear_wakesrc_count(void)
+{
+	int i = 0;
+	int j = 0;
+
+	for (i = 0; i < EINT_REG_NUMBER; i++) {
+		for (j = 0; j < EINT_WIDTH; j++) {
+			eint_wakesrc_x_count[i][j] = 0;
+		}
+	}
+}
+EXPORT_SYMBOL(mt_eint_clear_wakesrc_count);
+
+const char * mt_eint_get_name(int index)
+{
+	struct irq_desc *desc = NULL;
+
+	desc = irq_to_desc(EINT_IRQ(index));
+	return desc->action->name;
+}
+EXPORT_SYMBOL(mt_eint_get_name);
+#endif /* VENDOR_EDIT */
 
 /*
  * mt_eint_print_status: Print the EINT status register.
@@ -2420,6 +2478,10 @@ void mt_eint_print_status(void)
 {
 	unsigned int status, index;
 	unsigned int offset, reg_base, status_check;
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2018/04/23, Add for print wakeup source */
+	struct irq_desc *desc = NULL;
+	#endif /* VENDOR_EDIT */
 
 	pr_notice("EINT_STA:");
 	for (reg_base = 0; reg_base < EINT_MAX_CHANNEL; reg_base += 32) {
@@ -2439,6 +2501,20 @@ void mt_eint_print_status(void)
 			status_check = status & (1 << offset);
 			if (status_check) {
 				pr_notice("EINT %d is pending\n", index);
+
+			#ifdef VENDOR_EDIT
+			/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2018/04/23, Add for print wakeup source */
+			desc = irq_to_desc(EINT_IRQ(index));
+			memset(wakeup_source_buf, 0, sizeof(wakeup_source_buf));
+			if (desc->action != NULL) {
+					strcpy(wakeup_source_buf, desc->action->name);
+			} else {
+					pr_err("desc->action == NULL\n");
+			}
+			if (g_eint_pmic_num == index)
+					pmic_int_check(wakeup_source_buf);
+			#endif /* VENDOR_EDIT */
+
 #if (EINT_DEBUG == 1)
 				mt_eint_dump_status(index);
 #endif

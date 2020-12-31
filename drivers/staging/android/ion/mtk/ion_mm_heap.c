@@ -90,7 +90,6 @@ unsigned long long alloc_large_fail_ts;
 static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 				      struct ion_buffer *buffer, unsigned long order) {
 	bool cached = ion_buffer_cached(buffer);
-	bool split_pages = ion_buffer_fault_user_mappings(buffer);
 	struct ion_page_pool *pool;
 	struct page *page;
 
@@ -106,9 +105,6 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 		alloc_large_fail_ts = sched_clock();
 		return NULL;
 	}
-
-	if (split_pages)
-		split_page(page, order);
 
 	return page;
 }
@@ -597,16 +593,10 @@ static int ion_dump_all_share_fds(struct seq_file *s)
 
 int ion_mm_heap_for_each_pool(int (*fn)(int high, int order, int cache,
 					size_t size)) {
-	struct ion_heap *heap;
-	struct ion_system_heap *sys_heap;
+	struct ion_heap *heap = ion_drv_get_heap(g_ion_device, ION_HEAP_TYPE_MULTIMEDIA, 1);
+	struct ion_system_heap
+	*sys_heap = container_of(heap, struct ion_system_heap, heap);
 	int i;
-
-	heap = ion_drv_get_heap(g_ion_device, ION_HEAP_TYPE_MULTIMEDIA, 1);
-	if (!heap) {
-		IONMSG("%s get_heap is null\n", __func__);
-		return -1;
-	}
-	sys_heap = container_of(heap, struct ion_system_heap, heap);
 
 	for (i = 0; i < num_orders; i++) {
 		struct ion_page_pool *pool = sys_heap->pools[i];

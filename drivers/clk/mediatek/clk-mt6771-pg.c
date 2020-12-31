@@ -4117,8 +4117,21 @@ void subsys_if_on(void)
 			dump_cg_state(vdec_clks[i]);
 		ret++;
 	}
+
+#ifndef VENDOR_EDIT
+/* Fuchun.Liao@BSP.CHG.Basic 2018/02/26 modify for crash issue */
 	if (ret > 0)
 		BUG_ON(1);
+#else /* VENDOR_EDIT */
+#if defined (CONFIG_OPPO_REALEASE_BUILD) && !defined (CONFIG_OPPO_SPECIAL_BUILD)
+	if (ret > 0)
+		WARN_ON(1);
+#else
+	if (ret > 0)
+		BUG_ON(1);
+#endif
+#endif /* VENDOR_EDIT */
+
 #if 0
 	for (i = 0; i < num; i++)
 		dump_cg_state(clks[i]);

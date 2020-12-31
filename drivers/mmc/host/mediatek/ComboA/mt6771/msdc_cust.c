@@ -33,6 +33,11 @@
 #include "include/pmic_regulator.h"
 #endif
 
+#ifdef VENDOR_EDIT
+//Fuchun.Liao@BSP.CHG.Basic add for EVB phone sdcard
+#include <oppo/oppo_project.h>
+#endif /* VENDOR_EDIT */
+
 struct msdc_host *mtk_msdc_host[HOST_MAX_NUM];
 EXPORT_SYMBOL(mtk_msdc_host);
 
@@ -95,6 +100,16 @@ static void __iomem *apmixed_base;
 #endif
 
 void __iomem *msdc_io_cfg_bases[HOST_MAX_NUM];
+
+#ifdef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Modify for T_card */
+#include <linux/of.h>
+#include <linux/of_address.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
+static struct pinctrl *msdc1_pinctrl = NULL;
+static struct pinctrl_state *msdc1_on = NULL, *msdc1_off = NULL;
+#endif /*VENDOR_EDIT*/
 
 /**************************************************************/
 /* Section 2: Power                                           */
@@ -333,6 +348,30 @@ void msdc_sd_power(struct msdc_host *host, u32 on)
 		if (!card_on)
 			pmic_enable_interrupt(INT_VMCH_OC, 0, "sdcard");
 
+		/* VMCH VOLSEL */
+#ifndef VENDOR_EDIT
+/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Modify for T_card */
+		msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_3000,
+			&host->power_flash);
+#else
+		if (is_project(OPPO_17331) && get_PCB_Version() == HW_VERSION__10) {
+			if (IS_ERR(msdc1_on) || IS_ERR(msdc1_off)) {
+				msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_3000,
+					&host->power_flash);
+			} else {
+				if (on)
+					pinctrl_select_state(msdc1_pinctrl, msdc1_on);
+				else
+					pinctrl_select_state(msdc1_pinctrl, msdc1_off);
+			}
+			udelay(300);
+			pr_err("msdc1 setting ext_power state:%d\n",on);
+		} else {
+			msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_3000,
+				&host->power_flash);
+		}
+#endif /*VENDOR_EDIT*/
+
 		/* hw det, power off */
 		if (host->hw->flags & MSDC_VMCH_FASTOFF) {
 			if (card_on) {
@@ -346,8 +385,7 @@ void msdc_sd_power(struct msdc_host *host, u32 on)
 				pmic_set_register_value(PMIC_RG_LDO_VMCH_SD_EN, 0);
 			}
 		}
-
-		/* VMCH VOLSEL */
+				/* VMCH VOLSEL */
 		msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_3000,
 			&host->power_flash);
 
@@ -356,7 +394,6 @@ void msdc_sd_power(struct msdc_host *host, u32 on)
 			mdelay(3);
 			pmic_enable_interrupt(INT_VMCH_OC, 1, "sdcard");
 		}
-
 		/* VMC VOLSEL */
 		msdc_ldo_power(on, host->mmc->supply.vqmmc, VOL_3000,
 			&host->power_io);
@@ -1168,6 +1205,28 @@ int msdc_of_parse(struct platform_device *pdev, struct mmc_host *mmc)
 		pr_notice("[msdc%d] of_iomap failed\n", mmc->index);
 		return -ENOMEM;
 	}
+	#ifdef VENDOR_EDIT
+	/* Bin.Li@EXP.BSP.bootloader.bootflow, 2017/05/15, Modify for T_card */
+	if (1 == host->id) {
+		msdc1_pinctrl = devm_pinctrl_get(&pdev->dev);
+		if (IS_ERR(msdc1_pinctrl)) {
+			ret = PTR_ERR(msdc1_pinctrl);
+			pr_err("Cannot find msdc1 pinctrl!\n");
+		}
+
+		msdc1_on = pinctrl_lookup_state(msdc1_pinctrl, "msdc1_on");
+		if (IS_ERR(msdc1_on)) {
+			ret = PTR_ERR(msdc1_on);
+			pr_err("Cannot find msdc1 pinctrl msdc1_on!\n");
+		}
+
+		msdc1_off = pinctrl_lookup_state(msdc1_pinctrl, "msdc1_off");
+		if (IS_ERR(msdc1_off)) {
+			ret = PTR_ERR(msdc1_off);
+			pr_err("Cannot find msdc1 pinctrl msdc1_off!\n");
+		}
+	}
+	#endif /*VENDOR_EDIT*/
 
 	/* get irq # */
 	host->irq = irq_of_parse_and_map(np, 0);

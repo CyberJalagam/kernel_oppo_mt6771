@@ -245,6 +245,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		return SHRINK_STOP;
 	}
 
+
 	/*
 	 * Check whether it is caused by low memory in lower zone(s)!
 	 * This will help solve over-reclaiming situation while total number
@@ -323,6 +324,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	if (swap_pages * 4 < total_swap_pages)
 		to_be_aggressive++;
 
+
 #ifndef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	/* Try to enable AMR when we have enough memory */
 	if (totalram_pages < ENABLE_AMR_RAMSIZE) {
@@ -380,6 +382,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		spin_unlock(&lowmem_shrink_lock);
 		return 0;
 	}
+
 
 	selected_oom_score_adj = min_score_adj;
 
@@ -505,6 +508,7 @@ log_again:
 		}
 #endif
 		if (oom_score_adj < min_score_adj) {
+
 			task_unlock(p);
 			continue;
 		}
@@ -539,11 +543,16 @@ log_again:
 		long cache_limit = minfree * (long)(PAGE_SIZE / 1024);
 		long free = other_free * (long)(PAGE_SIZE / 1024);
 
+        if(selected_oom_score_adj<=200) {
+            dump_memory_status();
+        }
+
 		task_lock(selected);
 		send_sig(SIGKILL, selected, 0);
 		if (selected->mm)
 			task_set_lmk_waiting(selected);
 		task_unlock(selected);
+
 		trace_lowmemory_kill(selected, cache_size, cache_limit, free);
 		lowmem_print(1, "Killing '%s' (%d), adj %hd, state(%ld)\n"
 				"   to free %ldkB on behalf of '%s' (%d) because\n"
@@ -566,6 +575,8 @@ log_again:
 			     );
 
 		lowmem_deathpending_timeout = jiffies + LOWMEM_DEATHPENDING_TIMEOUT;
+
+
 
 #if defined(CONFIG_MTK_AEE_FEATURE) && defined(CONFIG_MTK_ENG_BUILD)
 		/*
@@ -616,6 +627,7 @@ log_again:
 			lowmem_print(1, "LowMemoryOn\n");
 		}
 #endif
+
 		rem += selected_tasksize;
 	} else {
 		if (p_state_is_found & LOWMEM_P_STATE_D)
@@ -648,6 +660,7 @@ log_again:
 #undef LOWMEM_P_STATE_R
 #undef LOWMEM_P_STATE_OTHER
 }
+
 
 static struct shrinker lowmem_shrinker = {
 	.scan_objects = lowmem_scan,
@@ -840,3 +853,4 @@ module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
 module_param_named(debug_adj, lowmem_debug_adj, short, S_IRUGO | S_IWUSR);
 module_param_named(candidate_log, enable_candidate_log, uint, S_IRUGO | S_IWUSR);
+

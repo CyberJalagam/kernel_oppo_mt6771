@@ -1479,6 +1479,13 @@ err_comp_cleanup:
 	return ret;
 }
 
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+extern void oppo_usb_enum_detected(void);
+extern int oppo_get_usb_enum_type(void);
+extern int oppo_cancel_usb_distinguish_timerout_interrupt(void);
+#endif /*VENDOR_EDIT*/
+
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
 static void android_work(struct work_struct *data)
 {
@@ -1514,6 +1521,18 @@ static void android_work(struct work_struct *data)
 	}
 
 	if (status[1]) {
+		#ifdef VENDOR_EDIT
+		//PengNan@BSP.CHG.Basic, 2018/01/20, add for bq24190 chargertype detect.
+		if(oppo_get_usb_enum_type() == 1) {
+			oppo_usb_enum_detected();
+			msleep(10);
+			pr_info("%s, usb_enum detected, usb_enum_type:%d\n",__func__, oppo_get_usb_enum_type());
+		}
+		if(oppo_get_usb_enum_type() == 4) {
+			oppo_cancel_usb_distinguish_timerout_interrupt();
+			printk("oppo_get_usb_enum_type() == 4\n");
+		}
+		#endif /*VENDOR_EDIT*/
 		kobject_uevent_env(&android_device->kobj,
 					KOBJ_CHANGE, configured);
 		pr_info("%s: sent uevent %s\n", __func__, configured[0]);

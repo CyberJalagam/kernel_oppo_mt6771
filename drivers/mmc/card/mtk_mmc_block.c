@@ -88,11 +88,11 @@ static uint64_t mt_bio_get_period_busy(struct mt_bio_context *ctx);
 static int get_qid_by_name(const char *str)
 {
 	if (strncmp(str, REQ_EXECQ, strlen(REQ_EXECQ)) == 0)
-		return 0;
+		return BTAG_STORAGE_EMBEDDED;
 	if (strncmp(str, REQ_MMCQD0, strlen(REQ_MMCQD0)) == 0)
-		return 0;  /* this includes boot0, boot1 */
+		return BTAG_STORAGE_EMBEDDED;  /* this includes boot0, boot1 */
 	if (strncmp(str, REQ_MMCQD1, strlen(REQ_MMCQD1)) == 0)
-		return 1;
+		return BTAG_STORAGE_EXTERNAL;
 	return 99;
 }
 
@@ -215,7 +215,8 @@ static struct mt_bio_context *mt_bio_get_ctx(int id)
 }
 
 /* append a pidlog to given context */
-int mtk_btag_pidlog_add_mmc(struct request_queue *q, pid_t pid, __u32 len, int rw)
+int mtk_btag_pidlog_add_mmc(struct request_queue *q, pid_t pid, __u32 len,
+	int write)
 {
 	unsigned long flags;
 	struct mt_bio_context *ctx;
@@ -225,7 +226,11 @@ int mtk_btag_pidlog_add_mmc(struct request_queue *q, pid_t pid, __u32 len, int r
 		return 0;
 
 	spin_lock_irqsave(&ctx->lock, flags);
-	mtk_btag_pidlog_insert(&ctx->pidlog, pid, len, rw);
+	mtk_btag_pidlog_insert(&ctx->pidlog, pid, len, write);
+
+	if (ctx->qid == BTAG_STORAGE_EMBEDDED)
+		mtk_btag_mictx_eval_req(write, 1, len);
+
 	spin_unlock_irqrestore(&ctx->lock, flags);
 
 	return 1;
@@ -416,6 +421,10 @@ void mt_biolog_cmdq_queue_task(unsigned int task_id, struct mmc_request *req)
 
 	tsk->arg = req->sbc->arg;
 	tsk->t[tsk_req_start] = sched_clock();
+
+	ctx->q_depth++;
+	mtk_btag_mictx_update_ctx(ctx->q_depth);
+
 	for (i = tsk_dma_start; i < tsk_max; i++)
 		tsk->t[i] = 0;
 
@@ -531,7 +540,7 @@ void mt_biolog_cmdq_isdone_start(unsigned int task_id, struct mmc_request *req)
 /* Command Queue Hook: stage5: isdone end */
 void mt_biolog_cmdq_isdone_end(unsigned int task_id)
 {
-	int rw, i;
+	int write, i;
 	__u32 bytes;
 	__u64 end_time, busy_time;
 	struct mt_bio_context *ctx;
@@ -549,14 +558,23 @@ void mt_biolog_cmdq_isdone_end(unsigned int task_id)
 
 	tsk->t[tsk_isdone_end] = end_time = sched_clock();
 
+	ctx->q_depth--;
+	mtk_btag_mictx_update_ctx(ctx->q_depth);
+
 	/* throughput usage := duration of handling this request */
-	rw = tsk->arg & (1<<30);  /* write: 0, read: 1 */
+
+	/* tsk->arg & (1 << 30): 0 means write */
+	write = tsk->arg & (1 << 30);
+	write = (write) ? 0 : 1;
+
 	bytes = tsk->arg & 0xFFFF;
 	bytes = bytes << SECTOR_SHIFT;
 	busy_time = end_time - tsk->t[tsk_req_start];
-	tp = (rw) ? &ctx->throughput.r : &ctx->throughput.w;
+	tp = (write) ? &ctx->throughput.w : &ctx->throughput.r;
 	tp->usage += busy_time;
 	tp->size += bytes;
+
+	mtk_btag_mictx_eval_tp(write, busy_time, bytes);
 
 	/* workload statistics */
 	ctx->workload.count++;
@@ -624,6 +642,15 @@ void mt_biolog_mmcqd_req_start(struct mmc_host *host)
 		(ctx->state == MMCQD_NORMAL) &&
 		host->card->ext_csd.cmdq_mode_en)
 		ctx->state = MMCQD_CMDQ_MODE_EN;
+
+	/*
+	 * CMDQ mode, embedded eMMC mictx will be
+	 * updated in mt_biolog_cmdq_*, so bypass it here.
+	 */
+#else
+	/* Legacy mode. Update mictx for embedded eMMC only */
+	if (ctx->qid == BTAG_STORAGE_EMBEDDED)
+		mtk_btag_mictx_update_ctx(1);
 #endif
 }
 
@@ -667,9 +694,18 @@ void mt_biolog_mmcqd_req_end(struct mmc_data *data)
 	mt_bio_ctx_count_usage(ctx, tsk->t[tsk_req_start], end_time);
 
 	/* throughput statistics */
-	tp = (rw) ? &ctx->throughput.r : &ctx->throughput.w; /* write: 0, read: 1 */
+
+	/* write: 0, read: 1 */
+	tp = (rw) ? &ctx->throughput.r : &ctx->throughput.w;
+
 	tp->usage += busy_time;
 	tp->size += size;
+
+	/* update mictx for embedded eMMC only */
+	if (ctx->qid == BTAG_STORAGE_EMBEDDED) {
+		mtk_btag_mictx_eval_tp(!rw, busy_time, size);
+		mtk_btag_mictx_update_ctx(0);
+	}
 
 	/* re-init task to indicate no on-going request */
 	mt_bio_init_task(tsk);

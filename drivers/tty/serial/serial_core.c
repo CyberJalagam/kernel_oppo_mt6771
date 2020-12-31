@@ -64,41 +64,6 @@ static int uart_dcd_enabled(struct uart_port *uport)
 	return !!(uport->status & UPSTAT_DCD_ENABLE);
 }
 
-static inline struct uart_port *uart_port_ref(struct uart_state *state)
-{
-	if (atomic_add_unless(&state->refcount, 1, 0))
-		return state->uart_port;
-	return NULL;
-}
-
-static inline void uart_port_deref(struct uart_port *uport)
-{
-	if (uport && atomic_dec_and_test(&uport->state->refcount))
-		wake_up(&uport->state->remove_wait);
-}
-
-#define uart_port_lock(state, flags)					\
-	({								\
-		struct uart_port *__uport = uart_port_ref(state);	\
-		if (__uport)						\
-			spin_lock_irqsave(&__uport->lock, flags);	\
-		__uport;						\
-	})
-
-#define uart_port_unlock(uport, flags)					\
-	({								\
-		struct uart_port *__uport = uport;			\
-		if (__uport)						\
-			spin_unlock_irqrestore(&__uport->lock, flags);	\
-		uart_port_deref(__uport);				\
-	})
-
-static inline struct uart_port *uart_port_check(struct uart_state *state)
-{
-	lockdep_assert_held(&state->port.mutex);
-	return state->uart_port;
-}
-
 /*
  * This routine is used by the interrupt handler to schedule processing in
  * the software interrupt portion of the driver.
@@ -117,13 +82,12 @@ void uart_write_wakeup(struct uart_port *port)
 static void uart_stop(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	unsigned long flags;
 
-	port = uart_port_lock(state, flags);
-	if (port)
-		port->ops->stop_tx(port);
-	uart_port_unlock(port, flags);
+	spin_lock_irqsave(&port->lock, flags);
+	port->ops->stop_tx(port);
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void __uart_start(struct tty_struct *tty)
@@ -131,22 +95,22 @@ static void __uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 
-	if (port && port->ops->wake_peer)
+	if (port->ops->wake_peer)
 		port->ops->wake_peer(port);
 
-	if (port && !uart_tx_stopped(port))
+	if (!uart_tx_stopped(port))
 		port->ops->start_tx(port);
 }
 
 static void uart_start(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	unsigned long flags;
 
-	port = uart_port_lock(state, flags);
+	spin_lock_irqsave(&port->lock, flags);
 	__uart_start(tty);
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static inline void
@@ -173,7 +137,7 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
 static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 		int init_hw)
 {
-	struct uart_port *uport = uart_port_check(state);
+	struct uart_port *uport = state->uart_port;
 	unsigned long page;
 	int retval = 0;
 
@@ -482,7 +446,7 @@ EXPORT_SYMBOL(uart_get_divisor);
 static void uart_change_speed(struct tty_struct *tty, struct uart_state *state,
 					struct ktermios *old_termios)
 {
-	struct uart_port *uport = uart_port_check(state);
+	struct uart_port *uport = state->uart_port;
 	struct ktermios *termios;
 	int hw_stopped;
 
@@ -524,26 +488,30 @@ static void uart_change_speed(struct tty_struct *tty, struct uart_state *state,
 	spin_unlock_irq(&uport->lock);
 }
 
-static int uart_put_char(struct tty_struct *tty, unsigned char c)
+static inline int __uart_put_char(struct uart_port *port,
+				struct circ_buf *circ, unsigned char c)
 {
-	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
-	struct circ_buf *circ;
 	unsigned long flags;
 	int ret = 0;
 
-	circ = &state->xmit;
 	if (!circ->buf)
 		return 0;
 
-	port = uart_port_lock(state, flags);
-	if (port && uart_circ_chars_free(circ) != 0) {
+	spin_lock_irqsave(&port->lock, flags);
+	if (uart_circ_chars_free(circ) != 0) {
 		circ->buf[circ->head] = c;
 		circ->head = (circ->head + 1) & (UART_XMIT_SIZE - 1);
 		ret = 1;
 	}
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
 	return ret;
+}
+
+static int uart_put_char(struct tty_struct *tty, unsigned char ch)
+{
+	struct uart_state *state = tty->driver_data;
+
+	return __uart_put_char(state->uart_port, &state->xmit, ch);
 }
 
 static void uart_flush_chars(struct tty_struct *tty)
@@ -569,12 +537,14 @@ static int uart_write(struct tty_struct *tty,
 		return -EL3HLT;
 	}
 
+	port = state->uart_port;
 	circ = &state->xmit;
+
 	if (!circ->buf)
 		return 0;
 
-	port = uart_port_lock(state, flags);
-	while (port) {
+	spin_lock_irqsave(&port->lock, flags);
+	while (1) {
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
 			c = count;
@@ -588,33 +558,32 @@ static int uart_write(struct tty_struct *tty,
 	}
 
 	__uart_start(tty);
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
+
 	return ret;
 }
 
 static int uart_write_room(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
 	unsigned long flags;
 	int ret;
 
-	port = uart_port_lock(state, flags);
+	spin_lock_irqsave(&state->uart_port->lock, flags);
 	ret = uart_circ_chars_free(&state->xmit);
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&state->uart_port->lock, flags);
 	return ret;
 }
 
 static int uart_chars_in_buffer(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
 	unsigned long flags;
 	int ret;
 
-	port = uart_port_lock(state, flags);
+	spin_lock_irqsave(&state->uart_port->lock, flags);
 	ret = uart_circ_chars_pending(&state->xmit);
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&state->uart_port->lock, flags);
 	return ret;
 }
 
@@ -633,15 +602,14 @@ static void uart_flush_buffer(struct tty_struct *tty)
 		return;
 	}
 
+	port = state->uart_port;
 	pr_debug("uart_flush_buffer(%d) called\n", tty->index);
 
-	port = uart_port_lock(state, flags);
-	if (!port)
-		return;
+	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->xmit);
 	if (port->ops->flush_buffer)
 		port->ops->flush_buffer(port);
-	uart_port_unlock(port, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
 	tty_wakeup(tty);
 }
 
@@ -652,12 +620,8 @@ static void uart_flush_buffer(struct tty_struct *tty)
 static void uart_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	unsigned long flags;
-
-	port = uart_port_ref(state);
-	if (!port)
-		return;
 
 	if (port->ops->send_xchar)
 		port->ops->send_xchar(port, ch);
@@ -668,18 +632,13 @@ static void uart_send_xchar(struct tty_struct *tty, char ch)
 			port->ops->start_tx(port);
 		spin_unlock_irqrestore(&port->lock, flags);
 	}
-	uart_port_deref(port);
 }
 
 static void uart_throttle(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	upstat_t mask = 0;
-
-	port = uart_port_ref(state);
-	if (!port)
-		return;
 
 	if (I_IXOFF(tty))
 		mask |= UPSTAT_AUTOXOFF;
@@ -691,24 +650,18 @@ static void uart_throttle(struct tty_struct *tty)
 		mask &= ~port->status;
 	}
 
-	if (mask & UPSTAT_AUTORTS)
-		uart_clear_mctrl(port, TIOCM_RTS);
-
 	if (mask & UPSTAT_AUTOXOFF)
 		uart_send_xchar(tty, STOP_CHAR(tty));
 
-	uart_port_deref(port);
+	if (mask & UPSTAT_AUTORTS)
+		uart_clear_mctrl(port, TIOCM_RTS);
 }
 
 static void uart_unthrottle(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	upstat_t mask = 0;
-
-	port = uart_port_ref(state);
-	if (!port)
-		return;
 
 	if (I_IXOFF(tty))
 		mask |= UPSTAT_AUTOXOFF;
@@ -720,31 +673,20 @@ static void uart_unthrottle(struct tty_struct *tty)
 		mask &= ~port->status;
 	}
 
-	if (mask & UPSTAT_AUTORTS)
-		uart_set_mctrl(port, TIOCM_RTS);
-
 	if (mask & UPSTAT_AUTOXOFF)
 		uart_send_xchar(tty, START_CHAR(tty));
 
-	uart_port_deref(port);
+	if (mask & UPSTAT_AUTORTS)
+		uart_set_mctrl(port, TIOCM_RTS);
 }
 
 static void do_uart_get_info(struct tty_port *port,
 			struct serial_struct *retinfo)
 {
 	struct uart_state *state = container_of(port, struct uart_state, port);
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 
 	memset(retinfo, 0, sizeof(*retinfo));
-
-	/*
-	 * Ensure the state we copy is consistent and no hardware changes
-	 * occur as we go
-	 */
-	mutex_lock(&port->mutex);
-	uport = uart_port_check(state);
-	if (!uport)
-		goto out;
 
 	retinfo->type	    = uport->type;
 	retinfo->line	    = uport->line;
@@ -764,8 +706,6 @@ static void do_uart_get_info(struct tty_port *port,
 	retinfo->io_type         = uport->iotype;
 	retinfo->iomem_reg_shift = uport->regshift;
 	retinfo->iomem_base      = (void *)(unsigned long)uport->mapbase;
-out:
-	mutex_unlock(&port->mutex);
 }
 
 static void uart_get_info(struct tty_port *port,
@@ -773,7 +713,9 @@ static void uart_get_info(struct tty_port *port,
 {
 	/* Ensure the state we copy is consistent and no hardware changes
 	   occur as we go */
+	mutex_lock(&port->mutex);
 	do_uart_get_info(port, retinfo);
+	mutex_unlock(&port->mutex);
 }
 
 static int uart_get_info_user(struct tty_port *port,
@@ -791,15 +733,12 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 			 struct uart_state *state,
 			 struct serial_struct *new_info)
 {
-	struct uart_port *uport = uart_port_check(state);
+	struct uart_port *uport = state->uart_port;
 	unsigned long new_port;
 	unsigned int change_irq, change_port, closing_wait;
 	unsigned int old_custom_divisor, close_delay;
 	upf_t old_flags, new_flags;
 	int retval = 0;
-
-	if (!uport)
-		return -EIO;
 
 	new_port = new_info->port;
 	if (HIGH_BITS_OFFSET)
@@ -891,7 +830,7 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 		/*
 		 * Free and release old regions
 		 */
-		if (old_type != PORT_UNKNOWN && uport->ops->release_port)
+		if (old_type != PORT_UNKNOWN)
 			uport->ops->release_port(uport);
 
 		uport->iobase = new_port;
@@ -904,7 +843,7 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 		/*
 		 * Claim and map the new regions
 		 */
-		if (uport->type != PORT_UNKNOWN && uport->ops->request_port) {
+		if (uport->type != PORT_UNKNOWN) {
 			retval = uport->ops->request_port(uport);
 		} else {
 			/* Always success - Jean II */
@@ -976,13 +915,8 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 			}
 			uart_change_speed(tty, state, NULL);
 		}
-	} else {
+	} else
 		retval = uart_startup(tty, state, 1);
-		if (retval == 0)
-			set_bit(ASYNCB_INITIALIZED, &port->flags);
-		if (retval > 0)
-			retval = 0;
-	}
  exit:
 	return retval;
 }
@@ -1021,7 +955,7 @@ static int uart_set_info_user(struct tty_struct *tty, struct uart_state *state,
 static int uart_get_lsr_info(struct tty_struct *tty,
 			struct uart_state *state, unsigned int __user *value)
 {
-	struct uart_port *uport = uart_port_check(state);
+	struct uart_port *uport = state->uart_port;
 	unsigned int result;
 
 	result = uport->ops->tx_empty(uport);
@@ -1093,8 +1027,8 @@ static int uart_break_ctl(struct tty_struct *tty, int break_state)
 
 static int uart_do_autoconfig(struct tty_struct *tty,struct uart_state *state)
 {
+	struct uart_port *uport = state->uart_port;
 	struct tty_port *port = &state->port;
-	struct uart_port *uport;
 	int flags, ret;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -1108,12 +1042,6 @@ static int uart_do_autoconfig(struct tty_struct *tty,struct uart_state *state)
 	if (mutex_lock_interruptible(&port->mutex))
 		return -ERESTARTSYS;
 
-	uport = uart_port_check(state);
-	if (!uport) {
-		ret = -EIO;
-		goto out;
-	}
-
 	ret = -EBUSY;
 	if (tty_port_users(port) == 1) {
 		uart_shutdown(tty, state);
@@ -1122,7 +1050,7 @@ static int uart_do_autoconfig(struct tty_struct *tty,struct uart_state *state)
 		 * If we already have a port type configured,
 		 * we must release its resources.
 		 */
-		if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
+		if (uport->type != PORT_UNKNOWN)
 			uport->ops->release_port(uport);
 
 		flags = UART_CONFIG_TYPE;
@@ -1136,12 +1064,7 @@ static int uart_do_autoconfig(struct tty_struct *tty,struct uart_state *state)
 		uport->ops->config_port(uport, flags);
 
 		ret = uart_startup(tty, state, 1);
-		if (ret == 0)
-			set_bit(ASYNCB_INITIALIZED, &port->flags);
-		if (ret > 0)
-			ret = 0;
 	}
-out:
 	mutex_unlock(&port->mutex);
 	return ret;
 }
@@ -1167,7 +1090,7 @@ static void uart_enable_ms(struct uart_port *uport)
 static int
 uart_wait_modem_status(struct uart_state *state, unsigned long arg)
 {
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 	struct tty_port *port = &state->port;
 	DECLARE_WAITQUEUE(wait, current);
 	struct uart_icount cprev, cnow;
@@ -1176,9 +1099,6 @@ uart_wait_modem_status(struct uart_state *state, unsigned long arg)
 	/*
 	 * note the counters on entry
 	 */
-	uport = uart_port_ref(state);
-	if (!uport)
-		return -EIO;
 	spin_lock_irq(&uport->lock);
 	memcpy(&cprev, &uport->icount, sizeof(struct uart_icount));
 	uart_enable_ms(uport);
@@ -1212,7 +1132,6 @@ uart_wait_modem_status(struct uart_state *state, unsigned long arg)
 	}
 	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&port->delta_msr_wait, &wait);
-	uart_port_deref(uport);
 
 	return ret;
 }
@@ -1228,15 +1147,11 @@ static int uart_get_icount(struct tty_struct *tty,
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_icount cnow;
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 
-	uport = uart_port_ref(state);
-	if (!uport)
-		return -EIO;
 	spin_lock_irq(&uport->lock);
 	memcpy(&cnow, &uport->icount, sizeof(struct uart_icount));
 	spin_unlock_irq(&uport->lock);
-	uart_port_deref(uport);
 
 	icount->cts         = cnow.cts;
 	icount->dsr         = cnow.dsr;
@@ -1406,15 +1321,10 @@ static void uart_set_termios(struct tty_struct *tty,
 						struct ktermios *old_termios)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 	unsigned int cflag = tty->termios.c_cflag;
 	unsigned int iflag_mask = IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK;
 	bool sw_changed = false;
-
-	mutex_lock(&state->port.mutex);
-	uport = uart_port_check(state);
-	if (!uport)
-		goto out;
 
 	/*
 	 * Drivers doing software flow control also need to know
@@ -1438,11 +1348,12 @@ static void uart_set_termios(struct tty_struct *tty,
 	    tty->termios.c_ispeed == old_termios->c_ispeed &&
 	    ((tty->termios.c_iflag ^ old_termios->c_iflag) & iflag_mask) == 0 &&
 	    !sw_changed) {
-		goto out;
+		return;
 	}
 
+	mutex_lock(&state->port.mutex);
 	uart_change_speed(tty, state, old_termios);
-
+	mutex_unlock(&state->port.mutex);
 	/* reload cflag from termios; port driver may have overriden flags */
 	cflag = tty->termios.c_cflag;
 
@@ -1456,8 +1367,6 @@ static void uart_set_termios(struct tty_struct *tty,
 			mask |= TIOCM_RTS;
 		uart_set_mctrl(uport, mask);
 	}
-out:
-	mutex_unlock(&state->port.mutex);
 }
 
 /*
@@ -1541,14 +1450,11 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port;
+	struct uart_port *port = state->uart_port;
 	unsigned long char_time, expire;
 
-	port = uart_port_ref(state);
-	if (!port || port->type == PORT_UNKNOWN || port->fifosize == 0) {
-		uart_port_deref(port);
+	if (port->type == PORT_UNKNOWN || port->fifosize == 0)
 		return;
-	}
 
 	/*
 	 * Set the check interval to be 1/5 of the estimated time to
@@ -1594,7 +1500,6 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 		if (time_after(jiffies, expire))
 			break;
 	}
-	uart_port_deref(port);
 }
 
 /*
@@ -1627,11 +1532,10 @@ static void uart_hangup(struct tty_struct *tty)
 	mutex_unlock(&port->mutex);
 }
 
-/* uport == NULL if uart_port has already been removed */
 static void uart_port_shutdown(struct tty_port *port)
 {
 	struct uart_state *state = container_of(port, struct uart_state, port);
-	struct uart_port *uport = uart_port_check(state);
+	struct uart_port *uport = state->uart_port;
 
 	/*
 	 * clear delta_msr_wait queue to avoid mem leaks: we may free
@@ -1645,36 +1549,23 @@ static void uart_port_shutdown(struct tty_port *port)
 	/*
 	 * Free the IRQ and disable the port.
 	 */
-	if (uport)
-		uport->ops->shutdown(uport);
+	uport->ops->shutdown(uport);
 
 	/*
 	 * Ensure that the IRQ handler isn't running on another CPU.
 	 */
-	if (uport)
-		synchronize_irq(uport->irq);
+	synchronize_irq(uport->irq);
 }
 
 static int uart_carrier_raised(struct tty_port *port)
 {
 	struct uart_state *state = container_of(port, struct uart_state, port);
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 	int mctrl;
-
-	uport = uart_port_ref(state);
-	/*
-	 * Should never observe uport == NULL since checks for hangup should
-	 * abort the tty_port_block_til_ready() loop before checking for carrier
-	 * raised -- but report carrier raised if it does anyway so open will
-	 * continue and not sleep
-	 */
-	if (WARN_ON(!uport))
-		return 1;
 	spin_lock_irq(&uport->lock);
 	uart_enable_ms(uport);
 	mctrl = uport->ops->get_mctrl(uport);
 	spin_unlock_irq(&uport->lock);
-	uart_port_deref(uport);
 	if (mctrl & TIOCM_CAR)
 		return 1;
 	return 0;
@@ -1683,18 +1574,12 @@ static int uart_carrier_raised(struct tty_port *port)
 static void uart_dtr_rts(struct tty_port *port, int onoff)
 {
 	struct uart_state *state = container_of(port, struct uart_state, port);
-	struct uart_port *uport;
-
-	uport = uart_port_ref(state);
-	if (!uport)
-		return;
+	struct uart_port *uport = state->uart_port;
 
 	if (onoff)
 		uart_set_mctrl(uport, TIOCM_DTR | TIOCM_RTS);
 	else
 		uart_clear_mctrl(uport, TIOCM_DTR | TIOCM_RTS);
-
-	uart_port_deref(uport);
 }
 
 /*
@@ -1782,15 +1667,13 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 	struct uart_state *state = drv->state + i;
 	struct tty_port *port = &state->port;
 	enum uart_pm_state pm_state;
-	struct uart_port *uport;
+	struct uart_port *uport = state->uart_port;
 	char stat_buf[32];
 	unsigned int status;
 	int mmio;
 
-	mutex_lock(&port->mutex);
-	uport = uart_port_check(state);
 	if (!uport)
-		goto out;
+		return;
 
 	mmio = uport->iotype >= UPIO_MEM;
 	seq_printf(m, "%d: uart:%s %s%08llX irq:%d",
@@ -1802,10 +1685,11 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 
 	if (uport->type == PORT_UNKNOWN) {
 		seq_putc(m, '\n');
-		goto out;
+		return;
 	}
 
 	if (capable(CAP_SYS_ADMIN)) {
+		mutex_lock(&port->mutex);
 		pm_state = state->pm_state;
 		if (pm_state != UART_PM_STATE_ON)
 			uart_change_pm(state, UART_PM_STATE_ON);
@@ -1814,6 +1698,7 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 		spin_unlock_irq(&uport->lock);
 		if (pm_state != UART_PM_STATE_ON)
 			uart_change_pm(state, pm_state);
+		mutex_unlock(&port->mutex);
 
 		seq_printf(m, " tx:%d rx:%d",
 				uport->icount.tx, uport->icount.rx);
@@ -1855,8 +1740,6 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 	seq_putc(m, '\n');
 #undef STATBIT
 #undef INFOBIT
-out:
-	mutex_unlock(&port->mutex);
 }
 
 static int uart_proc_show(struct seq_file *m, void *v)
@@ -2120,10 +2003,10 @@ EXPORT_SYMBOL_GPL(uart_set_options);
 static void uart_change_pm(struct uart_state *state,
 			   enum uart_pm_state pm_state)
 {
-	struct uart_port *port = uart_port_check(state);
+	struct uart_port *port = state->uart_port;
 
 	if (state->pm_state != pm_state) {
-		if (port && port->ops->pm)
+		if (port->ops->pm)
 			port->ops->pm(port, pm_state, state->pm_state);
 		state->pm_state = pm_state;
 	}
@@ -2436,15 +2319,12 @@ static int uart_poll_get_char(struct tty_driver *driver, int line)
 	struct uart_driver *drv = driver->driver_state;
 	struct uart_state *state = drv->state + line;
 	struct uart_port *port;
-	int ret = -1;
 
-	if (state) {
-		port = uart_port_ref(state);
-		if (port)
-			ret = port->ops->poll_get_char(port);
-		uart_port_deref(port);
-	}
-	return ret;
+	if (!state || !state->uart_port)
+		return -1;
+
+	port = state->uart_port;
+	return port->ops->poll_get_char(port);
 }
 
 static void uart_poll_put_char(struct tty_driver *driver, int line, char ch)
@@ -2453,17 +2333,14 @@ static void uart_poll_put_char(struct tty_driver *driver, int line, char ch)
 	struct uart_state *state = drv->state + line;
 	struct uart_port *port;
 
-	if (!state)
+	if (!state || !state->uart_port)
 		return;
 
-	port = uart_port_ref(state);
-	if (!port)
-		return;
+	port = state->uart_port;
 
 	if (ch == '\n')
 		port->ops->poll_put_char(port, '\r');
 	port->ops->poll_put_char(port, ch);
-	uart_port_deref(port);
 }
 #endif
 
@@ -2810,8 +2687,6 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	}
 
 	/* Link the port to the driver state table and vice versa */
-	atomic_set(&state->refcount, 1);
-	init_waitqueue_head(&state->remove_wait);
 	state->uart_port = uport;
 	uport->state = state;
 
@@ -2831,8 +2706,6 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
 
 	uart_configure_port(drv, state, uport);
-
-	port->console = uart_console(uport);
 
 	num_groups = 2;
 	if (uport->attr_group)
@@ -2886,11 +2759,14 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 {
 	struct uart_state *state = drv->state + uport->line;
 	struct tty_port *port = &state->port;
-	struct uart_port *uart_port;
 	struct tty_struct *tty;
 	int ret = 0;
 
 	BUG_ON(in_interrupt());
+
+	if (state->uart_port != uport)
+		dev_alert(uport->dev, "Removing wrong port: %p != %p\n",
+			state->uart_port, uport);
 
 	mutex_lock(&port_mutex);
 
@@ -2899,12 +2775,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 * succeeding while we shut down the port.
 	 */
 	mutex_lock(&port->mutex);
-	uart_port = uart_port_check(state);
-	if (uart_port != uport)
-		dev_alert(uport->dev, "Removing wrong port: %p != %p\n",
-			  uart_port, uport);
-
-	if (!uart_port) {
+	if (!state->uart_port) {
 		mutex_unlock(&port->mutex);
 		ret = -EINVAL;
 		goto out;
@@ -2932,7 +2803,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 	/*
 	 * Free the port IO and memory resources, if any.
 	 */
-	if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
+	if (uport->type != PORT_UNKNOWN)
 		uport->ops->release_port(uport);
 	kfree(uport->tty_groups);
 
@@ -2941,11 +2812,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	uport->type = PORT_UNKNOWN;
 
-	mutex_lock(&port->mutex);
-	WARN_ON(atomic_dec_return(&state->refcount) < 0);
-	wait_event(state->remove_wait, !atomic_read(&state->refcount));
 	state->uart_port = NULL;
-	mutex_unlock(&port->mutex);
 out:
 	mutex_unlock(&port_mutex);
 

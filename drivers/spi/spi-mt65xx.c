@@ -397,8 +397,14 @@ static void mtk_spi_prepare_transfer(struct spi_master *master,
 		writel(reg_val, mdata->base + SPI_CFG2_REG);
 		reg_val |= (((cs_time - 1) & 0xffff)
 			   << SPI_ADJUST_CFG0_CS_HOLD_OFFSET);
+#ifdef VENDOR_EDIT
+/* ZhongWenjie@PSW.BSP.TP.Function, 2019/01/28, Add for TP cs setup time */
+		reg_val |= (((cs_time * 4 - 1) & 0xffff)
+			   << SPI_ADJUST_CFG0_CS_SETUP_OFFSET);
+#else
 		reg_val |= (((cs_time - 1) & 0xffff)
 			   << SPI_ADJUST_CFG0_CS_SETUP_OFFSET);
+#endif/* VENDOR_EDIT */
 		writel(reg_val, mdata->base + SPI_CFG0_REG);
 	} else {
 		reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_HIGH_OFFSET);
@@ -654,7 +660,15 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
 		mdata->state = MTK_SPI_PAUSED;
 	else
 		mdata->state = MTK_SPI_IDLE;
-
+#ifdef VENDOR_EDIT
+/* Fuchun.Liao@BSP.CHG.Basic 2018/09/20 add for master->cur_msg = NULL crash, workaround ALPS04114936 */
+	if (NULL == master->cur_msg) {
+		master->cur_msg_prepared = false;
+		queue_kthread_work(&master->kworker, &master->pump_messages);
+		spi_debug("mtk_spi_interrupt NULL == master->cur_msg  \n");  
+		return IRQ_HANDLED;
+	}
+#endif /* VENDOR_EDIT */
 	if (!master->can_dma(master, master->cur_msg->spi, trans)) {
 		if (trans->rx_buf) {
 			cnt = mdata->xfer_len / 4;

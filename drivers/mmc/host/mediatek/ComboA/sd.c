@@ -73,6 +73,10 @@
 #endif
 
 #include "dbg.h"
+#ifdef VENDOR_EDIT
+//yh@BSP.Storage.Emmc, 2017/10/30 add for work around hynix emmc WP issue
+#include <linux/reboot.h>
+#endif
 
 #define CAPACITY_2G             (2 * 1024 * 1024 * 1024ULL)
 
@@ -896,6 +900,8 @@ void msdc_send_stop(struct msdc_host *host)
 	mrq.cmd = &stop;
 	stop.mrq = &mrq;
 	stop.data = NULL;
+	/* stop busy tmo */
+	stop.busy_timeout = 500;
 
 	err = msdc_do_command(host, &stop, CMD_TIMEOUT);
 }
@@ -1332,6 +1338,8 @@ int msdc_cache_ctrl(struct msdc_host *host, unsigned int enable,
 	mrq.cmd = &cmd;
 	cmd.mrq = &mrq;
 	cmd.data = NULL;
+	/* set CMD6 max tmo */
+	cmd.busy_timeout = 2550;
 
 	ERR_MSG("do eMMC %s Cache\n", (enable ? "enable" : "disable"));
 	err = msdc_do_command(host, &cmd, CMD_TIMEOUT);
@@ -1752,7 +1760,7 @@ static u32 msdc_command_resp_polling(struct msdc_host *host,
 {
 	void __iomem *base = host->base;
 	u32 intsts;
-	u32 resp;
+	u32 resp, tmo_type;
 	unsigned long tmo;
 	bool use_cmd_intr;
 
@@ -1853,6 +1861,14 @@ skip_cmd_resp_polling:
 					pr_notice("[%s]: msdc%d XXX CMD<%d> resp<0x%.8x>, write protection violation\n",
 						__func__, host->id, cmd->opcode,
 						*rsp);
+#ifdef VENDOR_EDIT
+//yh@BSP.Storage.Emmc, 2017/10/30 add for work around hynix emmc WP issue
+					if((host->hw->host_function == MSDC_EMMC) &&
+					   ( get_boot_mode() == RECOVERY_BOOT || get_boot_mode() == OPPO_SAU_BOOT ))
+					{
+						emergency_restart();
+					}
+#endif
 				}
 
 				if ((*rsp & R1_OUT_OF_RANGE)
@@ -1898,11 +1914,22 @@ skip_cmd_resp_polling:
 		}
 
 		if (use_cmd_intr && (mmc_resp_type(cmd) == MMC_RSP_R1B)) {
-			pr_notice("[%s]: msdc%d CMD<%d> Arg<0x%.8x> tmo: %dms (max %dms)\n",
+			/* tmo_type, 0x1:dat0, 0x2:resp */
+			MSDC_GET_FIELD(SDC_STS, SDC_STS_CMD_TMO_TYPE, tmo_type);
+			pr_notice("[%s]: msdc%d CMD<%d> Arg<0x%.8x> tmo: %dms (max %dms) type: %s\n",
 				__func__, host->id, cmd->opcode, cmd->arg,
-				host->busy_timeout_ms, host->max_busy_timeout_ms);
+				host->busy_timeout_ms,
+				host->max_busy_timeout_ms,
+				tmo_type == 0x1 ? "dat0":"resp");
 			/* when r1b hw tmo, use cmd13 instead */
-			cmd->error = 0;
+			/*
+			 * Maybe need fixed in the future to adjust to the
+			 * __mmc_switch(), otherwise cmd13 in __mmc_switch()
+			 * maybe polling for a long time(even through 10min).
+			 */
+			if (tmo_type == 0x1)
+				/* dat0 busy tmo, fall back */
+				cmd->error = 0;
 			goto out;
 		}
 
@@ -5160,6 +5187,9 @@ static void msdc_remove_host(struct msdc_host *host)
 {
 	if (host->irq >= 0)
 		free_irq(host->irq, host);
+#ifdef VENDOR_EDIT
+    return;
+#endif
 	platform_set_drvdata(host->pdev, NULL);
 	msdc_deinit_hw(host);
 	kfree(host->hw);
@@ -5235,6 +5265,13 @@ static int msdc_drv_probe(struct platform_device *pdev)
 #endif
 	if (host->hw->host_function == MSDC_SD)
 		mmc->caps |= MMC_CAP_RUNTIME_RESUME;
+#ifdef VENDOR_EDIT
+//Chunyi.Mei@PSW.BSP.Storage.Sdcard, 2019-01-04, Add for SD deferred resume 
+#ifdef CONFIG_PM
+	if (host->hw->host_function == MSDC_SD)
+		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
+#endif
+#endif /* VENDOR_EDIT */
 
 	mmc->caps |= MMC_CAP_ERASE;
 

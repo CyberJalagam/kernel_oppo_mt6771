@@ -92,6 +92,7 @@ struct f_midi {
 	int index;
 	char *id;
 	unsigned int buflen, qlen;
+	unsigned char free_ref;
 };
 
 static inline struct f_midi *func_to_midi(struct usb_function *f)
@@ -100,6 +101,7 @@ static inline struct f_midi *func_to_midi(struct usb_function *f)
 }
 
 static void f_midi_transmit(struct f_midi *midi, struct usb_request *req);
+static void f_midi_rmidi_free(struct snd_rawmidi *rmidi);
 
 DECLARE_UAC_AC_HEADER_DESCRIPTOR(1);
 DECLARE_USB_MIDI_OUT_JACK_DESCRIPTOR(1);
@@ -726,6 +728,8 @@ static int f_midi_register_card(struct f_midi *midi)
 			    SNDRV_RAWMIDI_INFO_INPUT |
 			    SNDRV_RAWMIDI_INFO_DUPLEX;
 	rmidi->private_data = midi;
+	rmidi->private_free = f_midi_rmidi_free;
+	midi->free_ref++;
 
 	/*
 	 * Yes, rawmidi OUTPUT = USB IN, and rawmidi INPUT = USB OUT.
@@ -1279,14 +1283,21 @@ static void f_midi_free(struct usb_function *f)
 
 	midi = func_to_midi(f);
 	opts = container_of(f->fi, struct f_midi_opts, func_inst);
-	kfree(midi->id);
 	mutex_lock(&opts->lock);
-	for (i = opts->in_ports - 1; i >= 0; --i)
-		kfree(midi->in_port[i]);
-	kfree(midi);
-	opts->func_inst.f = NULL;
-	--opts->refcnt;
+	if (!--midi->free_ref) {
+		for (i = opts->in_ports - 1; i >= 0; --i)
+			kfree(midi->in_port[i]);
+		kfree(midi->id);
+		kfree(midi);
+		opts->func_inst.f = NULL;
+		--opts->refcnt;
+	}
 	mutex_unlock(&opts->lock);
+}
+
+static void f_midi_rmidi_free(struct snd_rawmidi *rmidi)
+{
+	f_midi_free(rmidi->private_data);
 }
 
 static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
@@ -1357,6 +1368,7 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	midi->index = opts->index;
 	midi->buflen = opts->buflen;
 	midi->qlen = opts->qlen;
+	midi->free_ref = 1;
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
 

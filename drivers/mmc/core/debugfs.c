@@ -353,6 +353,267 @@ static const struct file_operations mmc_dbg_ext_csd_fops = {
 	.llseek		= default_llseek,
 };
 
+#ifdef VENDOR_EDIT
+//Chunyi.Mei@PSW.BSP.Storage.EMMC,2018/9/12,2016/10/31,add for emmc life&size display
+#define SECTOR_COUNT_BUF_LEN 16
+
+static int mmc_sector_count_open(struct inode *inode, struct file *filp)
+{
+	struct mmc_card *card = inode->i_private;
+	char *buf;
+	ssize_t n = 0;
+	u8 *ext_csd;
+	int err;
+	unsigned int sector_count = 0;
+
+	buf = kmalloc(SECTOR_COUNT_BUF_LEN, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	memset(buf,0,SECTOR_COUNT_BUF_LEN);
+#if 0
+	ext_csd = kmalloc(512, GFP_KERNEL);
+	if (!ext_csd) {
+		err = -ENOMEM;
+		goto out_free;
+	}
+
+	memset(ext_csd,0,512);
+#endif
+	mmc_claim_host(card->host);
+#if 0
+	err = mmc_send_ext_csd(card, ext_csd);
+#else
+	err = mmc_get_ext_csd(card, &ext_csd);
+#endif
+	mmc_release_host(card->host);
+	if (err)
+		goto out_free;
+	sector_count = (ext_csd[215]<<24) |(ext_csd[214]<<16)|
+			(ext_csd[213]<<8)|(ext_csd[212]);
+	n = sprintf(buf, "0x%08x", sector_count);
+
+	BUG_ON(n > SECTOR_COUNT_BUF_LEN);
+
+	filp->private_data = buf;
+	kfree(ext_csd);
+	return 0;
+out_free:
+	kfree(buf);
+#if 0
+	kfree(ext_csd);
+#endif
+	return err;
+}
+
+static ssize_t mmc_sector_count_read(struct file *filp, char __user *ubuf,
+	size_t cnt, loff_t *ppos)
+{
+	char *buf = filp->private_data;
+	int len = strlen(buf);
+	return simple_read_from_buffer(ubuf, cnt, ppos,
+		buf, len);
+}
+
+static int mmc_sector_count_release(struct inode *inode, struct file *file)
+{
+	kfree(file->private_data);
+	return 0;
+}
+
+static const struct file_operations mmc_dbg_sector_count_fops = {
+	.open		= mmc_sector_count_open,
+	.read		= mmc_sector_count_read,
+	.release	= mmc_sector_count_release,
+	.llseek		= default_llseek,
+};
+
+
+#define LIFE_TIME_BUF_LEN 256
+static char* life_time_table[]={
+	"Not defined",
+	"0%-10% device life time used",
+	"10%-20% device life time used",
+	"20%-30% device life time used",
+	"30%-40% device life time used",
+	"30%-40% device life time used",
+	"40%-50% device life time used",
+	"60%-70% device life time used",
+	"80%-90% device life time used",
+	"90%-100% device life time used",
+	"Exceeded its maximum estimated device life time",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+};
+
+static int mmc_life_time_open(struct inode *inode, struct file *filp)
+{
+	struct mmc_card *card = inode->i_private;
+	char *buf;
+	ssize_t n = 0;
+	u8 *ext_csd;
+	int err;
+	unsigned char life_time_A = 0;
+	unsigned char life_time_B = 0;
+
+	buf = kmalloc(LIFE_TIME_BUF_LEN, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	memset(buf,0,LIFE_TIME_BUF_LEN);
+#if 0
+	ext_csd = kmalloc(512, GFP_KERNEL);
+	if (!ext_csd) {
+		err = -ENOMEM;
+		goto out_free;
+	}
+
+	memset(ext_csd,0,512);
+#endif
+	mmc_claim_host(card->host);
+#if 0
+	err = mmc_send_ext_csd(card, ext_csd);
+#else
+	err = mmc_get_ext_csd(card, &ext_csd);
+#endif
+	mmc_release_host(card->host);
+	if (err)
+		goto out_free;
+	life_time_A = ext_csd[268];
+	life_time_B = ext_csd[269];
+	n = sprintf(buf, "type A:%s\n\rtype B:%s\n\r",
+		life_time_table[life_time_A],life_time_table[life_time_B]);
+
+	BUG_ON(n > LIFE_TIME_BUF_LEN);
+
+	filp->private_data = buf;
+	kfree(ext_csd);
+	return 0;
+out_free:
+	kfree(buf);
+#if 0
+	kfree(ext_csd);
+#endif
+	return err;
+}
+
+static ssize_t mmc_life_time_read(struct file *filp, char __user *ubuf,
+	size_t cnt, loff_t *ppos)
+{
+	char *buf = filp->private_data;
+	int len = strlen(buf);
+
+	return simple_read_from_buffer(ubuf, cnt, ppos,
+		buf, len);
+	}
+
+static int mmc_life_time_release(struct inode *inode, struct file *file)
+{
+	kfree(file->private_data);
+	return 0;
+}
+
+static const struct file_operations mmc_dbg_life_time_fops = {
+	.open		= mmc_life_time_open,
+	.read		= mmc_life_time_read,
+	.release	= mmc_life_time_release,
+	.llseek		= default_llseek,
+};
+#endif /*VENDOR_EDIT*/
+
+#ifdef MTK_BKOPS_IDLE_MAYA
+static int mmc_bkops_stats_open(struct inode *inode, struct file *filp)
+{
+	struct mmc_card *card = inode->i_private;
+
+	filp->private_data = card;
+
+	card->bkops_info.bkops_stats.print_stats = 1;
+	return 0;
+}
+
+static ssize_t mmc_bkops_stats_read(struct file *filp, char __user *ubuf,
+	size_t cnt, loff_t *ppos)
+{
+	struct mmc_card *card = filp->private_data;
+	struct mmc_bkops_stats *bkops_stats;
+	int i, ret;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *temp_buf = (char *) page;
+
+	if (!card)
+		return cnt;
+
+	bkops_stats = &card->bkops_info.bkops_stats;
+	if (!bkops_stats->print_stats)
+		return 0;
+
+	if (!bkops_stats->enabled) {
+		pr_err("%s: bkops statistics are disabled\n",
+			mmc_hostname(card->host));
+		goto exit;
+	}
+
+	spin_lock(&bkops_stats->lock);
+	temp_buf += sprintf(temp_buf, "%s: bkops statistics:\n", mmc_hostname(card->host));
+
+	for (i = 0; i < BKOPS_NUM_OF_SEVERITY_LEVELS; ++i) {
+		temp_buf += sprintf(temp_buf, "%s: BKOPS: due to level %d: %u\n",
+				mmc_hostname(card->host), i, bkops_stats->bkops_level[i]);
+	}
+	temp_buf += sprintf(temp_buf, "%s: BKOPS: stopped due to HPI: %u\n",
+				mmc_hostname(card->host), bkops_stats->hpi);
+	temp_buf += sprintf(temp_buf, "%s: BKOPS: how many time host was suspended: %u\n",
+				mmc_hostname(card->host), bkops_stats->suspend);
+	spin_unlock(&bkops_stats->lock);
+	ret = simple_read_from_buffer(ubuf, cnt, ppos, (char *) page, (unsigned long) temp_buf - page);
+	free_page(page);
+exit:
+	if (bkops_stats->print_stats == 1) {
+		bkops_stats->print_stats = 0;
+		return strnlen(ubuf, cnt);
+	}
+	return ret;
+}
+
+static ssize_t mmc_bkops_stats_write(struct file *filp,
+	const char __user *ubuf, size_t cnt, loff_t *ppos)
+{
+	struct mmc_card *card = filp->private_data;
+	char value;
+	struct mmc_bkops_stats *bkops_stats;
+	int cnt;
+
+	if (!card)
+		return cnt;
+
+	bkops_stats = &card->bkops_info.bkops_stats;
+
+	cnt = sscanf(ubuf, "%s", &value);
+	if (cnt != 1)
+		return -1;
+	if (value) {
+		mmc_blk_init_bkops_statistics(card);
+	} else {
+		pr_err("enter into mmc_bkops_stats_write else bkops_stats->enabled = false\n");
+		spin_lock(&bkops_stats->lock);
+		bkops_stats->enabled = false;
+		spin_unlock(&bkops_stats->lock);
+	}
+
+	return cnt;
+}
+
+static const struct file_operations mmc_dbg_bkops_stats_fops = {
+	.open = mmc_bkops_stats_open,
+	.read = mmc_bkops_stats_read,
+	.write = mmc_bkops_stats_write
+};
+#endif
+
 void mmc_add_card_debugfs(struct mmc_card *card)
 {
 	struct mmc_host	*host = card->host;
@@ -384,6 +645,18 @@ void mmc_add_card_debugfs(struct mmc_card *card)
 		if (!debugfs_create_file("ext_csd", S_IRUSR, root, card,
 					&mmc_dbg_ext_csd_fops))
 			goto err;
+#ifdef VENDOR_EDIT
+//Chunyi.Mei@PSW.BSP.Storage.EMMC,2018/9/12,add for emmc life&size display
+	if (mmc_card_mmc(card))
+		if (!debugfs_create_file("sector_count", S_IRUSR, root, card,
+						&mmc_dbg_sector_count_fops))
+			goto err;
+
+	if (mmc_card_mmc(card))
+		if (!debugfs_create_file("life_time", S_IRUSR, root, card,
+						&mmc_dbg_life_time_fops))
+			goto err;
+#endif
 
 	return;
 

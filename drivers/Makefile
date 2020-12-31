@@ -178,3 +178,8 @@ obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_NVMEM)		+= nvmem/
 obj-$(CONFIG_FPGA)		+= fpga/
 obj-$(CONFIG_TEE)		+= tee/
+
+#ifdef VENDOR_EDIT /*ChenYong@Plf.Framework, 2018/11/27, add for kernel hotfix*/
+obj-$(CONFIG_QIHOO)             += qihoo/
+#endif /* VENDOR_EDIT */
+

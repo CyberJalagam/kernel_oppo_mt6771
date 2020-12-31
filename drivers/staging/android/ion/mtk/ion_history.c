@@ -601,8 +601,7 @@ static int ion_history_record(void *data)
 
 			if (g_client_history) {
 				/* record page pool info */
-				if (ion_mm_heap_for_each_pool(write_mm_page_pool) < 0)
-					break;
+				ion_mm_heap_for_each_pool(write_mm_page_pool);
 
 				if (total_orphaned_size)
 					ion_client_write_record(g_client_history, NULL, NULL,

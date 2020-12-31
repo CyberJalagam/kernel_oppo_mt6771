@@ -743,7 +743,12 @@ static int gs_start_io(struct gs_port *port)
 	started = gs_start_rx(port);
 
 	/* unblock any pending writes into our circular buffer */
+#ifndef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/12/19, sjc Modify for avoid NULL pointer */
 	if (started) {
+#else
+	if (started && (port->port.tty)) {
+#endif /* VENDOR_EDIT */
 		tty_wakeup(port->port.tty);
 	} else {
 		gs_free_requests(ep, head, &port->read_allocated);

@@ -3364,6 +3364,7 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	return -EIO;
 }
 
+
 int _mmc_detect_card_removed(struct mmc_host *host)
 {
 	int ret;
@@ -3388,10 +3389,6 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 		pr_debug("%s: card removed too slowly\n", mmc_hostname(host));
 	}
 
-	if (ret) {
-		mmc_card_set_removed(host->card);
-		pr_debug("%s: card remove detected\n", mmc_hostname(host));
-	}
 
 	return ret;
 }
@@ -3445,6 +3442,7 @@ void mmc_rescan(struct work_struct *work)
 	if (host->rescan_disable)
 		return;
 
+
 	/* If there is a non-removable card registered, only scan once */
 	if ((host->caps & MMC_CAP_NONREMOVABLE) && host->rescan_entered)
 		return;
@@ -3471,8 +3469,10 @@ void mmc_rescan(struct work_struct *work)
 
 	/* if there still is a card present, stop here */
 	if (host->bus_ops != NULL) {
-		mmc_bus_put(host);
-		goto out;
+		{
+			mmc_bus_put(host);
+			goto out;
+		}
 	}
 
 	/*
@@ -3481,8 +3481,7 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	mmc_bus_put(host);
 
-	if (!(host->caps & MMC_CAP_NONREMOVABLE) && host->ops->get_cd &&
-			host->ops->get_cd(host) == 0) {
+	if ((!(host->caps & MMC_CAP_NONREMOVABLE) && host->ops->get_cd && (host->ops->get_cd(host) == 0))	) {
 		mmc_claim_host(host);
 		mmc_power_off(host);
 		mmc_release_host(host);
@@ -3517,6 +3516,8 @@ void mmc_start_host(struct mmc_host *host)
 	mmc_release_host(host);
 
 	mmc_gpiod_request_cd_irq(host);
+
+
 	_mmc_detect_change(host, 0, false);
 }
 
@@ -3532,7 +3533,11 @@ void mmc_stop_host(struct mmc_host *host)
 		disable_irq(host->slot.cd_irq);
 
 	host->rescan_disable = 1;
+#ifndef VENDOR_EDIT //yixue.ge@bsp.drv modify
 	cancel_delayed_work_sync(&host->detect);
+#else
+	cancel_delayed_work(&host->detect);
+#endif
 
 	/* clear pm flags now and let card drivers set them as needed */
 	host->pm_flags = 0;
@@ -3728,6 +3733,7 @@ EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
 static int __init mmc_init(void)
 {
 	int ret;
+
 
 	ret = mmc_register_bus();
 	if (ret)

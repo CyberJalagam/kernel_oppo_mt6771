@@ -468,11 +468,30 @@ int usb_stor_bulk_srb(struct us_data* us, unsigned int pipe,
 {
 	unsigned int partial;
 	int result;
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/10/16, mtk patch for otg */
+	u16 vid = le16_to_cpu(us->pusb_dev->descriptor.idVendor);
+	u16 pid = le16_to_cpu(us->pusb_dev->descriptor.idProduct);
+#endif /* VENDOR_EDIT */
 
 	usb_boost();
 	result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
 			scsi_sg_count(srb), scsi_bufflen(srb),
 			&partial);
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/10/16, mtk patch for otg */
+	if (srb->cmnd[0] == MODE_SENSE && vid == 0x951 && pid == 0x1665) {
+		struct scatterlist *sg = scsi_sglist(srb);
+		char *ptr = sg_virt(sg);
+
+		/* make write protect on to off */
+		if (ptr[2] != 0x0) {
+			pr_notice("HACK <%x> to 0x0 for write protect off at vid:%x, pid:%x\n",
+					ptr[2], vid, pid);
+			ptr[2] = 0x0;
+		}
+	}
+#endif /* VENDOR_EDIT */
 
 	scsi_set_resid(srb, scsi_bufflen(srb) - partial);
 	return result;
