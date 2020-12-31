@@ -2792,6 +2792,7 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 	int retval = 0;
 	int mnt_flags = 0;
 
+
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;

@@ -605,6 +605,7 @@ void do_coredump(const siginfo_t *siginfo)
 	if (!__get_dumpable(cprm.mm_flags))
 		goto fail;
 
+
 	cred = prepare_creds();
 	if (!cred)
 		goto fail;

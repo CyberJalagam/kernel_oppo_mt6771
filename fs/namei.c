@@ -121,6 +121,8 @@
 
 #define EMBEDDED_NAME_MAX	(PATH_MAX - offsetof(struct filename, iname))
 
+
+
 struct filename *
 getname_flags(const char __user *filename, int flags, int *empty)
 {
@@ -2588,8 +2590,8 @@ static int may_delete(struct vfsmount *mnt, struct inode *dir, struct dentry *vi
 	if (d_is_negative(victim))
 		return -ENOENT;
 	BUG_ON(!inode);
-
 	BUG_ON(victim->d_parent->d_inode != dir);
+
 	audit_inode_child(dir, victim, AUDIT_TYPE_CHILD_DELETE);
 
 	error = inode_permission2(mnt, dir, MAY_WRITE | MAY_EXEC);

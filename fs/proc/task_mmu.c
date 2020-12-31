@@ -1438,6 +1438,7 @@ const struct file_operations proc_pagemap_operations = {
 };
 #endif /* CONFIG_PROC_PAGE_MONITOR */
 
+
 #ifdef CONFIG_NUMA
 
 struct numa_maps {

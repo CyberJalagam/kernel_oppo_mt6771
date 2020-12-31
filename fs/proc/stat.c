@@ -12,6 +12,7 @@
 #include <linux/cputime.h>
 #include <linux/tick.h>
 
+
 #ifndef arch_irq_stat_cpu
 #define arch_irq_stat_cpu(cpu) 0
 #endif
@@ -205,6 +206,7 @@ static const struct file_operations proc_stat_operations = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+
 
 static int __init proc_stat_init(void)
 {
