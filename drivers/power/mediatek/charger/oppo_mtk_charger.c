@@ -10,7 +10,7 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
 */
-
+ 
 /*
  *
  * Filename:
@@ -756,7 +756,6 @@ int charger_enable_vbus_ovp(struct charger_manager *pinfo, bool enable)
 bool is_typec_adapter(struct charger_manager *info)
 {
 	if (info->pd_type == PD_CONNECT_TYPEC_ONLY_SNK &&
-			tcpm_inquire_typec_remote_rp_curr(info->tcpc) != 500 &&
 			info->chr_type != STANDARD_HOST &&
 			info->chr_type != CHARGING_HOST &&
 			mtk_pe20_get_is_connect(info) == false &&
@@ -1090,6 +1089,22 @@ int charger_manager_notifier(struct charger_manager *info, int event)
 {
 	return srcu_notifier_call_chain(&info->evt_nh, event, NULL);
 }
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/15, Add for charger full status */
+int notify_battery_full(void)
+{
+	printk("notify_battery_full_is_ok\n");
+	if (pinfo == NULL) {
+		return 0;
+	} else {
+		if (charger_manager_notifier(pinfo, CHARGER_NOTIFY_EOC)) {
+		return 1;
+		} else {
+		return 0;
+		}
+	}
+}
+#endif /* VENDOR_EDIT */
 
 int charger_psy_event(struct notifier_block *nb, unsigned long event, void *v)
 {
@@ -1117,6 +1132,8 @@ int charger_psy_event(struct notifier_block *nb, unsigned long event, void *v)
 
 void mtk_charger_int_handler(void)
 {
+	chr_err("mtk_charger_int_handler\n");
+
 	if (pinfo == NULL) {
 		chr_err("charger is not rdy ,skip1\n");
 		return;
@@ -1126,6 +1143,7 @@ void mtk_charger_int_handler(void)
 		chr_err("charger is not rdy ,skip2\n");
 		return;
 	}
+	chr_err("wake_up_charger\n");
 	_wake_up_charger(pinfo);
 }
 
@@ -1482,8 +1500,9 @@ void mtk_charger_stop_timer(struct charger_manager *info)
 static int charger_routine_thread(void *arg)
 {
 	struct charger_manager *info = arg;
+	static int i;
 	unsigned long flags;
-	bool is_charger_on;
+	bool curr_sign, is_charger_on;
 	int bat_current, chg_current;
 
 	while (1) {
@@ -1496,10 +1515,13 @@ static int charger_routine_thread(void *arg)
 		spin_unlock_irqrestore(&info->slock, flags);
 
 		info->charger_thread_timeout = false;
+		i++;
+		curr_sign = battery_get_bat_current_sign();
 		bat_current = battery_get_bat_current();
 		chg_current = pmic_get_charging_current();
 		chr_err("Vbat=%d,Ibat=%d,I=%d,VChr=%d,T=%d,Soc=%d:%d,CT:%d:%d hv:%d pd:%d:%d\n",
-			battery_get_bat_voltage(), bat_current, chg_current,
+			battery_get_bat_voltage(),
+			curr_sign ? bat_current : -1 * bat_current, chg_current,
 			battery_get_vbus(), battery_get_bat_temperature(),
 			battery_get_bat_soc(), battery_get_bat_uisoc(),
 			mt_get_charger_type(), info->chr_type, info->enable_hv_charging,
@@ -2537,7 +2559,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	struct list_head *phead = &consumer_head;
 	struct charger_consumer *ptr;
 	int ret;
-
+    return 0;
 	chr_err("%s: starts\n", __func__);
 
 	info = devm_kzalloc(&pdev->dev, sizeof(struct charger_manager), GFP_KERNEL);
@@ -2578,10 +2600,11 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		register_charger_device_notifier(info->chg1_dev, &info->chg1_nb);
 		charger_dev_set_drvdata(info->chg1_dev, info);
 	}
-
-	info->psy_nb.notifier_call = charger_psy_event;
-	power_supply_reg_notifier(&info->psy_nb);
-
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/01/12, add for fast chargering.
+	//info->psy_nb.notifier_call = charger_psy_event;
+	//power_supply_reg_notifier(&info->psy_nb);
+#endif
 	srcu_init_notifier_head(&info->evt_nh);
 	ret = mtk_charger_setup_files(pdev);
 	if (ret)
@@ -2622,7 +2645,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	mutex_unlock(&consumer_mutex);
 	info->chg1_consumer = charger_manager_get_by_name(&pdev->dev, "charger_port1");
 	info->init_done = true;
-	_wake_up_charger(info);
+	//_wake_up_charger(info);
 
 	return 0;
 }
@@ -2635,7 +2658,10 @@ static int mtk_charger_remove(struct platform_device *dev)
 static void mtk_charger_shutdown(struct platform_device *dev)
 {
 	struct charger_manager *info = platform_get_drvdata(dev);
-
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.CHG.Basic, 2018/8/9,  Add for charging*/
+    return;
+#endif
 	if (mtk_pe20_get_is_connect(info) || mtk_pe_get_is_connect(info)) {
 		if (info->chg2_dev)
 			charger_dev_enable(info->chg2_dev, false);
@@ -2665,6 +2691,7 @@ static struct platform_driver charger_driver = {
 		   .of_match_table = mtk_charger_of_match,
 		   },
 };
+
 
 static int __init mtk_charger_init(void)
 {

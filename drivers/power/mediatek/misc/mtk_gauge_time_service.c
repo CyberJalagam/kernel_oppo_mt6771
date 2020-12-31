@@ -356,7 +356,10 @@ enum hrtimer_restart gtimer_kthread_hrtimer_func(struct hrtimer *timer)
 	wake_up_gtimer();
 	return HRTIMER_NORESTART;
 }
-
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/14, customize Ti fuelgauge  time case:ALPS03515995
+extern int oppo_is_vooc_project(void);
+#endif /*VENDOR_EDIT*/
 signed int get_dynamic_period(
 	int first_use, int first_wakeup_time, int battery_capacity_level)
 {
@@ -364,7 +367,13 @@ signed int get_dynamic_period(
 	struct list_head *pos = gtimer_head.next;
 	struct gtimer *ptr;
 	signed int sec = 4800;
-
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/14, customize Ti fuelgauge  time case:ALPS03515995
+	if (oppo_is_vooc_project() == 1) {
+		pr_err("%s,vooc_project,return 36hours.\n",__func__);
+		return 36 * 3600;
+	}
+#endif
 	pos = gtimer_head.next;
 	if (list_empty(pos) != true) {
 		ptr = container_of(pos, struct gtimer, list);

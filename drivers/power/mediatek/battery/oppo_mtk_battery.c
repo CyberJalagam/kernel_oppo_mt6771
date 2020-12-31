@@ -10,7 +10,7 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
 */
-
+ 
 /*****************************************************************************
  *
  * Filename:
@@ -67,6 +67,24 @@
 #include <mtk_gauge_time_service.h>
 #include <mt-plat/upmu_common.h>
 #include <pmic_lbat_service.h>
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.CHG.basic, 2017/07/20, Add for charger */
+#include <soc/oppo/device_info.h>
+#include <soc/oppo/oppo_project.h>
+#include <linux/gpio.h>
+#include "../../oppo/oppo_gauge.h"
+extern bool is_vooc_project(void);
+
+#endif  /*VENDOR_EDIT*/
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/08, Add for charger */
+int fgauge_is_start = 0;
+#endif /* VENDOR_EDIT */
+#ifdef VENDOR_EDIT
+//PengNan@BSP.CHG.basic,2017/07/27, customizing the battery NTC,modify the resistor.
+#define RBAT_PULL_DOWN_R 24000
+#endif /*VENDOR_EDIT*/
+
 
 
 
@@ -93,7 +111,20 @@
 #define Set_BAT_DISABLE_NAFG _IOW('k', 14, int)
 #define Set_CARTUNE_TO_KERNEL _IOW('k', 15, int)
 /* add for meta tool----------------------------------------- */
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/08, Add for charger */
+#define Get_FakeOff_Param _IOW('k', 7, int)
+#define Turn_Off_Charging _IOW('k', 9, int)
+extern int oppo_chg_get_ui_soc(void);
+extern int oppo_chg_get_notify_flag(void);
+extern int oppo_chg_show_vooc_logo_ornot(void);
+extern bool pmic_chrdet_status(void);
+extern int oppo_get_prop_status(void);
+extern bool oppo_chg_check_chip_is_null(void);
+extern signed int battery_get_bat_voltage(void);
 
+
+#endif
 static struct class *adc_cali_class;
 static int adc_cali_major;
 static dev_t adc_cali_devno;
@@ -109,22 +140,20 @@ static int adc_cali_cal[1] = { 0 };
 static int battery_in_data[1] = { 0 };
 static int battery_out_data[1] = { 0 };
 static bool g_ADC_Cali;
-
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/17, Remove for charge driver */
 static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
-	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_TEMP,
 };
-
+#endif
 /* weak function */
 int __attribute__ ((weak))
 	do_ptim_gauge(
@@ -178,6 +207,7 @@ int __attribute__ ((weak))
 }
 
 /* weak function end */
+
 
 bool is_battery_init_done(void)
 {
@@ -335,7 +365,8 @@ void battery_update_psd(struct battery_data *bat_data)
 	bat_data->BAT_batt_vol = battery_get_bat_voltage();
 	bat_data->BAT_batt_temp = battery_get_bat_temperature();
 }
-
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/17, Remove for charge driver */
 static int battery_get_property(struct power_supply *psy,
 	enum power_supply_property psp,
 	union power_supply_propval *val)
@@ -360,9 +391,6 @@ static int battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = data->BAT_TECHNOLOGY;
 		break;
-	case POWER_SUPPLY_PROP_CYCLE_COUNT:
-		val->intval = gm.bat_cycle;
-		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		if (gm.fixed_uisoc != 0xffff)
 			val->intval = gm.fixed_uisoc;
@@ -376,18 +404,9 @@ static int battery_get_property(struct power_supply *psy,
 
 		val->intval = fgcurrent * 100;
 		break;
-	case POWER_SUPPLY_PROP_CURRENT_AVG:
-		val->intval = battery_get_bat_avg_current() * 100;
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_FULL:
-		val->intval =
-			fg_table_cust_data.fg_profile[gm.battery_id].q_max
-			* 1000;
-		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-		val->intval = gm.ui_soc *
-			fg_table_cust_data.fg_profile[gm.battery_id].q_max
-			* 1000 / 100;
+		val->intval = gm.soc;
+		/* using soc as charge_counter */
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = data->BAT_batt_vol * 1000;
@@ -452,6 +471,7 @@ void battery_update(struct battery_data *bat_data)
 
 	power_supply_changed(bat_psy);
 }
+#endif /* VENDOR_EDIT */
 
 bool is_kernel_power_off_charging(void)
 {
@@ -524,8 +544,6 @@ static void proc_dump_dtsi(struct seq_file *m)
 		fg_cust_data.pmic_shutdown_current);
 	seq_printf(m, "FG_METER_RESISTANCE = %d\n",
 		fg_cust_data.fg_meter_resistance);
-	seq_printf(m, "COM_FG_METER_RESISTANCE = %d\n",
-		fg_cust_data.com_fg_meter_resistance);
 	seq_printf(m, "CAR_TUNE_VALUE = %d\n", fg_cust_data.car_tune_value);
 
 	seq_printf(m, "pl_two_sec_reboot = %d\n", gm.pl_two_sec_reboot);
@@ -703,8 +721,6 @@ static int proc_dump_log_show(struct seq_file *m, void *v)
 	seq_puts(m, "102: kernel table\n");
 	seq_puts(m, "103: send CHR FULL\n");
 	seq_puts(m, "104: disable NAFG interrupt\n");
-	seq_puts(m, "105: show daemon pid\n");
-
 	seq_printf(m, "current command:%d\n", gm.proc_cmd_id);
 
 	switch (gm.proc_cmd_id) {
@@ -737,9 +753,6 @@ static int proc_dump_log_show(struct seq_file *m, void *v)
 	case 104:
 		gauge_set_nag_en(false);
 		gm.disable_nafg_int = true;
-		break;
-	case 105:
-		seq_printf(m, "Gauge daemon pid:%d\n", gm.g_fgd_pid);
 		break;
 	default:
 		seq_printf(m, "do not support command:%d\n", gm.proc_cmd_id);
@@ -778,8 +791,7 @@ static ssize_t proc_write(
 		return -EFAULT;
 	}
 
-	bm_err("%s success %d\n",
-		__func__, cmd);
+	bm_err("proc_write success %d\n", cmd);
 	return count;
 }
 
@@ -814,9 +826,12 @@ static ssize_t show_Battery_Temperature(
 	struct device *dev, struct device_attribute *attr,
 					       char *buf)
 {
-	bm_err("%s: %d %d\n",
-		__func__,
+#ifndef VENDOR_EDIT
+    /* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/17, Remove for charge driver */
+	bm_err("show_Battery_Temperature: %d %d\n",
 		battery_main.BAT_batt_temp, gm.fixed_bat_tmp);
+#endif /* VENDOR_EDIT */
+
 	return sprintf(buf, "%d\n", gm.fixed_bat_tmp);
 }
 
@@ -839,14 +854,17 @@ static ssize_t store_Battery_Temperature(
 			wakeup_fg_algo(FG_INTR_BAT_TMP_C_HT);
 			wakeup_fg_algo(FG_INTR_BAT_TMP_HT);
 		}
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
+
 		battery_main.BAT_batt_temp = force_get_tbat(true);
 		bm_err(
-			"%s: fixed_bat_tmp:%d ,tmp:%d!\n",
-			__func__,
+			"store_Battery_Temperature: fixed_bat_tmp:%d ,tmp:%d!\n",
 			temp, battery_main.BAT_batt_temp);
 		battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
 	} else {
-		bm_err("%s: format error!\n", __func__);
+		bm_err("store_Battery_Temperature: format error!\n");
 	}
 	return size;
 }
@@ -858,8 +876,7 @@ static ssize_t show_UI_SOC(
 	struct device *dev, struct device_attribute *attr,
 					       char *buf)
 {
-	bm_err("%s: %d %d\n",
-		__func__,
+	bm_err("show_UI_SOC: %d %d\n",
 		gm.ui_soc, gm.fixed_uisoc);
 	return sprintf(buf, "%d\n", gm.fixed_uisoc);
 }
@@ -874,11 +891,12 @@ static ssize_t store_UI_SOC(
 
 		gm.fixed_uisoc = temp;
 
-		bm_err("%s: %d %d\n",
-			__func__,
+		bm_err("store_UI_SOC: %d %d\n",
 			gm.ui_soc, gm.fixed_uisoc);
-
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 		battery_update(&battery_main);
+#endif
 	}
 
 	return size;
@@ -960,8 +978,7 @@ unsigned int TempConverBattThermistor(int temp)
 	}
 
 	bm_warn(
-		"[%s] [%d] %d %d %d %d %d\n",
-		__func__,
+		"[TempConverBattThermistor] [%d] %d %d %d %d %d\n",
 		TBatt_R_Value, TMP1,
 		RES1, TMP2, RES2, temp);
 
@@ -976,13 +993,13 @@ int BattThermistorConverTemp(int Res)
 
 	if (Res >= Fg_Temperature_Table[0].TemperatureR) {
 		TBatt_Value = -40;
-	} else if (Res <= Fg_Temperature_Table[20].TemperatureR) {
-		TBatt_Value = 60;
+	} else if (Res <= Fg_Temperature_Table[26].TemperatureR) {
+		TBatt_Value = 90;
 	} else {
 		RES1 = Fg_Temperature_Table[0].TemperatureR;
 		TMP1 = Fg_Temperature_Table[0].BatteryTemp;
 
-		for (i = 0; i <= 20; i++) {
+		for (i = 0; i <= 26; i++) {
 			if (Res >= Fg_Temperature_Table[i].TemperatureR) {
 				RES2 = Fg_Temperature_Table[i].TemperatureR;
 				TMP2 = Fg_Temperature_Table[i].BatteryTemp;
@@ -998,8 +1015,7 @@ int BattThermistorConverTemp(int Res)
 			((RES1 - Res) * TMP2)) / (RES1 - RES2);
 	}
 	bm_trace(
-		"[%s] %d %d %d %d %d %d\n",
-		__func__,
+		"[BattThermistorConverTemp] %d %d %d %d %d %d\n",
 		RES1, RES2, Res, TMP1,
 		TMP2, TBatt_Value);
 
@@ -1015,11 +1031,11 @@ unsigned int TempToBattVolt(int temp, int update)
 	int vbif28 = gm.rbat.rbat_pull_up_volt;
 	static int fg_current_temp;
 	static bool fg_current_state;
-	int fg_r_value = fg_cust_data.com_r_fg_value;
+	int fg_r_value = fg_cust_data.r_fg_value;
 	int fg_meter_res_value = 0;
 
 	if (NO_BAT_TEMP_COMPENSATE == 0)
-		fg_meter_res_value = fg_cust_data.com_fg_meter_resistance;
+		fg_meter_res_value = fg_cust_data.fg_meter_resistance;
 	else
 		fg_meter_res_value = 0;
 
@@ -1049,8 +1065,7 @@ unsigned int TempToBattVolt(int temp, int update)
 			(fg_meter_res_value + fg_r_value)) / 10000);
 	}
 
-	bm_notice("[%s] temp %d R_NTC %d V(%lld %lld) I %d CHG %d\n",
-		__func__,
+	bm_notice("[TempToBattVolt] temp %d R_NTC %d V(%lld %lld) I %d CHG %d\n",
 		temp, R_NTC, Vin, V_IR_comp, fg_current_temp, fg_current_state);
 
 	return (unsigned int) V_IR_comp;
@@ -1115,8 +1130,7 @@ int BattVoltToTemp(int dwVolt, int volt_cali)
 		gm.rbat.bif_ntc_r);
 
 	bm_notice(
-		"[%s] %d %d %d %d\n",
-		__func__,
+		"[BattVoltToTemp] %d %d %d %d\n",
 		dwVolt, gm.rbat.rbat_pull_up_r,
 		vbif28, volt_cali);
 	return sBaTTMP;
@@ -1157,10 +1171,10 @@ int force_get_tbat_internal(bool update)
 		bat_temperature_volt = pmic_get_v_bat_temp();
 
 		if (bat_temperature_volt != 0) {
-			fg_r_value = fg_cust_data.com_r_fg_value;
+			fg_r_value = fg_cust_data.r_fg_value;
 			if (NO_BAT_TEMP_COMPENSATE == 0)
 				fg_meter_res_value =
-					fg_cust_data.com_fg_meter_resistance;
+					fg_cust_data.fg_meter_resistance;
 			else
 				fg_meter_res_value = 0;
 
@@ -1239,7 +1253,12 @@ int force_get_tbat_internal(bool update)
 					pre_fg_r_value,
 					pre_bat_temperature_val2);
 				/*pmic_auxadc_debug(1);*/
+#ifndef VENDOR_EDIT
+/* Fuchun.Liao@BSP.CHG.Basic 2018/01/20 modify to reduce log */
+
 				WARN_ON(1);
+#endif /* VENDOR_EDIT */
+
 			}
 
 			pre_bat_temperature_volt_temp =
@@ -1271,24 +1290,22 @@ int force_get_tbat(bool update)
 {
 	int bat_temperature_val = 0;
 	int counts = 0;
+    int fgv;
 
 	if (is_fg_disabled()) {
-		bm_debug("[%s] fixed TBAT=25 t\n",
-			__func__);
+		bm_debug("[force_get_tbat] fixed TBAT=25 t\n");
 		return 25;
 	}
 
 #if defined(FIXED_TBAT_25)
-	bm_debug("[%s] fixed TBAT=25 t\n",
-	__func__);
+	bm_debug("[force_get_tbat] fixed TBAT=25 t\n");
 	return 25;
 #else
 
 	bat_temperature_val = force_get_tbat_internal(update);
 
 	while (counts < 5 && bat_temperature_val >= 60) {
-		bm_err("[%s]over60 count=%d, bat_temp=%d\n",
-			__func__,
+		bm_err("[force_get_tbat]over60 count=%d, bat_temp=%d\n",
 			counts, bat_temperature_val);
 		bat_temperature_val = force_get_tbat_internal(true);
 		counts++;
@@ -1300,13 +1317,16 @@ int force_get_tbat(bool update)
 			"battery temperature is too low %d and disable GM3.0\n",
 			bat_temperature_val);
 		disable_fg();
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/17, Remove for charge driver */
 		if (gm.disableGM30 == true)
 			battery_main.BAT_CAPACITY = 50;
 		battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
+
 	}
 
 	if (bat_temperature_val <= BATTERY_TMP_TO_DISABLE_NAFG) {
-		int fgv;
 
 		fgv = gauge_get_hw_version();
 		if (fgv >= GAUGE_HW_V1000
@@ -1315,12 +1335,17 @@ int force_get_tbat(bool update)
 		}
 
 		gm.ntc_disable_nafg = true;
-		bm_err("[%s] ntc_disable_nafg %d %d\n",
-			__func__,
+		bm_err("[force_get_tbat] ntc_disable_nafg %d %d\n",
 			bat_temperature_val,
 			DEFAULT_BATTERY_TMP_WHEN_DISABLE_NAFG);
 
+#ifndef VENDOR_EDIT
+		/* tongfeng.huang@EXP.BSP.CHG.basic, 2018/01/25, do not return 25 when disconnect ntc pin */
 		return DEFAULT_BATTERY_TMP_WHEN_DISABLE_NAFG;
+#else
+		return bat_temperature_val;
+#endif
+
 	}
 
 	gm.ntc_disable_nafg = false;
@@ -1418,19 +1443,7 @@ static void nl_data_handler(struct sk_buff *skb)
 
 	size = fgd_msg->fgd_ret_data_len + FGD_NL_MSG_T_HDR_LEN;
 
-	if (size > (PAGE_SIZE << 1))
-		fgd_ret_msg = vmalloc(size);
-	else
-		fgd_ret_msg = kmalloc(size, GFP_KERNEL);
-
-	if (fgd_ret_msg == NULL) {
-		if (size > PAGE_SIZE)
-			fgd_ret_msg = vmalloc(size);
-
-		if (fgd_ret_msg == NULL)
-			return;
-	}
-
+	fgd_ret_msg = vmalloc(size);
 	if (!fgd_ret_msg)
 		return;
 
@@ -1439,7 +1452,7 @@ static void nl_data_handler(struct sk_buff *skb)
 	bmd_ctrl_cmd_from_user(data, fgd_ret_msg);
 	nl_send_to_user(pid, seq, fgd_ret_msg);
 
-	kvfree(fgd_ret_msg);
+	vfree(fgd_ret_msg);
 }
 
 int wakeup_fg_algo(unsigned int flow_state)
@@ -1462,35 +1475,20 @@ int wakeup_fg_algo(unsigned int flow_state)
 		struct fgd_nl_msg_t *fgd_msg;
 		int size = FGD_NL_MSG_T_HDR_LEN + sizeof(flow_state);
 
-		if (size > (PAGE_SIZE << 1))
-			fgd_msg = vmalloc(size);
-		else
-			fgd_msg = kmalloc(size, GFP_KERNEL);
-
-		if (fgd_msg == NULL) {
-			if (size > PAGE_SIZE)
-				fgd_msg = vmalloc(size);
-
-			if (fgd_msg == NULL)
-				return -1;
-		}
-
+		fgd_msg = vmalloc(size);
 		if (!fgd_msg) {
 /* bm_err("Error: wakeup_fg_algo() vmalloc fail!!!\n"); */
 			return -1;
 		}
 
-		bm_debug("[%s] malloc size=%d pid=%d cmd:%d\n",
-			__func__,
+		bm_debug("[wakeup_fg_algo] malloc size=%d pid=%d cmd:%d\n",
 			size, gm.g_fgd_pid, flow_state);
 		memset(fgd_msg, 0, size);
 		fgd_msg->fgd_cmd = FG_DAEMON_CMD_NOTIFY_DAEMON;
 		memcpy(fgd_msg->fgd_data, &flow_state, sizeof(flow_state));
 		fgd_msg->fgd_data_len += sizeof(flow_state);
 		nl_send_to_user(gm.g_fgd_pid, 0, fgd_msg);
-
-		kvfree(fgd_msg);
-
+		vfree(fgd_msg);
 		return 0;
 	} else {
 		return -1;
@@ -1517,19 +1515,7 @@ int wakeup_fg_algo_cmd(unsigned int flow_state, int cmd, int para1)
 		struct fgd_nl_msg_t *fgd_msg;
 		int size = FGD_NL_MSG_T_HDR_LEN + sizeof(flow_state);
 
-		if (size > (PAGE_SIZE << 1))
-			fgd_msg = vmalloc(size);
-		else
-			fgd_msg = kmalloc(size, GFP_KERNEL);
-
-		if (fgd_msg == NULL) {
-			if (size > PAGE_SIZE)
-				fgd_msg = vmalloc(size);
-
-			if (fgd_msg == NULL)
-				return -1;
-		}
-
+		fgd_msg = vmalloc(size);
 		if (!fgd_msg) {
 /* bm_err("Error: wakeup_fg_algo() vmalloc fail!!!\n"); */
 			return -1;
@@ -1545,9 +1531,7 @@ int wakeup_fg_algo_cmd(unsigned int flow_state, int cmd, int para1)
 		memcpy(fgd_msg->fgd_data, &flow_state, sizeof(flow_state));
 		fgd_msg->fgd_data_len += sizeof(flow_state);
 		nl_send_to_user(gm.g_fgd_pid, 0, fgd_msg);
-
-		kvfree(fgd_msg);
-
+		vfree(fgd_msg);
 		return 0;
 	} else {
 		return -1;
@@ -1598,7 +1582,13 @@ int wakeup_fg_algo_atomic(unsigned int flow_state)
 
 int fg_get_battery_temperature_for_zcv(void)
 {
+#ifndef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 	return battery_main.BAT_batt_temp;
+#else /* VENDOR_EDIT */
+	return  25;
+#endif /* VENDOR_EDIT */
+
 }
 
 int battery_get_charger_zcv(void)
@@ -1619,8 +1609,7 @@ void fg_ocv_query_soc(int ocv)
 		FG_INTR_KERNEL_CMD, FG_KERNEL_CMD_REQ_ALGO_DATA,
 		ocv);
 
-	bm_trace("[%s] ocv:%d\n",
-		__func__, ocv);
+	bm_trace("[fg_ocv_query_soc] ocv:%d\n", ocv);
 }
 
 void exec_BAT_EC(int cmd, int param)
@@ -1907,9 +1896,9 @@ void exec_BAT_EC(int cmd, int param)
 		break;
 	case 708:
 		{
-			fg_cust_data.com_fg_meter_resistance = param;
+			fg_cust_data.fg_meter_resistance = param;
 			bm_err(
-				"exe_BAT_EC cmd %d, param %d, com_fg_meter_resistance\n",
+				"exe_BAT_EC cmd %d, param %d, fg_meter_resistance\n",
 				cmd, param);
 		}
 		break;
@@ -2521,15 +2510,7 @@ void exec_BAT_EC(int cmd, int param)
 				cmd, param);
 		}
 		break;
-	case 788:
-		{
-			fg_cust_data.record_log = param;
 
-			bm_err(
-				"exe_BAT_EC cmd %d,record_log=%d\n",
-				cmd, fg_cust_data.record_log);
-		}
-		break;
 
 	default:
 		bm_err(
@@ -2553,9 +2534,13 @@ static ssize_t store_FG_daemon_disable(
 {
 	bm_err("[disable FG daemon]\n");
 	disable_fg();
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 	if (gm.disableGM30 == true)
 		battery_main.BAT_CAPACITY = 50;
 	battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
+
 	return size;
 }
 static DEVICE_ATTR(
@@ -2566,9 +2551,9 @@ static ssize_t show_FG_meter_resistance(
 	struct device *dev, struct device_attribute *attr, char *buf)
 {
 	bm_trace(
-		"[FG] show com_fg_meter_resistance : %d\n",
-		fg_cust_data.com_fg_meter_resistance);
-	return sprintf(buf, "%d\n", fg_cust_data.com_fg_meter_resistance);
+		"[FG] show fg_meter_resistance : %d\n",
+		fg_cust_data.fg_meter_resistance);
+	return sprintf(buf, "%d\n", fg_cust_data.fg_meter_resistance);
 }
 
 static ssize_t store_FG_meter_resistance(
@@ -2578,24 +2563,21 @@ static ssize_t store_FG_meter_resistance(
 	unsigned long val = 0;
 	int ret;
 
-	bm_err("[%s]\n", __func__);
+	bm_err("[store_FG_meter_resistance]\n");
 
 	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n",
-			__func__, buf);
+		bm_err("[store_FG_meter_resistance] buf is %s\n", buf);
 		ret = kstrtoul(buf, 10, &val);
 		if (val < 0) {
 			bm_err(
-				"[%s] val is %d ??\n",
-				__func__,
+				"[store_FG_meter_resistance] val is %d ??\n",
 				(int)val);
 			val = 0;
 		} else
-			fg_cust_data.com_fg_meter_resistance = val;
+			fg_cust_data.fg_meter_resistance = val;
 
 		bm_err(
-			"[%s] com FG_meter_resistance = %d\n",
-			__func__,
+			"[store_FG_meter_resistance] FG_meter_resistance = %d\n",
 			(int)val);
 	}
 
@@ -2620,16 +2602,14 @@ static ssize_t store_FG_nafg_disable(
 	unsigned long val = 0;
 	int ret;
 
-	bm_err("[%s]\n", __func__);
+	bm_err("[store_FG_nafg_disable]\n");
 
 	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n",
-			__func__, buf);
+		bm_err("[store_FG_nafg_disable] buf is %s\n", buf);
 		ret = kstrtoul(buf, 10, &val);
 		if (val < 0) {
 			bm_err(
-				"[%s] val is %d ??\n",
-				__func__,
+				"[store_FG_nafg_disable] val is %d ??\n",
 				(int)val);
 			val = 0;
 		}
@@ -2643,8 +2623,7 @@ static ssize_t store_FG_nafg_disable(
 			FG_INTR_KERNEL_CMD, FG_KERNEL_CMD_DISABLE_NAFG, val);
 
 		bm_err(
-			"[%s] FG_nafg_disable = %d\n",
-			__func__,
+			"[store_FG_nafg_disable] FG_nafg_disable = %d\n",
 			(int)val);
 	}
 
@@ -2655,65 +2634,10 @@ static DEVICE_ATTR(
 	disable_nafg, 0664,
 	show_FG_nafg_disable, store_FG_nafg_disable);
 
-static ssize_t show_FG_ntc_disable_nafg(
-	struct device *dev, struct device_attribute *attr, char *buf)
-{
-	bm_trace("[FG]%s: %d\n", __func__, gm.ntc_disable_nafg);
-	return sprintf(buf, "%d\n", gm.ntc_disable_nafg);
-}
-
-static ssize_t store_FG_ntc_disable_nafg(
-	struct device *dev, struct device_attribute *attr,
-					const char *buf, size_t size)
-{
-	unsigned long val = 0;
-	int ret;
-
-	bm_err("[%s]\n",  __func__);
-
-	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n", __func__, buf);
-		ret = kstrtoul(buf, 10, &val);
-		if (val < 0) {
-			bm_err(
-				"[%s] val is %d ??\n",  __func__,
-				(int)val);
-			val = 0;
-		}
-
-		if (val == 0) {
-			gm.ntc_disable_nafg = false;
-			get_ec()->fixed_temp_en = 0;
-			get_ec()->fixed_temp_value = 25;
-		} else if (val == 1) {
-			get_ec()->fixed_temp_en = 1;
-			get_ec()->fixed_temp_value =
-				BATTERY_TMP_TO_DISABLE_NAFG;
-			gm.ntc_disable_nafg = true;
-			wakeup_fg_algo(FG_INTR_NAG_C_DLTV);
-		}
-
-		bm_err(
-			"[%s]val=%d, temp:%d %d, %d\n",
-			 __func__,
-			(int)val,
-			get_ec()->fixed_temp_en,
-			get_ec()->fixed_temp_value,
-			gm.ntc_disable_nafg);
-	}
-
-	return size;
-}
-static DEVICE_ATTR(
-	ntc_disable_nafg, 0664,
-	show_FG_ntc_disable_nafg, store_FG_ntc_disable_nafg);
-
-
 static ssize_t show_uisoc_update_type(
 	struct device *dev, struct device_attribute *attr, char *buf)
 {
-	bm_trace("[FG] %s : %d\n",
-		__func__,
+	bm_trace("[FG] show_uisoc_update_type : %d\n",
 		fg_cust_data.uisoc_update_type);
 	return sprintf(buf, "%d\n", fg_cust_data.uisoc_update_type);
 }
@@ -2725,16 +2649,14 @@ static ssize_t store_uisoc_update_type(
 	unsigned long val = 0;
 	int ret;
 
-	bm_err("[%s]\n", __func__);
+	bm_err("[store_uisoc_update_type]\n");
 
 	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n",
-			__func__, buf);
+		bm_err("[store_uisoc_update_type] buf is %s\n", buf);
 		ret = kstrtoul(buf, 10, &val);
 		if (val < 0) {
 			bm_err(
-				"[%s] val is %d ??\n",
-				__func__,
+				"[store_uisoc_update_type] val is %d ??\n",
 				(int)val);
 			val = 0;
 		}
@@ -2746,13 +2668,11 @@ static ssize_t store_uisoc_update_type(
 				FG_KERNEL_CMD_UISOC_UPDATE_TYPE,
 				val);
 			bm_err(
-				"[%s] type = %d\n",
-				__func__,
+				"[store_uisoc_update_type] type = %d\n",
 				(int)val);
 		} else
 			bm_err(
-			"[%s] invalid type:%d\n",
-			__func__,
+			"[store_uisoc_update_type] invalid type:%d\n",
 			(int)val);
 	}
 
@@ -2803,7 +2723,6 @@ static ssize_t store_FG_daemon_log_level(
 				val
 			);
 
-			gm.d_log_level = val;
 			gm.log_level = val;
 		}
 		if (val >= 7) {
@@ -2827,8 +2746,7 @@ static ssize_t show_shutdown_cond_enable(
 	struct device *dev, struct device_attribute *attr, char *buf)
 {
 	bm_trace(
-		"[FG] %s : %d\n",
-		__func__,
+		"[FG] show_shutdown_cond_enable : %d\n",
 		get_shutdown_cond_flag());
 	return sprintf(buf, "%d\n", get_shutdown_cond_flag());
 }
@@ -2840,15 +2758,13 @@ static ssize_t store_shutdown_cond_enable(
 	unsigned long val = 0;
 	int ret;
 
-	bm_err("[%s]\n", __func__);
+	bm_err("[store_shutdown_cond_enable]\n");
 	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n",
-			__func__, buf);
+		bm_err("[store_shutdown_cond_enable] buf is %s\n", buf);
 		ret = kstrtoul(buf, 10, &val);
 		if (val < 0) {
 			bm_err(
-				"[%s] val is %d ??\n",
-				__func__,
+				"[store_shutdown_cond_enable] val is %d ??\n",
 				(int)val);
 			val = 0;
 		}
@@ -2856,8 +2772,7 @@ static ssize_t store_shutdown_cond_enable(
 		set_shutdown_cond_flag(val);
 
 		bm_err(
-			"[%s] shutdown_cond_enabled=%d\n",
-			__func__,
+			"[store_shutdown_cond_enable] shutdown_cond_enabled=%d\n",
 			get_shutdown_cond_flag());
 	}
 
@@ -2870,8 +2785,7 @@ static DEVICE_ATTR(
 static ssize_t show_reset_battery_cycle(
 	struct device *dev, struct device_attribute *attr, char *buf)
 {
-	bm_trace("[FG] %s : %d\n",
-		__func__,
+	bm_trace("[FG] show_reset_battery_cycle : %d\n",
 		gm.is_reset_battery_cycle);
 	return sprintf(buf, "%d\n", gm.is_reset_battery_cycle);
 }
@@ -2883,15 +2797,13 @@ static ssize_t store_reset_battery_cycle(
 	unsigned long val = 0;
 	int ret;
 
-	bm_err("[%s]\n", __func__);
+	bm_err("[store_reset_battery_cycle]\n");
 	if (buf != NULL && size != 0) {
-		bm_err("[%s] buf is %s\n",
-			__func__, buf);
+		bm_err("[store_reset_battery_cycle] buf is %s\n", buf);
 		ret = kstrtoul(buf, 10, &val);
 		if (val < 0) {
 			bm_err(
-				"[%s] val is %d ??\n",
-				__func__,
+				"[store_reset_battery_cycle] val is %d ??\n",
 				(int)val);
 			val = 0;
 		}
@@ -2902,8 +2814,7 @@ static ssize_t store_reset_battery_cycle(
 			wakeup_fg_algo(FG_INTR_BAT_CYCLE);
 		}
 		bm_err(
-			"%s=%d\n",
-			__func__,
+			"[store_reset_battery_cycle] store_reset_battery_cycle=%d\n",
 			gm.is_reset_battery_cycle);
 	}
 
@@ -2916,7 +2827,7 @@ static DEVICE_ATTR(
 static ssize_t show_BAT_EC(
 	struct device *dev, struct device_attribute *attr, char *buf)
 {
-	bm_err("%s\n", __func__);
+	bm_err("show_BAT_EC\n");
 
 	return sprintf(buf, "%d:%d\n", gm.BAT_EC_cmd, gm.BAT_EC_param);
 }
@@ -2928,18 +2839,17 @@ static ssize_t store_BAT_EC(
 	int ret1 = 0, ret2 = 0;
 	char cmd_buf[4], param_buf[16];
 
-	bm_err("%s\n", __func__);
+	bm_err("store_BAT_EC\n");
 	cmd_buf[3] = '\0';
 	param_buf[15] = '\0';
 
 	if (size < 4 || size > 20) {
-		bm_err("%s error, size mismatch\n",
-			__func__);
+		bm_err("store_BAT_EC error, size mismatch:%Zu\n", size);
 		return -1;
 	}
 
 	if (buf != NULL && size != 0) {
-		bm_err("buf is %s\n", buf);
+		bm_err("buf is %s and size is %Zu\n", buf, size);
 		cmd_buf[0] = buf[0];
 		cmd_buf[1] = buf[1];
 		cmd_buf[2] = buf[2];
@@ -3043,12 +2953,11 @@ static DEVICE_ATTR(
 	Power_Off_Voltage, 0664,
 	show_Power_Off_Voltage, store_Power_Off_Voltage);
 
-
+#if 1
 static int battery_callback(
 	struct notifier_block *nb, unsigned long event, void *v)
 {
-	bm_err("%s:%ld\n",
-		__func__, event);
+	bm_err("battery_callback:%ld\n", event);
 	switch (event) {
 	case CHARGER_NOTIFY_EOC:
 		{
@@ -3059,33 +2968,46 @@ static int battery_callback(
 	case CHARGER_NOTIFY_START_CHARGING:
 		{
 /* START CHARGING */
-			fg_sw_bat_cycle_accu();
-
+			if (gauge_get_hw_version() >= GAUGE_HW_V1000 &&
+				gauge_get_hw_version() < GAUGE_HW_V2000)
+				fg_sw_bat_cycle_accu();
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 			battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_CHARGING;
 			battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
+
 		}
 		break;
 	case CHARGER_NOTIFY_STOP_CHARGING:
 		{
 /* STOP CHARGING */
-			fg_sw_bat_cycle_accu();
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 			battery_main.BAT_STATUS =
 			POWER_SUPPLY_STATUS_DISCHARGING;
 			battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
 		}
 		break;
 	case CHARGER_NOTIFY_ERROR:
 		{
 /* charging enter error state */
-		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_NOT_CHARGING;
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
+		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_DISCHARGING;
 		battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
 		}
 		break;
 	case CHARGER_NOTIFY_NORMAL:
 		{
 /* charging leave error state */
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/05, Remove for charge driver */
 		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_CHARGING;
 		battery_update(&battery_main);
+#endif /* VENDOR_EDIT */
 
 		}
 		break;
@@ -3098,7 +3020,7 @@ static int battery_callback(
 
 	return NOTIFY_DONE;
 }
-
+#endif
 /********** adc_cdev*******************/
 signed int battery_meter_meta_tool_cali_car_tune(int meta_current)
 {
@@ -3118,11 +3040,9 @@ signed int battery_meter_meta_tool_cali_car_tune(int meta_current)
 static long compat_adc_cali_ioctl(
 struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	bm_notice("%s 32bit IOCTL, cmd=0x%08x\n",
-		__func__, cmd);
+	bm_notice("compat_adc_cali_ioctl 32bit IOCTL, cmd=0x%08x\n", cmd);
 	if (!filp->f_op || !filp->f_op->unlocked_ioctl) {
-		bm_err("%s file has no f_op or no f_op->unlocked_ioctl.\n",
-			__func__);
+		bm_err("compat_adc_cali_ioctl file has no f_op or no f_op->unlocked_ioctl.\n");
 		return -ENOTTY;
 	}
 
@@ -3134,10 +3054,15 @@ struct file *filp, unsigned int cmd, unsigned long arg)
 	case Get_META_BAT_CAR_TUNE_VALUE:
 	case Set_META_BAT_CAR_TUNE_VALUE:
 	case Set_BAT_DISABLE_NAFG:
+#ifdef VENDOR_EDIT
+//huangtongfeng@BSP.CHG.Basic, 2017/12/14, add for kpoc charging param.
+    case Get_FakeOff_Param:
+    case Turn_Off_Charging:
+#endif /*VENDOR_EDIT*/
+
 	case Set_CARTUNE_TO_KERNEL: {
 		bm_notice(
-			"%s send to unlocked_ioctl cmd=0x%08x\n",
-			__func__,
+			"compat_adc_cali_ioctl send to unlocked_ioctl cmd=0x%08x\n",
 			cmd);
 		return filp->f_op->unlocked_ioctl(
 			filp, cmd,
@@ -3145,8 +3070,7 @@ struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 		break;
 	default:
-		bm_err("%s unknown IOCTL: 0x%08x\n",
-			__func__, cmd);
+		bm_err("compat_adc_cali_ioctl unknown IOCTL: 0x%08x\n", cmd);
 		break;
 	}
 
@@ -3165,8 +3089,12 @@ static long adc_cali_ioctl(
 	int adc_out_data[2] = { 1, 1 };
 	int temp_car_tune;
 	int isdisNAFG = 0;
+#ifdef VENDOR_EDIT
+//huangtongfeng@BSP.CHG.Basic, 2017/01/13, add for kpoc charging param.
+    int fakeoff_out_data[5] = {0,0,0,0,0};
+#endif /*VENDOR_EDIT*/
 
-	bm_notice("%s enter\n", __func__);
+	bm_notice("adc_cali_ioctl enter\n");
 
 	mutex_lock(&gm.fg_mutex);
 
@@ -3397,6 +3325,42 @@ static long adc_cali_ioctl(
 		bm_err("**** unlocked_ioctl Set_CARTUNE_TO_KERNEL[%d,%d], ret=%d\n",
 			adc_in_data[0], adc_in_data[1], ret);
 		break;
+#ifdef VENDOR_EDIT
+/************ kpoc_charger *******************/
+//huangtongfeng@BSP.CHG.Basic, 2017/01/13, add for kpoc charging param.
+    case Get_FakeOff_Param:
+        user_data_addr = (int *)arg;
+        fakeoff_out_data[0] = oppo_chg_get_ui_soc();
+        fakeoff_out_data[1] = oppo_chg_get_notify_flag();
+        if(pmic_chrdet_status() == true && oppo_get_prop_status() != 3)
+        {
+            fakeoff_out_data[2] = 1;
+        }
+        else
+        {
+            fakeoff_out_data[2] = 0;
+        }
+        fakeoff_out_data[3] = oppo_chg_show_vooc_logo_ornot();
+#ifdef CONFIG_OPPO_CHARGER_MTK6771
+        if (is_vooc_project()) {
+            fakeoff_out_data[4] = (oppo_chg_check_chip_is_null() == false? 1:0);
+        } else
+#endif /* CONFIG_OPPO_CHARGER_MTK6771 */
+        {
+            if(fgauge_is_start == 1)
+                fakeoff_out_data[4] = 2;
+            else
+                fakeoff_out_data[4] = 0;
+        }
+        
+        ret = copy_to_user(user_data_addr, fakeoff_out_data, 20);
+        bm_err("ioctl : Get_FakeOff_Param:ui_soc:%d, g_NotifyFlag:%d,chr_det:%d,fast_chg = %d\n",fakeoff_out_data[0],fakeoff_out_data[1],fakeoff_out_data[2],fakeoff_out_data[3]);
+        break;
+    case Turn_Off_Charging:
+        bm_err("ioctl : Turn_Off_Charging\n");
+        break;
+#endif /*VEDNOR_EDIT*/
+
 	default:
 		bm_err("**** unlocked_ioctl unknown IOCTL: 0x%08x\n", cmd);
 		g_ADC_Cali = false;
@@ -3441,9 +3405,458 @@ static const struct file_operations adc_cali_fops = {
 	.release = adc_cali_release,
 };
 
+#ifdef VENDOR_EDIT
+
+//PengNan@BSP.CHG.Basic, 2017/09/07, add for compatabling two fuelgauge.
+extern int oppo_gauge_get_batt_current(void);
+extern int oppo_chg_get_soc(void);
+extern int oppo_chg_get_ui_soc(void);
+extern int oppo_gauge_get_batt_temperature(void);
+extern int pmic_get_battery_voltage(void);
+extern int gauge_get_average_current(bool *valid);
+extern bool gauge_get_current(int *bat_current);
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for charge driver */
+int oppo_battery_get_bat_temperature(void)
+{
+#ifdef VENDOR_EDIT
+    //PengNan@BSP.CHG.Basic, 2017/09/07, add for compatabling two fuelgauge.
+    if(is_vooc_project()){
+        return oppo_gauge_get_batt_temperature()/10;
+    }
+#endif /*VENDOR_EDIT*/
+   /* TODO */
+   if (is_battery_init_done()) {
+       return force_get_tbat(true);
+   }
+   else {
+       return -127;
+   }
+
+}
+bool oppo_get_current_status(int *bat_current)
+{
+	*bat_current = oppo_gauge_get_batt_current() * 10;
+	if(*bat_current >= 0){
+		return false;
+	} else 
+		return true;
+}
+
+bool battery_meter_get_battery_current_signed(void)
+{
+    int curr_val;
+
+	if(is_vooc_project()){
+		return oppo_get_current_status(&curr_val);
+	} else {
+		return gauge_get_current(&curr_val);
+	}
+
+}
+
+static int meter_fg_30_get_battery_mvolts(void)
+{
+	int ret = 0;
+
+	ret = battery_get_bat_voltage();
+	return ret;
+}
+
+static int meter_fg_30_get_battery_temperature(void)
+{
+	int ret = 0;
+
+	ret = oppo_battery_get_bat_temperature();
+	return ret * 10;
+}
+
+static int meter_fg_30_get_batt_remaining_capacity(void)
+{
+	return -1;
+}
+/*
+signed int oppo_battery_get_bat_soc(void)
+{
+
+	if(is_vooc_project()){
+		return oppo_chg_get_soc();
+	} else {
+		return gm.soc;
+    }
+
+}
+*/
+static int meter_fg_30_get_battery_soc(void)
+{
+
+    if(is_vooc_project()){
+        return oppo_chg_get_ui_soc();
+    } else {
+        if(gm.init_flag == 1) {
+            return gm.ui_soc;
+        } else {
+            return -1;
+        }
+    }
+
+
+}
+
+static int meter_fg_30_get_average_current(void)
+{
+	int ret = 0;
+	bool volid;
+
+	//ret = gauge_get_average_current(&volid);
+	volid = gauge_get_current(&ret);
+	ret = ret / 10;
+	if (battery_meter_get_battery_current_signed() == 1)
+		ret = 0 - ret;	/* charging */
+
+	return ret;
+}
+
+int meter_fg_30_get_bat_charging_current(void)
+{
+	return meter_fg_30_get_average_current();
+}
+
+static int meter_fg_30_get_battery_fcc(void)
+{
+	return -1;
+}
+
+static int meter_fg_30_get_battery_cc(void)
+{
+	return -1;
+}
+
+static int meter_fg_30_get_battery_soh(void)
+{
+	return -1;
+}
+
+static int meter_fg_30_get_prev_batt_remaining_capacity(void)
+{
+	return -1;
+}
+
+static int meter_fg_30_modify_dod0(void)
+{
+	return -1;
+}
+
+static int meter_fg_30_update_soc_smooth_parameter(void)
+{
+	return -1;
+}
+#endif
+
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/22, Add for charger full status of FG 3.0 */
+bool last_full = false;
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/15, Add for charger full status */
+extern int notify_battery_full(void);
+
+static void meter_fg_30_set_battery_full(bool full)
+{
+	if(last_full != full) {
+		if (full) {
+			if (notify_battery_full()) {
+				//BMT_status.bat_full = true;
+				last_full = full;
+			}
+		} else {
+			//BMT_status.bat_full = false;
+			last_full = full;
+		}
+	}
+}
+#else
+static void meter_fg_30_set_battery_full(bool full)
+{
+		if (full) {
+			BMT_status.bat_full = true;
+		} else {
+			BMT_status.bat_full = false;
+		}
+}
+#endif
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/11/29, Add for charger full status of FG 3.0 */
+int oppo_get_rtc_ui_soc(void)
+{
+	int rtc_ui_soc;
+	if (is_vooc_project())
+		return 0;
+	gauge_dev_get_rtc_ui_soc(gm.gdev, &rtc_ui_soc);
+  	printk("oppo_get_rtc_ui_soc =%d\n",rtc_ui_soc);
+	return rtc_ui_soc;
+}
+int oppo_set_rtc_ui_soc(int value)
+{
+	if (is_vooc_project())
+		return 0;
+	gauge_dev_set_rtc_ui_soc(gm.gdev, value);
+  	printk("oppo_set_rtc_ui_soc =%d\n",value);
+	return value;
+}
+#endif
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic,, 2016/08/25  Add for use lk vbatt */
+int lk_vbatt;
+
+static int oppo_get_lk_vbatt(char *oppo_vbatt_char)
+{
+	sscanf(oppo_vbatt_char, "%d", &lk_vbatt);
+	printk(KERN_ERR "lk_vbatt=%d\n", lk_vbatt);
+
+	return 1;
+}
+__setup("vbatt=", oppo_get_lk_vbatt);
+#endif /*VENDOR_EDIT*/
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.CHG.basic, 2017/07/20, Add for charger */
+extern int IMM_GetOneChannelValue(int dwChannel, int data[4], int* rawdata);
+extern int IMM_IsAdcInitReady(void);
+enum {
+	BAT_TYPE__UNKNOWN,
+	BAT_TYPE__SDI_4350mV, //50mV~290mV
+	BAT_TYPE__SDI_4400mV, //300mV~520mV
+	BAT_TYPE__LG_4350mV, //NO use
+	BAT_TYPE__LG_4400mV, //530mV~780mV
+	BAT_TYPE__ATL_4350mV, //1110mV~1450mV
+	BAT_TYPE__ATL_4400mV, //790mV~1100mV
+	BAT_TYPE__TWS_4400mV,
+};
+#define BAT_ID (3) //AUXIN3
+static int battery_type_check(void)
+{
+	int value = 0;
+	int data[4] = {0};
+	int i = 0;
+	int ret = 0;
+	int ret_value = 0;
+	int times = 5;
+	int channel = BAT_ID;
+	int battery_type = BAT_TYPE__UNKNOWN;
+	if (IMM_IsAdcInitReady() == 0) {
+		printk(KERN_ERR "[battery_type_check]: AUXADC is not ready\n");
+		return 0;
+	}
+	 i = times;
+	 while (i--) {
+	 	printk("IMM_GetOneChannelValue start\n");
+		ret = IMM_GetOneChannelValue(channel, data, &ret_value);
+ 		printk(KERN_ERR "[battery_type_check]: ret = %d,ret_value[%d]\n", ret,ret_value);
+		if (ret == 0) {
+			value += ret_value;
+		} else {
+			 times = times > 1 ? times - 1 : 1;
+			 printk(KERN_ERR "[battery_type_check]: ret[%d], times[%d]\n", ret, times);
+		 }
+	 }
+	value = value * 1500 / 4096;
+	value = value / times;
+	printk(KERN_ERR "[battery_value= %d\n", value);
+	if(!is_vooc_project()){
+		if (value >= 790 && value <= 1100) {
+			battery_type = BAT_TYPE__ATL_4400mV;
+			gm.battery_id = 0;
+			if(is_project(OPPO_17061)){
+				gm.battery_id = 2;
+			}
+		} else if (value >= 300 && value <= 520) {
+			battery_type = BAT_TYPE__SDI_4400mV;
+			gm.battery_id = 1;
+			if(is_project(OPPO_17061)){
+				gm.battery_id = 3;
+			}
+		} else {
+			battery_type = BAT_TYPE__UNKNOWN;
+		}
+	}
+	else {
+		if (value >= 50 && value <= 290) {
+			battery_type = BAT_TYPE__SDI_4350mV;
+			gm.battery_id = 1;
+		}
+		else {
+			battery_type = BAT_TYPE__UNKNOWN;
+			gm.battery_id = 0;
+		}
+	}
+
+	printk(KERN_ERR "[battery_type_check]: adc_value[%d], battery_type[%d],g_fg_battery_id[%d]\n", value, battery_type, gm.battery_id);
+	return battery_type;
+}
+
+#ifdef CONFIG_OPPO_4400MV_BATTERY_SUPPORT
+static bool battery_type_is_4400mv(void)
+{
+	int battery_type = BAT_TYPE__UNKNOWN;
+	int retry_flag = 0;
+try_again:
+	battery_type = battery_type_check();
+	if (battery_type == BAT_TYPE__SDI_4400mV || battery_type == BAT_TYPE__LG_4400mV || battery_type == BAT_TYPE__ATL_4400mV) {
+		return true;
+	} else {
+		if (retry_flag == 0) {
+			retry_flag = 1;
+			goto try_again;
+		}
+		if (is_meta_mode() == true) {
+			return false;
+		} else {
+			return false;
+		}
+	}
+}
+#else
+
+static bool battery_type_is_4350mv(void)
+{
+	int battery_type = BAT_TYPE__UNKNOWN;
+	int retry_flag = 0;
+try_again:
+	battery_type = battery_type_check();
+	if (battery_type == BAT_TYPE__SDI_4350mV || battery_type == BAT_TYPE__ATL_4350mV) {
+		return true;
+	} else {
+		if (retry_flag == 0) {
+			retry_flag = 1;
+			goto try_again;
+		}
+		return false;
+	}
+}
+#endif
+
+bool meter_fg_30_get_battery_authenticate(void)
+{
+    #ifdef CONFIG_OPPO_4400MV_BATTERY_SUPPORT
+	return battery_type_is_4400mv();
+    #else
+	return battery_type_is_4350mv();
+    #endif
+}
+
+static void register_battery_devinfo(void)
+{
+	int ret = 0;
+	char *version;
+	char *manufacture;
+	switch (battery_type_check()) {
+		case BAT_TYPE__SDI_4350mV:
+			version = "4.35v";
+			manufacture = "SDI";
+			break;
+		case BAT_TYPE__SDI_4400mV:
+			version = "4.40v";
+			manufacture = "SDI";
+			break;
+		case BAT_TYPE__LG_4350mV:
+			version = "4.35v";
+			manufacture = "LG";
+			break;
+		case BAT_TYPE__LG_4400mV:
+			version = "4.40v";
+			manufacture = "LG";
+			break;
+		case BAT_TYPE__ATL_4350mV:
+			version = "4.35v";
+			manufacture = "ATL";
+			break;
+		case BAT_TYPE__ATL_4400mV:
+			version = "4.40v";
+			manufacture = "ATL";
+			break;
+		default:
+			version = "unknown";
+			manufacture = "UNKNOWN";
+			break;
+	}
+	ret = register_device_proc("battery", version, manufacture);
+	if (ret)
+		pr_err("register_battery_devinfo fail\n");
+}
+#endif  /*VENDOR_EDIT*/
+
+static int average_current_fg_30 = 0;
+static void get_average_current(struct work_struct *work);
+static struct workqueue_struct *average_current_wq = NULL;
+static DECLARE_DELAYED_WORK(get_average_current_wk, get_average_current);
+static void get_average_current(struct work_struct *work)
+{
+	int i = 0;
+	int delay_time = 0;
+	int fg_current_avg = 0;
+	int fg_current_temp = 0;
+	bool valid = false;
+
+	average_current_fg_30 = battery_meter_get_battery_current();
+	delay_time = 5;
+
+	if (battery_meter_get_battery_current_signed() == 1) {
+		for (i = 0; i < 25; i++) {
+			fg_current_temp = gauge_get_average_current(&valid);
+			fg_current_avg = fg_current_avg + fg_current_temp;
+			msleep(20);
+		}
+		if (i != 0)
+			fg_current_avg = fg_current_avg / i;
+		average_current_fg_30 = fg_current_avg;
+		delay_time = 3;
+	}
+
+	queue_delayed_work(average_current_wq,
+						&get_average_current_wk,
+						msecs_to_jiffies(delay_time * 1000));
+}
+
+static struct oppo_gauge_operations battery_meter_fg_30_gauge = {
+	.get_battery_mvolts			= meter_fg_30_get_battery_mvolts,
+	.get_battery_temperature		= meter_fg_30_get_battery_temperature,
+	.get_batt_remaining_capacity	= meter_fg_30_get_batt_remaining_capacity,
+	.get_battery_soc				= meter_fg_30_get_battery_soc,
+	.get_average_current			= meter_fg_30_get_average_current,
+	.get_battery_fcc				= meter_fg_30_get_battery_fcc,
+	.get_battery_cc				= meter_fg_30_get_battery_cc,
+	.get_battery_soh				= meter_fg_30_get_battery_soh,
+	.get_battery_authenticate		= meter_fg_30_get_battery_authenticate,
+	.set_battery_full				= meter_fg_30_set_battery_full,
+	.get_prev_battery_mvolts		= meter_fg_30_get_battery_mvolts,
+	.get_prev_battery_temperature	= meter_fg_30_get_battery_temperature,
+	.get_prev_battery_soc			= meter_fg_30_get_battery_soc,
+	.get_prev_average_current		= meter_fg_30_get_average_current,
+	.get_prev_batt_remaining_capacity	= meter_fg_30_get_prev_batt_remaining_capacity,
+	.get_battery_mvolts_2cell_max		= meter_fg_30_get_battery_mvolts,
+	.get_battery_mvolts_2cell_min		= meter_fg_30_get_battery_mvolts,
+	.get_prev_battery_mvolts_2cell_max	= meter_fg_30_get_battery_mvolts,
+	.get_prev_battery_mvolts_2cell_min	= meter_fg_30_get_battery_mvolts,
+	.update_battery_dod0				= meter_fg_30_modify_dod0,
+	.update_soc_smooth_parameter		= meter_fg_30_update_soc_smooth_parameter,
+};
+#endif /* VENDOR_EDIT */
 
 /*************************************/
 static struct wakeup_source battery_lock;
+#ifdef VENDOR_EDIT
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/01/13, mtk patch for distinguish fast charging and normal charging fgauge*/
+void dis_GM3_SRC_SEL(void)
+{
+         unsigned int reset_sel;
+ 
+         reset_sel = pmic_get_register_value(PMIC_RG_FGADC_RST_SRC_SEL);
+ 
+         if (reset_sel == 1) {
+                   pmic_set_register_value(PMIC_RG_FGADC_RST_SRC_SEL, 0);
+                   bm_err("DISABLE GM3! set PMIC_RG_FGADC_RST_SRC_SEL to 0\n");
+         }
+}
+#endif /* VENDOR_EDIT */
+
 static int __init battery_probe(struct platform_device *dev)
 {
 	int ret_device_file = 0;
@@ -3461,8 +3874,7 @@ static int __init battery_probe(struct platform_device *dev)
 	const char *boot_voltage = NULL;
 	char boot_voltage_tmp[10];
 	int boot_voltage_len = 0;
-
-	wakeup_source_init(&battery_lock, "battery wakelock");
+	wakeup_source_init(&battery_lock, "abc wakelock");
 	__pm_stay_awake(&battery_lock);
 
 /********* adc_cdev **********/
@@ -3484,9 +3896,10 @@ static int __init battery_probe(struct platform_device *dev)
 /*****************************/
 
 	mtk_battery_init(dev);
-
 	/* Power supply class */
 #if !defined(CONFIG_MTK_DISABLE_GAUGE)
+#ifndef VENDOR_EDIT
+/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/06/17, Remove for charge driver */
 	battery_main.psy =
 		power_supply_register(
 			&(dev->dev), &battery_main.psd, NULL);
@@ -3495,6 +3908,7 @@ static int __init battery_probe(struct platform_device *dev)
 		ret = PTR_ERR(battery_main.psy);
 		return ret;
 	}
+#endif /* VENDOR_EDIT */
 	bm_err("[BAT_probe] power_supply_register Battery Success !!\n");
 #endif
 	ret = device_create_file(&(dev->dev), &dev_attr_Battery_Temperature);
@@ -3505,8 +3919,6 @@ static int __init battery_probe(struct platform_device *dev)
 		&dev_attr_uisoc_update_type);
 	ret_device_file = device_create_file(&(dev->dev),
 		&dev_attr_disable_nafg);
-	ret_device_file = device_create_file(&(dev->dev),
-		&dev_attr_ntc_disable_nafg);
 	ret_device_file = device_create_file(&(dev->dev),
 		&dev_attr_FG_meter_resistance);
 	ret_device_file = device_create_file(&(dev->dev),
@@ -3595,23 +4007,39 @@ static int __init battery_probe(struct platform_device *dev)
 			boot_voltage, boot_voltage_len,
 			boot_voltage_tmp, gm.pl_bat_vol);
 	}
-
+#if 1
 	gm.pbat_consumer = charger_manager_get_by_name(&(dev->dev), "charger");
 	if (gm.pbat_consumer != NULL) {
 		gm.bat_nb.notifier_call = battery_callback;
 		register_charger_manager_notifier(gm.pbat_consumer, &gm.bat_nb);
 	}
+#endif
 
 	battery_debug_init();
-
 	__pm_relax(&battery_lock);
 
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@BSP.CHG.Basic, 2018/11/20, sjc Modify for charging */
+	if (is_vooc_project()) {
+		bm_err("disable GM 3.0\n");
+		disable_fg();
+		dis_GM3_SRC_SEL();
+	} else if (is_recovery_mode()) {
+		if (!is_vooc_project()) {
+			battery_recovery_init();
+		}
+	}
+#else
 	if (IS_ENABLED(CONFIG_POWER_EXT) || gm.disable_mtkbattery ||
 		IS_ENABLED(CONFIG_MTK_DISABLE_GAUGE)) {
 		bm_err("disable GM 3.0\n");
 		disable_fg();
-	} else if (is_recovery_mode())
-		battery_recovery_init();
+	} else if (is_recovery_mode()) {
+		if (!is_vooc_project()) {
+			battery_recovery_init();
+		}
+	}
+#endif /*VENDOR_EDIT*/
 
 	mtk_battery_last_init(dev);
 
@@ -3635,16 +4063,14 @@ void battery_shutdown(struct platform_device *dev)
 	}
 	gauge_dev_get_info(gm.gdev, GAUGE_SHUTDOWN_CAR, &verify_car);
 
-	bm_err("******** %s!! car=[o:%d,new:%d,diff:%d v:%d]********\n",
-		__func__,
+	bm_err("******** battery_shutdown!! car=[o:%d,new:%d,diff:%d v:%d]********\n",
 		gm.d_saved_car, fg_coulomb, shut_car_diff, verify_car);
 
 }
 
 static int battery_suspend(struct platform_device *dev, pm_message_t state)
 {
-	bm_err("******** %s!! iavg=%d ***GM3 disable:%d %d %d %d***\n",
-		__func__,
+	bm_err("******** battery_suspend!! iavg=%d ***GM3 disable:%d %d %d %d***\n",
 		gm.hw_status.iavg_intr_flag,
 		gm.disableGM30,
 		fg_cust_data.disable_nafg,
@@ -3661,8 +4087,7 @@ static int battery_suspend(struct platform_device *dev, pm_message_t state)
 
 static int battery_resume(struct platform_device *dev)
 {
-	bm_err("******** %s!! iavg=%d ***GM3 disable:%d %d %d %d***\n",
-		__func__,
+	bm_err("******** battery_resume!! iavg=%d ***GM3 disable:%d %d %d %d***\n",
 		gm.hw_status.iavg_intr_flag,
 		gm.disableGM30,
 		fg_cust_data.disable_nafg,
@@ -3677,6 +4102,7 @@ static int battery_resume(struct platform_device *dev)
 	}
 	/* reset nafg monitor time to avoid suspend for too long case */
 	get_monotonic_boottime(&gm.last_nafg_update_time);
+
 
 	fg_update_sw_iavg();
 	return 0;
@@ -3710,14 +4136,18 @@ static struct platform_driver battery_driver_probe = {
 	},
 };
 
-static int __init battery_init(void)
+int __init battery_init(void)
 {
 	struct netlink_kernel_cfg cfg = {
 		.input = nl_data_handler,
 	};
 
 	int ret;
-
+#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for charge driver */
+	struct oppo_gauge_chip *chip = NULL;
+#endif /* VENDOR_EDIT */
+    printk("battery_init\n");
 	gm.daemo_nl_sk = netlink_kernel_create(&init_net, NETLINK_FGD, &cfg);
 	bm_err("netlink_kernel_create protol= %d\n", NETLINK_FGD);
 
@@ -3726,6 +4156,24 @@ static int __init battery_init(void)
 		return -1;
 	}
 	bm_err("netlink_kernel_create ok\n");
+#ifdef VENDOR_EDIT
+	/* Qiao.Hu@EXP.BSP.CHG.basic, 2017/07/20, Add for charger */
+	register_battery_devinfo();
+#endif  /*VENDOR_EDIT*/
+#ifdef VENDOR_EDIT
+    /* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for charge driver */
+    chip = (struct oppo_gauge_chip*) kzalloc(sizeof(struct oppo_gauge_chip),
+                GFP_KERNEL);
+    if (!chip) {
+        pr_err("oppo_gauge_chip devm_kzalloc failed.\n");
+        return -ENOMEM;
+    }
+/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/01/01, modefy for fastcharger */
+if(!is_vooc_project()) {
+    chip->gauge_ops = &battery_meter_fg_30_gauge;
+    oppo_gauge_init(chip);
+}
+#endif /* VENDOR_EDIT */
 
 #ifdef CONFIG_OF
 	/* register battery_device by DTS */
@@ -3735,8 +4183,7 @@ static int __init battery_init(void)
 
 	ret = platform_driver_register(&battery_driver_probe);
 
-	bm_err("[%s] Initialization : DONE\n",
-		__func__);
+	bm_err("[battery_init] Initialization : DONE\n");
 
 	return 0;
 }
@@ -3745,6 +4192,8 @@ static void __exit battery_exit(void)
 {
 
 }
+//late_initcall(battery_init);
+
 module_init(battery_init);
 module_exit(battery_exit);
 

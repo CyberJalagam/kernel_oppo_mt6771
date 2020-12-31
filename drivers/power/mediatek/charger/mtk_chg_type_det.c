@@ -53,8 +53,24 @@ void __attribute__((weak)) fg_charger_in_handler(void)
 {
 	pr_notice("%s not defined\n", __func__);
 }
+#ifdef VENDOR_EDIT
+extern int oppo_ac_get_property(struct power_supply *psy,
+        enum power_supply_property psp,
+        union power_supply_propval *val);
+extern int oppo_usb_get_property(struct power_supply *psy,
+        enum power_supply_property psp,
+        union power_supply_propval *val);
+extern int oppo_battery_property_is_writeable(struct power_supply *psy,
+        enum power_supply_property psp);
+extern int oppo_battery_set_property(struct power_supply *psy,
+        enum power_supply_property psp,
+        const union power_supply_propval *val);
+extern int oppo_battery_get_property(struct power_supply *psy,
+        enum power_supply_property psp,
+        union power_supply_propval *val);
+#endif
 
-static enum charger_type g_chr_type;
+enum charger_type g_chr_type;
 static bool ignore_usb;
 
 #ifdef CONFIG_MTK_FPGA
@@ -272,13 +288,18 @@ static enum power_supply_property mt_usb_properties[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+    POWER_SUPPLY_PROP_OTG_SWITCH,
+    POWER_SUPPLY_PROP_OTG_ONLINE,
+    
 };
 
 static int mt_charger_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct mt_charger *mt_chg = NULL;
-
+#ifdef VENDOR_EDIT
+    return 1;
+#endif
 	mt_chg = devm_kzalloc(&pdev->dev, sizeof(struct mt_charger), GFP_KERNEL);
 	if (!mt_chg)
 		return -ENOMEM;
@@ -351,8 +372,11 @@ err_ac_psy:
 
 static int mt_charger_remove(struct platform_device *pdev)
 {
-	struct mt_charger *mt_charger = platform_get_drvdata(pdev);
-
+	struct mt_charger *mt_charger = NULL;
+#ifdef VENDOR_EDIT
+    return 1;
+#endif
+    mt_charger = platform_get_drvdata(pdev);
 	power_supply_unregister(mt_charger->chg_psy);
 	power_supply_unregister(mt_charger->ac_psy);
 	power_supply_unregister(mt_charger->usb_psy);
@@ -369,9 +393,13 @@ static int mt_charger_suspend(struct device *dev)
 
 static int mt_charger_resume(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mt_charger *mt_charger = platform_get_drvdata(pdev);
-
+	struct platform_device *pdev = NULL;
+	struct mt_charger *mt_charger = NULL;
+#ifdef VENDOR_EDIT
+        return 1;
+#endif
+    mt_charger = platform_get_drvdata(pdev);
+    pdev = to_platform_device(dev);
 	power_supply_changed(mt_charger->chg_psy);
 	power_supply_changed(mt_charger->ac_psy);
 	power_supply_changed(mt_charger->usb_psy);
@@ -408,11 +436,32 @@ bool upmu_is_chr_det(void)
 }
 
 /* Legacy api to prevent build error */
+
+//extern int get_oppo_short_check_fast_to_normal(void);
+extern bool oppo_vooc_get_fastchg_started(void);
+
 bool pmic_chrdet_status(void)
 {
-	if (upmu_is_chr_det())
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2018/01/12, add for fast chargering.
+	if (oppo_vooc_get_fastchg_started()/* || get_oppo_short_check_fast_to_normal()*/) {
 		return true;
-
+	}
+#endif /*VENDOR_EDIT*/
+	if (upmu_is_chr_det()) {
+#ifndef VENDOR_EDIT
+		//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/13, add for otg operation, to mislead to charger status.
+		return true;
+#else
+		if(mt_usb_is_device()) {
+		pr_err("[%s],Charger exist and USB is not host",__func__);
+		return true;
+		} else {
+			pr_err("[%s],Charger exist but USB is host, now skip",__func__);
+			return false;
+		}
+#endif /*VENDOR_EDIT*/
+	}
 	pr_err("%s: No charger\n", __func__);
 	return false;
 }

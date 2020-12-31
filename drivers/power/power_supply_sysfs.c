@@ -138,6 +138,25 @@ static ssize_t power_supply_store_property(struct device *dev,
 /* Must be in the same order as POWER_SUPPLY_PROP_* */
 static struct device_attribute power_supply_attrs[] = {
 	/* Properties of type `int' */
+	#ifdef VENDOR_EDIT
+	/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/11/19, Add for charging */
+	POWER_SUPPLY_ATTR(authenticate),
+	POWER_SUPPLY_ATTR(charge_timeout),
+	POWER_SUPPLY_ATTR(battery_request_poweroff),
+	POWER_SUPPLY_ATTR(charge_technology),
+	POWER_SUPPLY_ATTR(fastcharger),
+	POWER_SUPPLY_ATTR(mmi_charging_enable),
+	POWER_SUPPLY_ATTR(stop_charging_enable),
+	POWER_SUPPLY_ATTR(otg_switch),
+	POWER_SUPPLY_ATTR(otg_online),
+	POWER_SUPPLY_ATTR(batt_fcc),
+	POWER_SUPPLY_ATTR(batt_soh),
+	POWER_SUPPLY_ATTR(batt_cc),
+	POWER_SUPPLY_ATTR(batt_rm),
+	POWER_SUPPLY_ATTR(notify_code),
+	POWER_SUPPLY_ATTR(charger_ic),
+	#endif /* VENDOR_EDIT */
+
 	POWER_SUPPLY_ATTR(status),
 	POWER_SUPPLY_ATTR(charge_type),
 	POWER_SUPPLY_ATTR(health),
@@ -224,7 +243,64 @@ static struct device_attribute power_supply_attrs[] = {
 	/* ADB CMD Discharging */
 	POWER_SUPPLY_ATTR(adjust_power),
 #endif
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for adapter fwupdate */
+	POWER_SUPPLY_ATTR(adapter_fw_update),
+	#endif /* VENDOR_EDIT */
+
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for capacity node */
+	POWER_SUPPLY_ATTR(internal_capacity),
+	#endif  /* VENDOR_EDIT */
+
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for chargeid voltage */
+	POWER_SUPPLY_ATTR(chargerid_volt),
+	#endif  /* VENDOR_EDIT */
+
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for voocchg_ing */
+	POWER_SUPPLY_ATTR(voocchg_ing),
+	#endif /* VENDOR_EDIT */
+
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for critical log */
+	POWER_SUPPLY_ATTR(primal_type),
+	#endif /* VENDOR_EDIT */
+
+	#ifdef CONFIG_OPPO_CALL_MODE_SUPPORT
+	/* ChaoYing.Chen@EXP.BSP.CHG.basic, 2017/05/16, Add for calling */
+	POWER_SUPPLY_ATTR(call_mode),
+	#endif /* VENDOR_EDIT */
+	#ifdef CONFIG_OPPO_SHIP_MODE_SUPPORT
+	/* Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/09, Add for ship mode */
+	POWER_SUPPLY_ATTR(ship_mode),
+	#endif /* CONFIG_OPPO_SHIP_MODE_SUPPORT */
 	/* Properties of type `const char *' */
+	#ifdef VENDOR_EDIT
+	//tongfeng.huang@PSW.BSP.CHG, 2018/02/05, Add for battery info collect
+	#ifdef CONFIG_OPPO_SHORT_C_BATT_CHECK
+	#ifdef CONFIG_OPPO_SHORT_USERSPACE
+	POWER_SUPPLY_ATTR(short_c_batt_limit_chg),
+	POWER_SUPPLY_ATTR(short_c_batt_limit_rechg),
+	POWER_SUPPLY_ATTR(input_current_settled),
+	#else
+	POWER_SUPPLY_ATTR(short_c_batt_update_change),
+	POWER_SUPPLY_ATTR(short_c_batt_in_idle),
+	POWER_SUPPLY_ATTR(short_c_batt_cv_status),
+	#endif /*CONFIG_OPPO_SHORT_USERSPACE*/
+	#endif	
+	#ifdef CONFIG_OPPO_SHORT_HW_CHECK
+	POWER_SUPPLY_ATTR(short_c_hw_feature),
+	POWER_SUPPLY_ATTR(short_c_hw_status),
+	#endif
+#ifdef CONFIG_OPPO_SHORT_IC_CHECK
+	POWER_SUPPLY_ATTR(short_ic_otp_status),
+	POWER_SUPPLY_ATTR(short_ic_volt_thresh),
+    POWER_SUPPLY_ATTR(short_ic_otp_value),
+#endif
+	POWER_SUPPLY_ATTR(fast2normal_chg),
+	#endif /*VENDOR_EDIT*/
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),
 	POWER_SUPPLY_ATTR(serial_number),

@@ -134,7 +134,10 @@ int disable_shutdown_cond(int shutdown_cond)
 	}
 	return 0;
 }
-
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/12, add for sdc.lock null pointer.
+extern int oppo_is_vooc_project(void);
+#endif /*VENDOR_EDIT*/
 int set_shutdown_cond(int shutdown_cond)
 {
 	int now_current;
@@ -163,13 +166,26 @@ int set_shutdown_cond(int shutdown_cond)
 		shutdown_cond, enable_lbat_shutdown,
 		now_is_kpoc, now_current, now_is_charging,
 		shutdown_cond_flag, vbat);
-
+#ifdef VENDOR_EDIT
+//Qiao.Hu@BSP.BaseDrv.CHG.Basic, 2017/12/14, add for sdc.lock null pointer.
+	if (oppo_is_vooc_project() == 1) {
+		pr_err("%s:vooc_project,return directly\n",__func__);
+		return 0;
+	}
+#endif /*VENDOR_EDIT*/
 	if (shutdown_cond_flag == 1)
 		return 0;
 
 	if (shutdown_cond_flag == 2 && shutdown_cond != LOW_BAT_VOLT)
 		return 0;
 
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/10/16, sjc Add for remove dlpt shutdown */
+	if (shutdown_cond == DLPT_SHUTDOWN) {
+		bm_err("[%s], DLPT_SHUTDOWN, return directly\n", __func__);
+		return 0;
+	}
+#endif /* VENDOR_EDIT */
 
 	switch (shutdown_cond) {
 	case OVERHEAT:
@@ -327,7 +343,10 @@ static int shutdown_event_handler(struct shutdown_controller *sdd)
 		if (duraction.tv_sec >= SHUTDOWN_TIME) {
 			bm_err("dlpt shutdown\n");
 			mutex_unlock(&sdd->lock);
+#ifndef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/10/16, sjc Delete for remove dlpt shutdown */
 			kernel_power_off();
+#endif
 			return next_waketime(polling);
 		}
 	}
@@ -505,10 +524,11 @@ void mtk_power_misc_init(struct platform_device *pdev)
 	gtimer_init(&sdc.kthread_fgtimer, &pdev->dev, "power_misc");
 	sdc.kthread_fgtimer.callback = power_misc_kthread_fgtimer_func;
 	init_waitqueue_head(&sdc.wait_que);
-
+#ifndef VENDOR_EDIT
+/* Qiao.Hu@EXP.BSP.BaseDrv.CHG.Basic, 2017/08/02, Add for charger memory electricity */
 	sdc.psy_nb.notifier_call = mtk_power_misc_psy_event;
 	power_supply_reg_notifier(&sdc.psy_nb);
-
+#endif
 	kthread_run(power_misc_routine_thread, &sdc, "power_misc_thread");
 }
 
