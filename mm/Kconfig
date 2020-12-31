@@ -644,6 +644,7 @@ config MAX_STACK_SIZE_MB
 
 	  A sane initial value is 80 MB.
 
+
 # For architectures that support deferred memory initialisation
 config ARCH_SUPPORTS_DEFERRED_STRUCT_PAGE_INIT
 	bool
@@ -696,3 +697,5 @@ config ARCH_HAS_PTE_SPECIAL
 	bool
 config FRAME_VECTOR
 	bool
+
+

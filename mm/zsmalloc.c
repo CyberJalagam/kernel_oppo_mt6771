@@ -79,6 +79,7 @@
  * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
  */
 #define ZS_MAX_ZSPAGE_ORDER 2
+
 #define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
 
 #define ZS_HANDLE_SIZE (sizeof(unsigned long))
@@ -278,6 +279,8 @@ struct zs_pool {
 #define FULLNESS_BITS	4
 #define CLASS_IDX_MASK	((1 << CLASS_IDX_BITS) - 1)
 #define FULLNESS_MASK	((1 << FULLNESS_BITS) - 1)
+
+#define ISOLATED_BITS	(ZS_MAX_ZSPAGE_ORDER+1)
 
 struct mapping_area {
 #ifdef CONFIG_PGTABLE_MAPPING

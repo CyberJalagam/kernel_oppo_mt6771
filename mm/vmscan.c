@@ -105,6 +105,7 @@ struct scan_control {
 
 	/* Number of pages freed so far during a call to shrink_zones() */
 	unsigned long nr_reclaimed;
+
 };
 
 #define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
@@ -138,7 +139,7 @@ struct scan_control {
 #endif
 
 /*
- * From 0 .. 100.  Higher means more swappy.
+ * From 0 .. 200.  Higher means more swappy.
  */
 int vm_swappiness = 60;
 /*
@@ -967,6 +968,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		struct page *page;
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
+
 		bool dirty, writeback;
 
 		cond_resched();
@@ -1122,8 +1124,10 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		 * processes. Try to unmap it here.
 		 */
 		if (page_mapped(page) && mapping) {
+
 			switch (try_to_unmap(page,
 					ttu_flags|TTU_BATCH_FLUSH)) {
+
 			case SWAP_FAIL:
 				goto activate_locked;
 			case SWAP_AGAIN:
@@ -1635,6 +1639,8 @@ static int current_may_throttle(void)
 		bdi_write_congested(current->backing_dev_info);
 }
 
+
+
 /*
  * shrink_inactive_list() is a helper for shrink_zone().  It returns the number
  * of reclaimed pages
@@ -1776,9 +1782,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	 * unqueued dirty pages or cycling through the LRU too quickly.
 	 */
 	if (!sc->hibernation_mode && !current_is_kswapd() &&
-	    current_may_throttle())
+		current_may_throttle())
 		wait_iff_congested(zone, BLK_RW_ASYNC, HZ/10);
-
 	trace_mm_vmscan_lru_shrink_inactive(zone->zone_pgdat->node_id,
 		zone_idx(zone),
 		nr_scanned, nr_reclaimed,
@@ -1953,7 +1958,6 @@ static bool inactive_anon_is_low_global(struct zone *zone)
 
 	active = zone_page_state(zone, NR_ACTIVE_ANON);
 	inactive = zone_page_state(zone, NR_INACTIVE_ANON);
-
 	return inactive * zone->inactive_ratio < active;
 }
 
@@ -2191,7 +2195,7 @@ static void get_scan_count(struct lruvec *lruvec, int swappiness,
 	 */
 	if (!inactive_file_is_low(lruvec) &&
 	    get_lru_size(lruvec, LRU_INACTIVE_FILE) >> sc->priority) {
-		scan_balance = SCAN_FILE;
+	scan_balance = SCAN_FILE;
 		goto out;
 	}
 

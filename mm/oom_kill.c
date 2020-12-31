@@ -408,13 +408,6 @@ static void dump_header(struct oom_control *oc, struct task_struct *p,
 	if (sysctl_oom_dump_tasks)
 		dump_tasks(memcg, oc->nodemask);
 
-#ifdef CONFIG_MTK_ION
-	ion_mm_heap_memory_detail();
-#endif
-#ifdef CONFIG_MTK_GPU_SUPPORT
-	if (mtk_dump_gpu_memory_usage() == false)
-		pr_warn("mtk_dump_gpu_memory_usage not support\n");
-#endif
 }
 
 /*
