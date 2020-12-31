@@ -287,7 +287,6 @@ config MACH_MT6771
 	select FAST_CIRQ_CLONE_FLUSH
 	select MTK_CACHE_FLUSH_BY_SF
 	select MTK_PID_MAP
-	select MTK_DYNAMIC_LOAD_STORE_BYPASS_WA
 	help
 	  This enables support for MediaTek MT6771
 	  Support for aarch64 Architecture
@@ -381,14 +380,6 @@ config MACH_MT6739
 	select ARM_AMBA
 	select CPU_V7
 	select HAVE_SMP
-	select EXT4_FS
-	select EXT4_FS_ENCRYPTION
-	select EXT4_FS_SECURITY
-	select EXT4_ENCRYPTION
-	select F2FS_FS
-	select F2FS_FS_ENCRYPTION
-	select F2FS_FS_SECURITY
-	select F2FS_FS_XATTR
 	select NEED_MACH_MEMORY_H
 	select IRQ_DOMAIN
 	select IRQ_DOMAIN_DEBUG
