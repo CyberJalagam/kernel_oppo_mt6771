@@ -36,6 +36,12 @@
 
 #define MTK_SOLUTION 1
 
+#ifdef VENDOR_EDIT
+//Cong.Dai@psw.bsp.tp 2018/08/30 modified for stop system enter sleep before low irq handled
+#include <soc/oppo/oppo_project.h>
+__attribute__((weak)) int check_touchirq_triggered(void) {return 0;}
+#endif /* VENDOR_EDIT */
+
 const char *pm_labels[] = { "mem", "standby", "freeze", NULL };
 const char *pm_states[PM_SUSPEND_MAX];
 
@@ -376,6 +382,13 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 	arch_suspend_disable_irqs();
 	BUG_ON(!irqs_disabled());
 
+#ifdef VENDOR_EDIT
+//Cong.Dai@psw.bsp.tp 2018/08/30 modified for stop system enter sleep before low irq handled
+    if (is_project(OPPO_17197) && check_touchirq_triggered()) {
+        error = -EBUSY;
+        goto Enable_irqs;
+    }
+#endif /* VENDOR_EDIT */
 	error = syscore_suspend();
 	if (!error) {
 		*wakeup = pm_wakeup_pending();
@@ -395,6 +408,10 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		syscore_resume();
 	}
 
+#ifdef VENDOR_EDIT
+//Cong.Dai@psw.bsp.tp 2018/08/30 modified for stop system enter sleep before low irq handled
+ Enable_irqs:
+#endif /* VENDOR_EDIT */
 	arch_suspend_enable_irqs();
 	BUG_ON(irqs_disabled());
 

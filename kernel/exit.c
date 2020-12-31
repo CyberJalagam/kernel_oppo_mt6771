@@ -264,6 +264,7 @@ static bool has_stopped_jobs(struct pid *pgrp)
 	return false;
 }
 
+
 /*
  * Check to see if any process groups have become orphaned as
  * a result of our exiting, and if they have any stopped jobs,
@@ -660,6 +661,10 @@ void do_exit(long code)
 	TASKS_RCU(int tasks_rcu_i);
 
 	profile_task_exit(tsk);
+#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_SPECIAL_BUILD)
+/*xing.xiong@BSP.Kernel.Debug, 2018/10/25, Add for aging*/
+	printk("[%d:%s] exit\n", tsk->pid, tsk->comm);
+#endif
 	kcov_task_exit(tsk);
 
 	WARN_ON(blk_needs_flush_plug(tsk));

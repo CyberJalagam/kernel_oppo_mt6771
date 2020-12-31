@@ -902,6 +902,10 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			audit_sock = skb->sk;
 		}
 		if (s.mask & AUDIT_STATUS_RATE_LIMIT) {
+#if defined(VENDOR_EDIT) && !defined(OPPO_RELEASE_FLAG)
+//Jiemin.Zhu@PSW.Android.SELinux, 2019/01/25/, Add for disable audit limit in user version
+			return 0;
+#endif
 			err = audit_set_rate_limit(s.rate_limit);
 			if (err < 0)
 				return err;

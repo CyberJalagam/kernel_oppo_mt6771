@@ -27,6 +27,40 @@
 #include <linux/notifier.h>
 #include <linux/suspend.h>
 
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/9, Add for print wakeup source */
+#include <linux/notifier.h>
+#include <linux/fb.h>
+
+#include <linux/irqchip/mtk-eic.h>
+
+#define LOG_BUF_SIZE	256
+extern	char wakeup_source_buf[LOG_BUF_SIZE];
+
+#ifdef CONFIG_MACH_MT6771
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2018/04/23, Add for print wakeup source */
+#define PMIC_INT_REG_WIDTH  	16
+#define PMIC_INT_REG_NUMBER  	16
+#else /* CONFIG_MACH_MT6771 */
+#define PMIC_INT_REG_WIDTH  	16
+#define PMIC_INT_REG_NUMBER  	18
+#endif /* CONFIG_MACH_MT6771 */
+
+extern u64 pmic_wakesrc_x_count[PMIC_INT_REG_NUMBER][PMIC_INT_REG_WIDTH];
+extern const char *pmic_interrupt_status_name[PMIC_INT_REG_NUMBER][PMIC_INT_REG_WIDTH];
+
+#define EINT_WIDTH  			32
+#define EINT_REG_NUMBER  		18
+extern u64 eint_wakesrc_x_count[EINT_REG_NUMBER][EINT_WIDTH];
+extern  u64  wakesrc_count[32];
+int wakeup_reason_stastics_flag = 0;
+extern const char * mt_eint_get_name(int index);
+extern void mt_clear_wakesrc_count(void);
+extern void mt_pmic_clear_wakesrc_count(void);
+extern void mt_eint_clear_wakesrc_count(void);
+
+extern const char *wakesrc_str[32];
+#endif /* VENDOR_EDIT */
 
 #define MAX_WAKEUP_REASON_IRQS 32
 static int irq_list[MAX_WAKEUP_REASON_IRQS];
@@ -40,6 +74,64 @@ static ktime_t last_monotime; /* monotonic time before last suspend */
 static ktime_t curr_monotime; /* monotonic time after last suspend */
 static ktime_t last_stime; /* monotonic boottime offset before last suspend */
 static ktime_t curr_stime; /* monotonic boottime offset after last suspend */
+
+
+#ifdef VENDOR_EDIT
+//Wenxian.zhen@Prd.BaseDrv, 2016/07/19, add for analysis power consumption
+void wakeup_src_clean(void);
+#endif /* VENDOR_EDIT */
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+static ssize_t new_resume_reason_show(struct kobject *kobj, struct kobj_attribute *attr,
+		char *buf)
+{
+	return sprintf(buf, "%s\n", wakeup_source_buf);
+}
+
+static struct kobj_attribute new_resume_reason = __ATTR_RO(new_resume_reason);
+
+static ssize_t ap_resume_reason_stastics_show(struct kobject *kobj, struct kobj_attribute *attr,
+		char *buf)
+{
+	int i = 0;
+	int j = 0;
+	int buf_offset = 0;
+	const char *name = NULL;
+
+	for (i = 0; i < MAX_WAKEUP_REASON_IRQS; i++) {
+		if (wakesrc_count[i]) {
+			buf_offset += sprintf(buf + buf_offset, wakesrc_str[i]);
+			buf_offset += sprintf(buf + buf_offset,  "%s",":");
+			buf_offset += sprintf(buf + buf_offset,  "%lld \n",wakesrc_count[i]);
+			printk(KERN_WARNING "%s wakeup %lld times\n",wakesrc_str[i],wakesrc_count[i]);
+		}
+	}
+	for (i = 0; i < EINT_REG_NUMBER; i++) {
+		for (j = 0; j < EINT_WIDTH; j++) {
+			if (eint_wakesrc_x_count[i][j] != 0)	{
+				name = mt_eint_get_name(i*32 +j);
+				buf_offset += sprintf(buf + buf_offset, name);
+				buf_offset += sprintf(buf + buf_offset, "%s", ":");
+				buf_offset += sprintf(buf + buf_offset, "%lld \n", eint_wakesrc_x_count[i][j]);
+				printk(KERN_WARNING "%s wakeup %lld times\n", name, eint_wakesrc_x_count[i][j]);
+			}
+		}
+	}
+	for (i = 0; i < PMIC_INT_REG_NUMBER; i++) {
+		for (j = 0; j < PMIC_INT_REG_WIDTH; j++) {
+			if (pmic_wakesrc_x_count[i][j] != 0)	{
+				buf_offset += sprintf(buf + buf_offset, pmic_interrupt_status_name[i][j]);
+				buf_offset += sprintf(buf + buf_offset, "%s", ":");
+				buf_offset += sprintf(buf + buf_offset, "%lld \n", pmic_wakesrc_x_count[i][j]);
+				printk(KERN_WARNING "%s wakeup %lld times\n", pmic_interrupt_status_name[i][j], pmic_wakesrc_x_count[i][j]);
+			}
+		}
+	}
+	return buf_offset;
+}
+
+static struct kobj_attribute ap_resume_reason_stastics = __ATTR_RO(ap_resume_reason_stastics);
+#endif /* VENDOR_EDIT */
 
 static ssize_t last_resume_reason_show(struct kobject *kobj, struct kobj_attribute *attr,
 		char *buf)
@@ -92,11 +184,48 @@ static ssize_t last_suspend_time_show(struct kobject *kobj,
 				sleep_time.tv_sec, sleep_time.tv_nsec);
 }
 
+#ifdef VENDOR_EDIT
+//Wenxian.Zhen@BSP.Power.Basic, 2018/11/17, Add for  clean wake up source  according to echo reset >   /sys/kernel/wakeup_reasons/wakeup_stastisc_reset
+static ssize_t  wakeup_stastisc_reset_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	char reset_string[]="reset";
+#ifdef VENDOR_EDIT
+/* Ji.Xu@SW.BSP.CHG, 2018-11-29 modify framework ioctl fail */
+	if(!((count == strlen(reset_string)) || ((count == strlen(reset_string) + 1) && (buf[count-1] == '\n'))))
+#endif /*VENDOR_EDIT*/
+		return count;
+
+	if (strncmp(buf, reset_string, strlen(reset_string)) != 0)
+		return count;
+
+	wakeup_src_clean();
+	return count;
+}
+
+
+#endif /* VENDOR_EDIT */
+
 static struct kobj_attribute resume_reason = __ATTR_RO(last_resume_reason);
 static struct kobj_attribute suspend_time = __ATTR_RO(last_suspend_time);
 
+#ifdef VENDOR_EDIT
+//Wenxian.Zhen@BSP.Power.Basic, 2018/11/17, Add for  clean wake up source  according to echo reset >   /sys/kernel/wakeup_reasons/wakeup_stastisc_reset
+static struct kobj_attribute wakeup_stastisc_reset_sys =
+	__ATTR(wakeup_stastisc_reset, S_IWUSR|S_IRUGO, NULL, wakeup_stastisc_reset_store);
+#endif /* VENDOR_EDIT */
 static struct attribute *attrs[] = {
 	&resume_reason.attr,
+
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+	&new_resume_reason.attr,
+	&ap_resume_reason_stastics.attr,
+#endif /* VENDOR_EDIT */
+#ifdef VENDOR_EDIT
+//Wenxian.Zhen@BSP.Power.Basic, 2018/11/17, Add for  clean wake up source  according to echo reset >   /sys/kernel/wakeup_reasons/wakeup_stastisc_reset
+    &wakeup_stastisc_reset_sys.attr,
+#endif /* VENDOR_EDIT */
 	&suspend_time.attr,
 	NULL,
 };
@@ -195,6 +324,64 @@ static struct notifier_block wakeup_reason_pm_notifier_block = {
 	.notifier_call = wakeup_reason_pm_event,
 };
 
+#ifdef VENDOR_EDIT
+/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+void wakeup_src_clean(void)
+{
+	mt_clear_wakesrc_count();
+	mt_pmic_clear_wakesrc_count();
+	mt_eint_clear_wakesrc_count();
+}
+EXPORT_SYMBOL(wakeup_src_clean);
+static int wakeup_src_fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
+{
+    struct fb_event *evdata = data;
+    int *blank = NULL;
+    const char *name = NULL;
+    int i = 0;
+    int j = 0;
+
+    if (evdata && evdata->data && event == FB_EVENT_BLANK) {
+        blank = evdata->data;
+
+        if (*blank == FB_BLANK_UNBLANK) {
+            for (i = 0; i < MAX_WAKEUP_REASON_IRQS; i++) {
+                if (wakesrc_count[i]) {
+                    printk(KERN_WARNING "%s wakeup %lld times\n", wakesrc_str[i], wakesrc_count[i]);
+                }
+            }
+            for (i = 0; i < EINT_REG_NUMBER; i++) {
+                for (j = 0; j < EINT_WIDTH; j++) {
+                    if (eint_wakesrc_x_count[i][j] != 0) {
+                        name = mt_eint_get_name(i*32 +j);
+                        printk(KERN_WARNING "%s wakeup %lld times\n", name, eint_wakesrc_x_count[i][j]);
+                    }
+                }
+            }
+            for (i = 0; i < PMIC_INT_REG_NUMBER; i++) {
+                for (j = 0; j < PMIC_INT_REG_WIDTH; j++) {
+                    if (pmic_wakesrc_x_count[i][j] != 0) {
+                        printk(KERN_WARNING "%s wakeup %lld times\n", pmic_interrupt_status_name[i][j], pmic_wakesrc_x_count[i][j]);
+                    }
+                }
+            }
+        }
+    } else if (evdata && evdata->data && event == FB_EARLY_EVENT_BLANK) {
+			blank = evdata->data;
+			if (*blank == FB_BLANK_POWERDOWN) {
+		//wenxian.Zhen@PSW.BSP.POWER, 2019/01/15, removing for analysis power consumption,clear wakeup source stastatics action according to framework			
+//				wakeup_src_clean();
+//				pr_err("[wakeup_src_fb_notifier_callback] wakeup_src_clean all wakeup\n");
+			}
+    }
+    return 0;
+}
+
+static struct notifier_block wakeup_src_fb_notif = {
+	.notifier_call = wakeup_src_fb_notifier_callback,
+};
+#endif /* VENDOR_EDIT */
+
 /* Initializes the sysfs parameter
  * registers the pm_event notifier
  */
@@ -219,6 +406,10 @@ int __init wakeup_reason_init(void)
 		printk(KERN_WARNING "[%s] failed to create a sysfs group %d\n",
 				__func__, retval);
 	}
+	#ifdef VENDOR_EDIT
+	/* ChaoYing.Chen@BSP.Power.Basic.1056413, 2017/12/11, Add for print wakeup source */
+	fb_register_client(&wakeup_src_fb_notif);
+	#endif /* VENDOR_EDIT */
 	return 0;
 }
 

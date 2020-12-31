@@ -249,10 +249,13 @@ void smpboot_park_threads(unsigned int cpu)
 {
 	struct smp_hotplug_thread *cur;
 
+
 	mutex_lock(&smpboot_threads_lock);
 	list_for_each_entry_reverse(cur, &hotplug_threads, list)
 		smpboot_park_thread(cur, cpu);
 	mutex_unlock(&smpboot_threads_lock);
+
+
 }
 
 static void smpboot_destroy_threads(struct smp_hotplug_thread *ht)
