@@ -15,6 +15,7 @@ ifeq ($(CONFIG_DEPRECATED_MTK_SYSTRACKER_SUPPORT),y)
   obj-y += systracker.o
   obj-y += backtrace.o
 else
+  ifneq ($(CONFIG_MTK_SYSTRACKER_DISABLE),y)
   ifeq ($(CONFIG_MTK_SYSTRACKER_V2),y)
       obj-y += systracker_interface_v2.o
   else
@@ -27,4 +28,5 @@ else
     obj-y += backtrace32.o
     obj-y += backtrace32_asm.o
   endif
+endif
 endif
