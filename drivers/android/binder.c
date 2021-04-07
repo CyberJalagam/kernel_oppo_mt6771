@@ -3191,9 +3191,9 @@ static void binder_transaction(struct binder_proc *proc,
 	}
 	if (secctx) {
 		size_t buf_offset = ALIGN(tr->data_size, sizeof(void *)) +
-			ALIGN(tr->offsets_size, sizeof(void *)) +
-			ALIGN(extra_buffers_size, sizeof(void *)) -
-			ALIGN(secctx_sz, sizeof(u64));
+				    ALIGN(tr->offsets_size, sizeof(void *)) +
+				    ALIGN(extra_buffers_size, sizeof(void *)) -
+				    ALIGN(secctx_sz, sizeof(u64));
 		char *kptr = t->buffer->data + buf_offset;
 
 		t->security_ctx = (uintptr_t)kptr +

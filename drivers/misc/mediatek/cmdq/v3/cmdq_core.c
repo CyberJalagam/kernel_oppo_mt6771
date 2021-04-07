@@ -3594,7 +3594,7 @@ static int32_t cmdq_core_insert_read_reg_command(struct TaskStruct *pTask,
 		return -EFAULT;
 
 	/* If no read request, no post-process needed. Do verify and stop */
-	if (!postInstruction) {
+	if (!postInstruction && !cmdq_core_check_task_valid(pTask)) {
 		if (unlikely(!cmdq_core_task_finalize_end(pTask))) {
 			CMDQ_ERR("[CMD] with smp_mb() cmdSize:%d bufferSize:%u blockSize:%d\n",
 				pTask->commandSize, pTask->bufferSize, pCommandDesc->blockSize);
