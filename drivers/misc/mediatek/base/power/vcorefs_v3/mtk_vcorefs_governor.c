@@ -221,7 +221,7 @@ bool is_vcorefs_feature_enable(void)
 	}
 #endif
 	if (!spm_load_firmware_status()) {
-		vcorefs_err("SPM FIRMWARE IS NOT READY\n");
+		pr_debug("SPM FIRMWARE IS NOT READY\n");
 		return false;
 	}
 

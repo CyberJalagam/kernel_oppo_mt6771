@@ -1349,7 +1349,7 @@ void spm_vcorefs_init(void)
 	plat_info_init();
 
 	if (!spm_load_firmware_status()) {
-		spm_vcorefs_warn("[%s] SPM FIRMWARE IS NOT READY\n", __func__);
+		pr_debug("[%s] SPM FIRMWARE IS NOT READY\n", __func__);
 		return;
 	}
 
