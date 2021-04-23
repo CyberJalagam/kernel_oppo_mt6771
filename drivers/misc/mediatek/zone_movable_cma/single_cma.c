@@ -75,7 +75,7 @@ static void __init check_and_fix_base(struct reserved_mem *rmem, phys_addr_t tot
 		return;
 	}
 
-	pr_info("%s: total phys size: %pa\n", __func__, &total_phys_size);
+	pr_debug("%s: total phys size: %pa\n", __func__, &total_phys_size);
 
 	/* No need to fix if the size of DRAM is less or equal to 4GB */
 	if (total_phys_size <= 0x100000000ULL)
@@ -95,7 +95,7 @@ static void __init check_and_fix_base(struct reserved_mem *rmem, phys_addr_t tot
 		memblock_add(rmem->base, return_size);
 		rmem->base = new_zmc_base;
 		rmem->size -= return_size;
-		pr_info("%s: new base: %pa, new size: %pa\n", __func__, &rmem->base, &rmem->size);
+		pr_debug("%s: new base: %pa, new size: %pa\n", __func__, &rmem->base, &rmem->size);
 	}
 }
 #else	/* !CONFIG_MTK_MEMORY_LOWPOWER */
@@ -110,7 +110,7 @@ static bool __init zmc_is_the_last(struct reserved_mem *rmem)
 	phys_addr_t phys_end = memblock_end_of_DRAM();
 	phys_addr_t rmem_end_max = rmem->base + rmem->size + (pageblock_nr_pages << PAGE_SHIFT);
 
-	pr_info("%s: phys end: %pa, rmem end max: %pa\n", __func__, &phys_end, &rmem_end_max);
+	pr_debug("%s: phys end: %pa, rmem end max: %pa\n", __func__, &phys_end, &rmem_end_max);
 
 	if (rmem_end_max >= phys_end)
 		return true;
@@ -135,7 +135,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 	memblock_add(rmem->base, kasan_shadow_size);
 	rmem->base += kasan_shadow_size;
 	rmem->size -= kasan_shadow_size;
-	pr_info("zmc: Modify zmc size because KASAN enabled\n");
+	pr_debug("zmc: Modify zmc size because KASAN enabled\n");
 #undef ZMC_SEG_SIZE
 #endif
 	zmc_size = rmem->size;
@@ -153,7 +153,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 	}
 
 	if (!zmc_is_the_last(rmem)) {
-		pr_info("[Fail] ZMC is not the last\n");
+		pr_debug("[Fail] ZMC is not the last\n");
 		memblock_free(rmem->base, rmem->size);
 		memblock_add(rmem->base, rmem->size);
 		return -1;
@@ -172,7 +172,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 	for (order = 0; order < NR_ZMC_LOCATIONS; order++) {
 		struct single_cma_registration *p;
 
-		pr_info("Start to zone: %d\n", order);
+		pr_debug("Start to zone: %d\n", order);
 		for (i = 0; i < ARRAY_SIZE(single_cma_list[order]); i++) {
 			phys_addr_t start, end;
 
@@ -186,8 +186,8 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 			}
 
 			end = rmem->base + rmem->size;
-			pr_info("::[%s]: size: %pa, align: %pa\n", p->name, &p->size, &p->align);
-			pr_info("::[%pa-%pa] remain of rmem\n", &rmem->base, &end);
+			pr_debug("::[%s]: size: %pa, align: %pa\n", p->name, &p->size, &p->align);
+			pr_debug("::[%pa-%pa] remain of rmem\n", &rmem->base, &end);
 
 			if (p->flag & ZMC_ALLOC_ALL)
 				start = rmem->base;
@@ -208,7 +208,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 				}
 			}
 
-			pr_info("::cma_init_reserved_mem - [%pa - %pa]\n", &start, &end);
+			pr_debug("::cma_init_reserved_mem - [%pa - %pa]\n", &start, &end);
 			ret = cma_init_reserved_mem(start, end - start, 0, &cma[cma_area_count]);
 			if (ret) {
 				pr_warn(":: %s cma failed at %d, ret: %d\n", __func__, cma_area_count, ret);
@@ -225,7 +225,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 			if (order == ZMC_LOCATE_MOVABLE) {
 				movable_min = min(movable_min, start);
 				movable_max = max(movable_max, end);
-				pr_info("===> MOVABLE ZONE: Update range[%pa,%pa)\n", &movable_min, &movable_max);
+				pr_debug("===> MOVABLE ZONE: Update range[%pa,%pa)\n", &movable_min, &movable_max);
 			}
 
 			if (p->init)
@@ -233,7 +233,7 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 
 			cma_area_count++;
 			zmc_reserved_mem_inited = true;
-			pr_info("::[PASS]: %s[%pa-%pa] (rmem->size=%pa)\n",
+			pr_debug("::[PASS]: %s[%pa-%pa] (rmem->size=%pa)\n",
 					p->name, &start, &end, &rmem->size);
 		}
 	}
@@ -257,7 +257,7 @@ bool is_zmc_inited(void)
 void zmc_get_range(phys_addr_t *base, phys_addr_t *size)
 {
 	if (movable_max > movable_min) {
-		pr_info("Query return: [%pa,%pa)\n", &movable_min, &movable_max);
+		pr_debug("Query return: [%pa,%pa)\n", &movable_min, &movable_max);
 		*base = movable_min;
 		*size = movable_max - movable_min;
 	} else {
@@ -283,7 +283,7 @@ static bool system_mem_status_ok(unsigned long count)
 		}
 	}
 
-	pr_info("%s: free(%lu) file(%lu) high(%lu) count(%lu)\n",
+	pr_debug("%s: free(%lu) file(%lu) high(%lu) count(%lu)\n",
 			__func__, free, file, high_wmark, count);
 
 	/* Hope the system has as less memory reclaim as possible */
@@ -310,7 +310,7 @@ static bool zmc_check_mem_status_ok(unsigned long count)
 		available += minus;
 	}
 
-	pr_info("%s: count(%lu) free(%lu) available(%lu) minus(%lu)\n",
+	pr_debug("%s: count(%lu) free(%lu) available(%lu) minus(%lu)\n",
 			__func__, count, free, available, minus);
 
 	/*
@@ -336,7 +336,7 @@ struct page *zmc_cma_alloc(struct cma *cma, int count, unsigned int align, struc
 
 	/* Check current memory status before proceeding */
 	if (p->prio >= ZMC_CHECK_MEM_STAT && !zmc_check_mem_status_ok(count)) {
-		pr_info("%s: mem status is not ok\n", __func__);
+		pr_debug("%s: mem status is not ok\n", __func__);
 		return NULL;
 	}
 
@@ -351,7 +351,7 @@ struct page *zmc_cma_alloc(struct cma *cma, int count, unsigned int align, struc
 	 * for memory reclaim or abort cma_alloc.
 	 */
 	if (!cma_alloc_range_ok(cma, count, align)) {
-		pr_info("No more space in zone movable cma\n");
+		pr_debug("No more space in zone movable cma\n");
 		return NULL;
 	}
 
@@ -366,7 +366,7 @@ retry:
 	if (p->prio == ZMC_SSVP &&
 			candidate != NULL && page_to_pfn(candidate) == ABANDON_PFN) {
 		abandon = candidate;
-		pr_info("%s %p is abandoned\n", __func__, candidate);
+		pr_debug("%s %p is abandoned\n", __func__, candidate);
 		goto retry;
 	}
 
