@@ -66,6 +66,18 @@ unexport GREP_OPTIONS
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
 
+# OPPO DEBUG
+# Make OPPO debug build easier by just using a single flag
+ifeq ($(ALIEN_DEBUG),true)
+ export OPPO_SLUB_CONFIG=1
+ export OPPO_KASAN_CONFIG=1
+ export OPPO_KMEMLEAK_CONFIG=1
+ TARGET_BUILD_VARIANT=eng
+else
+ export OPPO_BUILD_TYPE=release
+endif
+
+
 ifeq ("$(origin V)", "command line")
   KBUILD_VERBOSE = $(V)
 endif
