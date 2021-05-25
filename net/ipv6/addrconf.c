@@ -6045,7 +6045,7 @@ static struct addrconf_sysctl_table
 			.data			= &ipv6_devconf.ra_info_flag,
 			.maxlen			= sizeof(int),
 			.mode			= 0644,
-			.proc_handler	= proc_dointvec,
+			.proc_handler	= proc_dointvec
                },
                {
 			.procname	= "drop_unicast_in_l2_multicast",
