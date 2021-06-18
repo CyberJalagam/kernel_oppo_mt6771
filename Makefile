@@ -415,7 +415,15 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 TARGET_BUILD_VARIANT := user
+
+# OPPO BUILD PRODUCT
+ifeq ($(ALIEN_RM1),true)
 TARGET_PRODUCT := full_oppo6771_17065
+endif
+
+ifeq ($(ALIEN_RMU1),true)
+TARGET_PRODUCT := full_oppo6771_18611
+endif
 
 #ifdef  VENDOR_EDIT
 #LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
