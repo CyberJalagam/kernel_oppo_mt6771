@@ -116,3 +116,13 @@ all.config
 
 # fetched Android config fragments
 android/configs/android-*.cfg
+
+# misc
+out/
+clang/
+gcc/
+gcc32/
+AnyKernel/
+buildlog.txt
+log.txt
+transfer
