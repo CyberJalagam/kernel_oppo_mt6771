@@ -415,6 +415,7 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 TARGET_BUILD_VARIANT := user
+VENDOR_EDIT := 1
 
 # OPPO BUILD PRODUCT
 ifeq ($(ALIEN_RM1),true)
@@ -509,6 +510,7 @@ export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
 export TARGET_BUILD_VARIANT
 export TARGET_PRODUCT
+export VENDOR_EDIT
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
