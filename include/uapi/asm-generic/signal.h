@@ -86,9 +86,6 @@
 #endif
 
 #ifndef __ASSEMBLY__
-typedef struct {
-	unsigned long sig[_NSIG_WORDS];
-} sigset_t;
 
 /* not actually used, but required for linux/syscalls.h */
 typedef unsigned long old_sigset_t;

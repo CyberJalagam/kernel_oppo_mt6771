@@ -5,6 +5,10 @@
 #include <linux/bug.h>
 #include <uapi/linux/signal.h>
 
+typedef struct {
+	unsigned long sig[_NSIG_WORDS];
+} sigset_t;
+
 struct task_struct;
 
 /* for sysctl */

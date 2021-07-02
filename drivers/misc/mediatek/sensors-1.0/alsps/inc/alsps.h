@@ -150,6 +150,7 @@ struct alsps_context {
 
 	struct alsps_data	drv_data;
 	struct als_control_path	als_ctl;
+	struct als_control_path	set_cali;
 	struct als_data_path	als_data;
 	struct ps_control_path ps_ctl;
 	struct ps_data_path	ps_data;
