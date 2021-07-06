@@ -381,7 +381,7 @@ ACAO_HPS_START:
 		if (cpumask_test_cpu(i, hps_ctxt.online_core))
 			cpu_onoff |= (1<<i);
 	}
-	pr_info("CPU request is 0x%x\n", cpu_onoff);
+	pr_debug("CPU request is 0x%x\n", cpu_onoff);
 
 	if (!cpumask_empty(hps_ctxt.online_core)) {
 		aee_rr_rec_hps_cb_footprint(3);

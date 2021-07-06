@@ -44,20 +44,12 @@
  * LOG
  */
 #define EEM_TAG	 "[xxxxEEM] "
-#if 1
-	#define eem_error(fmt, args...)		pr_notice(EEM_TAG fmt, ##args)
-	#define eem_warning(fmt, args...)
-	#define eem_notice(fmt, args...)
-	#define eem_info(fmt, args...)
-	#define eem_debug(fmt, args...)
-#else
 	#define eem_error(fmt, args...)	 pr_debug(EEM_TAG fmt, ##args)
 	#define eem_warning(fmt, args...)   pr_debug(EEM_TAG fmt, ##args)
 	#define eem_notice(fmt, args...)	pr_debug(EEM_TAG fmt, ##args)
 	#define eem_info(fmt, args...)	  pr_debug(EEM_TAG fmt, ##args)
 	#define eem_debug(fmt, args...)	 pr_debug(EEM_TAG"(%d)" fmt, __LINE__, ##args)
 									/* pr_debug(EEM_TAG fmt, ##args) */
-#endif
 
 #if EN_ISR_LOG /* For Interrupt use */
 	#define eem_isr_info(fmt, args...)  eem_debug(fmt, ##args)

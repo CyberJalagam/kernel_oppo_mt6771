@@ -68,7 +68,7 @@ unsigned long dcm_mp2_ca15m_base;
 short is_dcm_bringup(void)
 {
 #ifdef DCM_BRINGUP
-	dcm_pr_info("%s: skipped for bring up\n", __func__);
+	dcm_pr_dbg("%s: skipped for bring up\n", __func__);
 	return 1;
 #else
 	return 0;
@@ -716,7 +716,7 @@ struct DCM dcm_array[NR_DCM_TYPE] = {
 
 void dcm_dump_regs(void)
 {
-	dcm_pr_info("\n******** dcm dump register *********\n");
+	dcm_pr_dbg("\n******** dcm dump register *********\n");
 	REG_DUMP(CPUSYS_RGU_SYNC_DCM);
 	REG_DUMP(L2C_SRAM_CTRL);
 	REG_DUMP(CCI_CLK_CTRL);
@@ -813,7 +813,7 @@ static int dcm_hotplug_nc(struct notifier_block *self,
 				dcm_cpu_cluster_stat |= DCM_CPU_CLUSTER_B;
 				break;
 			default:
-				dcm_pr_info("%s: action=0x%lx, cpu=%u\n",
+				dcm_pr_dbg("%s: action=0x%lx, cpu=%u\n",
 					__func__, action, cpu);
 				break;
 			}
@@ -840,7 +840,7 @@ static int dcm_hotplug_nc(struct notifier_block *self,
 				dcm_cpu_cluster_stat &= ~DCM_CPU_CLUSTER_B;
 				break;
 			default:
-				dcm_pr_info("%s: action=0x%lx, cpu=%u\n",
+				dcm_pr_dbg("%s: action=0x%lx, cpu=%u\n",
 					__func__, action, cpu);
 				break;
 			}

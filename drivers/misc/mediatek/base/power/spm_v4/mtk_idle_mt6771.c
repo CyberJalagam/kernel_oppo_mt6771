@@ -21,7 +21,7 @@
 #include <mtk_spm_reg.h>
 
 #define IDLE_TAG     "Power/swap"
-#define idle_err(fmt, args...)		pr_info(IDLE_TAG fmt, ##args)
+#define idle_err(fmt, args...)		pr_err(IDLE_TAG fmt, ##args)
 
 #define NF_CLKMUX_PASS_CRITERIA     8
 #define NF_CLKMUX_COND_SET          9 /* NF_CLKMUX_PASS_CRITERIA + 1 */

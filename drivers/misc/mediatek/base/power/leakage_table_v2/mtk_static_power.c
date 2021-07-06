@@ -31,6 +31,7 @@
 #define SPOWER_LOG_PRINT SPOWER_LOG_NONE
 
 #define SPOWER_ERR(fmt, args...)	 pr_err(SP_TAG fmt, ##args)
+#define SPOWER_DBG(fmt, args...)	 pr_debug(SP_TAG fmt, ##args)
 
 #if (SPOWER_LOG_PRINT == SPOWER_LOG_NONE)
 #define SPOWER_INFO(fmt, args...)
@@ -89,9 +90,9 @@ void interpolate_table(struct sptab_s *spt, int c1, int c2, int c3, struct sptab
 	/* avoid divid error, if we have bad raw data table */
 	if (unlikely(c1 == c2)) {
 		*spt = *tab1;
-		SPOWER_INFO("sptab equal to tab1:%d/%d\n",  c1, c3);
+		SPOWER_DBG("sptab equal to tab1:%d/%d\n",  c1, c3);
 	} else {
-		SPOWER_INFO("make sptab %d, %d, %d\n", c1, c2, c3);
+		SPOWER_DBG("make sptab %d, %d, %d\n", c1, c2, c3);
 		for (t = 0; t < tsize(spt); t++) {
 			for (v = 0; v < vsize(spt); v++) {
 				int *p = &mA(spt, v, t);
@@ -101,11 +102,11 @@ void interpolate_table(struct sptab_s *spt, int c1, int c2, int c3, struct sptab
 					   mA(tab2, v, t));
 
 				if (v == 0 || v == vsize(spt)-1)
-					SPOWER_INFO("ma1, ma2=%d, %d, %d\n", mA(tab1, v, t), mA(tab2, v, t), p[0]);
+					SPOWER_DBG("ma1, ma2=%d, %d, %d\n", mA(tab1, v, t), mA(tab2, v, t), p[0]);
 			}
-			SPOWER_INFO("\n");
+			SPOWER_DBG("\n");
 		}
-		SPOWER_INFO("make sptab done!\n");
+		SPOWER_DBG("make sptab done!\n");
 	}
 }
 
@@ -157,8 +158,8 @@ int sptab_lookup(struct sptab_s *tab, int voltage, int degree)
 	mamper = interpolate_2d(tab, x1, x2, y1, y2, voltage, degree);
 
 	/*
-	 * SPOWER_INFO("x1=%d, x2=%d, y1=%d, y2=%d\n", x1, x2, y1, y2);
-	 * SPOWER_INFO("sptab_lookup-volt=%d, deg=%d, lkg=%d\n",
+	 * SPOWER_DBG("x1=%d, x2=%d, y1=%d, y2=%d\n", x1, x2, y1, y2);
+	 * SPOWER_DBG("sptab_lookup-volt=%d, deg=%d, lkg=%d\n",
 	 *                                 voltage, degree, mamper);
 	 */
 	return mamper;
@@ -178,7 +179,7 @@ int mtk_spower_make_table(struct sptab_s *spt, int voltage, int degree, unsigned
 	/* voltage = 1150; */
 	/* degree = 30; */
 
-	SPOWER_INFO("spower_raw->table_size : %d\n", spower_raw->table_size);
+	SPOWER_DBG("spower_raw->table_size : %d\n", spower_raw->table_size);
 	/* find out target domain's 3 raw table */
 	for (i = 0; i < spower_raw->table_size; i++)
 		tab[i] = &(all_tab[id]->tab_raw[i]);
@@ -189,17 +190,17 @@ int mtk_spower_make_table(struct sptab_s *spt, int voltage, int degree, unsigned
 	/** lookup tables which the chip type locates to **/
 	for (i = 0; i < spower_raw->table_size; i++) {
 		devinfo_domain = tab[i]->devinfo_domain;
-		SPOWER_INFO("devinfo_domain : 0x%x\n", devinfo_domain);
+		SPOWER_DBG("devinfo_domain : 0x%x\n", devinfo_domain);
 		for (j = 0; j < MTK_SPOWER_MAX; j++) {
 			/* get table of reference bank, and look up target in that table */
 			if (devinfo_domain & BIT(j)) {
 				temp = (sptab_lookup(&(all_tab[j]->tab_raw[i]), voltage, degree));
-				/* SPOWER_INFO("cal table %d lkg %d\n", j, temp); */
+				/* SPOWER_DBG("cal table %d lkg %d\n", j, temp); */
 				c[i] += (temp * all_tab[j]->tab_raw[i].instance) >> 10;
-				/* SPOWER_INFO("total lkg %d\n", c[i]); */
+				/* SPOWER_DBG("total lkg %d\n", c[i]); */
 			}
 		}
-		SPOWER_INFO("done-->get c=%d\n", c[i]);
+		SPOWER_DBG("done-->get c=%d\n", c[i]);
 		if (wat >= c[i])
 			break;
 	}
@@ -222,7 +223,7 @@ int mtk_spower_make_table(struct sptab_s *spt, int voltage, int degree, unsigned
 		tspt = tab1 = tab2 = tab[spower_raw->table_size-1];
 #endif /* #if defined(EXTER_POLATION) */
 
-		SPOWER_INFO("sptab max tab:%d/%d\n",  wat, c[i]);
+		SPOWER_DBG("sptab max tab:%d/%d\n",  wat, c[i]);
 	} else if (i == 0) {
 #if defined(EXTER_POLATION)
 		/** below all **/
@@ -235,13 +236,13 @@ int mtk_spower_make_table(struct sptab_s *spt, int voltage, int degree, unsigned
 		tspt = tab1 = tab2 = tab[0];
 #endif /* #if defined(EXTER_POLATION) */
 
-		SPOWER_INFO("sptab min tab:%d/%d\n",  wat, c[i]);
+		SPOWER_DBG("sptab min tab:%d/%d\n",  wat, c[i]);
 	} else if (wat == c[i]) {
 		/** just match **/
 		tab1 = tab2 = tab[i];
 		/** pointer duplicate  **/
 		tspt = tab1;
-		SPOWER_INFO("sptab equal to tab:%d/%d\n",  wat, c[i]);
+		SPOWER_DBG("sptab equal to tab:%d/%d\n",  wat, c[i]);
 	} else {
 		/** anyone **/
 		tab1 = tab[i-1];
@@ -249,7 +250,7 @@ int mtk_spower_make_table(struct sptab_s *spt, int voltage, int degree, unsigned
 
 		/** occupy the free container**/
 		tspt = tab[(i+1)%spower_raw->table_size];
-		SPOWER_INFO("sptab interpolate tab:%d/%d, i:%d\n",  wat, c[i], i);
+		SPOWER_DBG("sptab interpolate tab:%d/%d, i:%d\n",  wat, c[i], i);
 	}
 
 
@@ -271,7 +272,7 @@ void mtk_spower_ut(void)
 	for (i = 0; i < MTK_SPOWER_MAX; i++) {
 		struct sptab_s *spt = &sptab[i];
 
-		SPOWER_INFO("This is %s\n", spower_name[i]);
+		SPOWER_DBG("This is %s\n", spower_name[i]);
 
 		/* new test case */
 		v = 300;
@@ -370,8 +371,8 @@ void mtk_spower_ut(void)
 		t = 10;
 		p = mt_spower_get_leakage(i, v, t);
 
-		SPOWER_INFO("%s efuse: %d\n", spower_name[i], mt_spower_get_efuse_lkg(i));
-		SPOWER_INFO("%s Done\n", spower_name[i]);
+		SPOWER_DBG("%s efuse: %d\n", spower_name[i], mt_spower_get_efuse_lkg(i));
+		SPOWER_DBG("%s Done\n", spower_name[i]);
 	}
 }
 #endif
@@ -429,7 +430,7 @@ int mt_spower_init(void)
 	for (i = 0; i < MTK_LEAKAGE_MAX; i++) {
 		devinfo = (int)get_devinfo_with_index(spower_lkg_info[i].devinfo_idx);
 		temp_lkg = (devinfo >> spower_lkg_info[i].devinfo_offset) & 0xff;
-		SPOWER_INFO("[Efuse] %s => 0x%x\n", spower_lkg_info[i].name, temp_lkg);
+		SPOWER_DBG("[Efuse] %s => 0x%x\n", spower_lkg_info[i].name, temp_lkg);
 		/* if has leakage info in efuse, get the final leakage */
 		/* if no leakage info in efuse, spower_lkg_info[i].value will use default lkg */
 
@@ -437,19 +438,19 @@ int mt_spower_init(void)
 			temp_lkg = (int) devinfo_table[temp_lkg];
 			spower_lkg_info[i].value = (int) (temp_lkg * spower_lkg_info[i].v_of_fuse / 1000);
 		}
-		SPOWER_INFO("[Efuse Leakage] %s => 0x%x\n", spower_lkg_info[i].name, temp_lkg);
-		SPOWER_INFO("[Final Leakage] %s => %d\n", spower_lkg_info[i].name, spower_lkg_info[i].value);
+		SPOWER_DBG("[Efuse Leakage] %s => 0x%x\n", spower_lkg_info[i].name, temp_lkg);
+		SPOWER_DBG("[Final Leakage] %s => %d\n", spower_lkg_info[i].name, spower_lkg_info[i].value);
 	}
 #endif
-	SPOWER_INFO("spower table construct\n");
+	SPOWER_DBG("spower table construct\n");
 	/** structurize the raw data **/
 	for (i = 0; i < MTK_SPOWER_MAX; i++) {
 		spower_tab_construct(tab[i]->tab_raw, &spower_raw[i], i);
-		SPOWER_INFO("table %d done\n", tab[i]->tab_raw[0].spower_id);
+		SPOWER_DBG("table %d done\n", tab[i]->tab_raw[0].spower_id);
 	}
 
 	for (i = 0; i < MTK_SPOWER_MAX; i++) {
-		SPOWER_INFO("%s\n", spower_name[i]);
+		SPOWER_DBG("%s\n", spower_name[i]);
 		idx = tab[i]->tab_raw[0].leakage_id;
 		v_of_fuse = spower_lkg_info[idx].v_of_fuse;
 		t_of_fuse = spower_lkg_info[idx].t_of_fuse;
@@ -460,9 +461,9 @@ int mt_spower_init(void)
 	p_buf += sprintf(p_buf, "\n");
 
 #if defined(MTK_SPOWER_UT)
-	SPOWER_INFO("Start SPOWER UT!\n");
+	SPOWER_DBG("Start SPOWER UT!\n");
 	mtk_spower_ut();
-	SPOWER_INFO("End SPOWER UT!\n");
+	SPOWER_DBG("End SPOWER UT!\n");
 #endif
 
 	/* print static_power_buf and generate debugfs node */
@@ -500,7 +501,7 @@ int mt_spower_get_leakage(int dev, unsigned int vol, int deg)
 
 	ret = sptab_lookup(&sptab[dev], (int)vol, deg) >> 10;
 
-	SPOWER_INFO("mt_spower_get_leakage-dev=%d, volt=%d, deg=%d, lkg=%d\n",
+	SPOWER_DBG("mt_spower_get_leakage-dev=%d, volt=%d, deg=%d, lkg=%d\n",
 		    dev, vol, deg, ret);
 	return ret;
 }

@@ -44,7 +44,7 @@
 #define clk_buf_pr_dbg(fmt, args...)			\
 	do {						\
 		if (clkbuf_debug)			\
-			pr_info(TAG fmt, ##args);	\
+			pr_debug(TAG fmt, ##args);	\
 	} while (0)
 
 #define clkbuf_readl(addr)			__raw_readl(addr)
