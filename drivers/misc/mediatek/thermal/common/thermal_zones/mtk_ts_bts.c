@@ -974,15 +974,15 @@ void mtkts_bts_prepare_table(int table_num)
 		break;
 	}
 
-	pr_notice("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
+	pr_debug("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
 #if 0
 	{
 		int i = 0;
 		for (i = 0; i < (ntc_tbl_size
 			/ sizeof(struct BTS_TEMPERATURE)); i++) {
-			pr_notice("BTS_Temperature_Table[%d].APteryTemp =%d\n",
+			pr_debug("BTS_Temperature_Table[%d].APteryTemp =%d\n",
 				i, BTS_Temperature_Table[i].BTS_Temp);
-			pr_notice("BTS_Temperature_Table[%d].TemperatureR=%d\n",
+			pr_debug("BTS_Temperature_Table[%d].TemperatureR=%d\n",
 				i, BTS_Temperature_Table[i].TemperatureR);
 		}
 	}

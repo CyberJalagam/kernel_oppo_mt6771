@@ -24,7 +24,7 @@
 
 static int cl_debug_flag;
 
-#define mtk_cooler_3Gmutt_dprintk_always(fmt, args...)pr_notice("[Thermal/TC/3Gmutt]" fmt, ##args)
+#define mtk_cooler_3Gmutt_dprintk_always(fmt, args...)pr_debug("[Thermal/TC/3Gmutt]" fmt, ##args)
 
 
 #define mtk_cooler_3Gmutt_dprintk(fmt, args...) \

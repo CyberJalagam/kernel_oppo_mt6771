@@ -114,7 +114,7 @@ static __s32 tsbuck3_raw_to_temp(__u32 ret)
 
 static void mtktspmic_read_efuse(void)
 {
-	mtktspmic_info("[pmic_debug]  start\n");
+	mtktspmic_dprintk("[pmic_debug]  start\n");
 	g_adc_cali_en = pmic_get_register_value(PMIC_AUXADC_EFUSE_ADC_CALI_EN);
 	g_degc_cali = pmic_get_register_value(PMIC_AUXADC_EFUSE_DEGC_CALI);
 	g_o_vts = pmic_get_register_value(PMIC_AUXADC_EFUSE_O_VTS);
@@ -125,17 +125,17 @@ static void mtktspmic_read_efuse(void)
 	g_o_slope = pmic_get_register_value(PMIC_AUXADC_EFUSE_O_SLOPE);
 	g_id = pmic_get_register_value(PMIC_AUXADC_EFUSE_ID);
 
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_vts        = %d\n", g_o_vts);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_vts_2      = %d\n", g_o_vts_2);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_vts_3      = %d\n", g_o_vts_3);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_4rsv0      = %d\n", g_o_4rsv0);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_degc_cali    = %d\n", g_degc_cali);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_adc_cali_en  = %d\n", g_adc_cali_en);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_slope      = %d\n", g_o_slope);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_o_slope_sign = %d\n", g_o_slope_sign);
-	mtktspmic_info("[pmic_debug] 6358_efuse: g_id		   = %d\n", g_id);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_vts        = %d\n", g_o_vts);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_vts_2      = %d\n", g_o_vts_2);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_vts_3      = %d\n", g_o_vts_3);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_4rsv0      = %d\n", g_o_4rsv0);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_degc_cali    = %d\n", g_degc_cali);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_adc_cali_en  = %d\n", g_adc_cali_en);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_slope      = %d\n", g_o_slope);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_o_slope_sign = %d\n", g_o_slope_sign);
+	mtktspmic_dprintk("[pmic_debug] 6358_efuse: g_id		   = %d\n", g_id);
 
-	mtktspmic_info("[pmic_debug]  end\n");
+	mtktspmic_dprintk("[pmic_debug]  end\n");
 }
 
 void mtktspmic_cali_prepare(void)
@@ -148,7 +148,7 @@ void mtktspmic_cali_prepare(void)
 	/* g_adc_cali_en=0;//FIX ME */
 
 	if (g_adc_cali_en == 0) {	/* no calibration */
-		mtktspmic_info("[pmic_debug]  It isn't calibration values\n");
+		mtktspmic_dprintk("[pmic_debug]  It isn't calibration values\n");
 		g_o_vts = 1600;
 		g_o_vts_2 = 1600;
 		g_o_vts_3 = 1600;
@@ -162,15 +162,15 @@ void mtktspmic_cali_prepare(void)
 	if (g_degc_cali < 38 || g_degc_cali > 60)
 		g_degc_cali = 53;
 
-	mtktspmic_info("[pmic_debug] g_o_vts        = 0x%x\n", g_o_vts);
-	mtktspmic_info("[pmic_debug] g_o_vts_2      = 0x%x\n", g_o_vts_2);
-	mtktspmic_info("[pmic_debug] g_o_vts_3      = 0x%x\n", g_o_vts_3);
-	mtktspmic_info("[pmic_debug] g_o_4rsv0      = 0x%x\n", g_o_4rsv0);
-	mtktspmic_info("[pmic_debug] g_degc_cali    = 0x%x\n", g_degc_cali);
-	mtktspmic_info("[pmic_debug] g_adc_cali_en  = 0x%x\n", g_adc_cali_en);
-	mtktspmic_info("[pmic_debug] g_o_slope      = 0x%x\n", g_o_slope);
-	mtktspmic_info("[pmic_debug] g_o_slope_sign = 0x%x\n", g_o_slope_sign);
-	mtktspmic_info("[pmic_debug] g_id           = 0x%x\n", g_id);
+	mtktspmic_dprintk("[pmic_debug] g_o_vts        = 0x%x\n", g_o_vts);
+	mtktspmic_dprintk("[pmic_debug] g_o_vts_2      = 0x%x\n", g_o_vts_2);
+	mtktspmic_dprintk("[pmic_debug] g_o_vts_3      = 0x%x\n", g_o_vts_3);
+	mtktspmic_dprintk("[pmic_debug] g_o_4rsv0      = 0x%x\n", g_o_4rsv0);
+	mtktspmic_dprintk("[pmic_debug] g_degc_cali    = 0x%x\n", g_degc_cali);
+	mtktspmic_dprintk("[pmic_debug] g_adc_cali_en  = 0x%x\n", g_adc_cali_en);
+	mtktspmic_dprintk("[pmic_debug] g_o_slope      = 0x%x\n", g_o_slope);
+	mtktspmic_dprintk("[pmic_debug] g_o_slope_sign = 0x%x\n", g_o_slope_sign);
+	mtktspmic_dprintk("[pmic_debug] g_id           = 0x%x\n", g_id);
 
 }
 
@@ -197,7 +197,7 @@ void mtktspmic_cali_prepare2(void)
 
 	g_intercept = g_intercept + (g_degc_cali * (1000 / 2));	/* 1000 is for 0.1 degree */
 
-	mtktspmic_info("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
+	mtktspmic_dprintk("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
 		       g_slope1, g_slope2, g_intercept, vbe_t);
 
 	factor = 1863;
@@ -218,7 +218,7 @@ void mtktspmic_cali_prepare2(void)
 
 	g_tsbuck1_intercept = g_tsbuck1_intercept + (g_degc_cali * (1000 / 2));	/* 1000 is for 0.1 degree */
 
-	mtktspmic_info("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
+	mtktspmic_dprintk("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
 		       g_tsbuck1_slope1, g_tsbuck1_slope2, g_tsbuck1_intercept, vbe_t);
 
 	factor = 1863;
@@ -239,7 +239,7 @@ void mtktspmic_cali_prepare2(void)
 
 	g_tsbuck2_intercept = g_tsbuck2_intercept + (g_degc_cali * (1000 / 2));	/* 1000 is for 0.1 degree */
 
-	mtktspmic_info("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
+	mtktspmic_dprintk("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
 		       g_tsbuck2_slope1, g_tsbuck2_slope2, g_tsbuck2_intercept, vbe_t);
 
 	factor = 1863;
@@ -260,7 +260,7 @@ void mtktspmic_cali_prepare2(void)
 
 	g_tsbuck3_intercept = g_tsbuck3_intercept + (g_degc_cali * (1000 / 2));	/* 1000 is for 0.1 degree */
 
-	mtktspmic_info("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
+	mtktspmic_dprintk("[Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
 		       g_tsbuck3_slope1, g_tsbuck3_slope2, g_tsbuck3_intercept, vbe_t);
 
 }
@@ -278,15 +278,15 @@ int mtktspmic_get_hw_temp(void)
 	mtktspmic_dprintk("[pmic_debug] Raw=%d, T=%d\n", temp, temp1);
 
 	if ((temp1 > 100000) || (temp1 < -30000))
-		mtktspmic_info("[mtktspmic_get_hw_temp] raw=%d, PMIC T=%d", temp, temp1);
+		mtktspmic_dprintk("[mtktspmic_get_hw_temp] raw=%d, PMIC T=%d", temp, temp1);
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
-		mtktspmic_info("[mtktspmic_get_hw_temp] temp(%d) too high, drop this data!\n",
+		mtktspmic_dprintk("[mtktspmic_get_hw_temp] temp(%d) too high, drop this data!\n",
 			       temp1);
 		temp1 = pre_temp1;
 	} else if ((PMIC_counter != 0)
 		   && (((pre_temp1 - temp1) > 30000) || ((temp1 - pre_temp1) > 30000))) {
-		mtktspmic_info("[mtktspmic_get_hw_temp] temp diff too large, drop this data\n");
+		mtktspmic_dprintk("[mtktspmic_get_hw_temp] temp diff too large, drop this data\n");
 		temp1 = pre_temp1;
 	} else {
 		/* update previous temp */
@@ -315,15 +315,15 @@ int mt6358tsbuck1_get_hw_temp(void)
 	mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 100000) || (temp1 < -30000))
-		mtktspmic_info("%s raw=%d T=%d\n", __func__, temp, temp1);
+		mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
-		mtktspmic_info("%s T=%d too high, drop it!\n", __func__,
+		mtktspmic_dprintk("%s T=%d too high, drop it!\n", __func__,
 				   temp1);
 		temp1 = pre_tsbuck1_temp1;
 	} else if ((tsbuck1_cnt != 0)
 		   && (((pre_tsbuck1_temp1 - temp1) > 30000) || ((temp1 - pre_tsbuck1_temp1) > 30000))) {
-		mtktspmic_info("%s delta temp too large, drop it!\n", __func__);
+		mtktspmic_dprintk("%s delta temp too large, drop it!\n", __func__);
 		temp1 = pre_tsbuck1_temp1;
 	} else {
 		/* update previous temp */
@@ -352,15 +352,15 @@ int mt6358tsbuck2_get_hw_temp(void)
 	mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 100000) || (temp1 < -30000))
-		mtktspmic_info("%s raw=%d T=%d\n", __func__, temp, temp1);
+		mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
-		mtktspmic_info("%s T=%d too high, drop it!\n", __func__,
+		mtktspmic_dprintk("%s T=%d too high, drop it!\n", __func__,
 				   temp1);
 		temp1 = pre_tsbuck2_temp1;
 	} else if ((tsbuck2_cnt != 0)
 		   && (((pre_tsbuck2_temp1 - temp1) > 30000) || ((temp1 - pre_tsbuck2_temp1) > 30000))) {
-		mtktspmic_info("%s delta temp too large, drop it!\n", __func__);
+		mtktspmic_dprintk("%s delta temp too large, drop it!\n", __func__);
 		temp1 = pre_tsbuck2_temp1;
 	} else {
 		/* update previous temp */
@@ -389,15 +389,15 @@ int mt6358tsbuck3_get_hw_temp(void)
 	mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 100000) || (temp1 < -30000))
-		mtktspmic_info("%s raw=%d T=%d\n", __func__, temp, temp1);
+		mtktspmic_dprintk("%s raw=%d T=%d\n", __func__, temp, temp1);
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
-		mtktspmic_info("%s T=%d too high, drop it!\n", __func__,
+		mtktspmic_dprintk("%s T=%d too high, drop it!\n", __func__,
 				   temp1);
 		temp1 = pre_tsbuck3_temp1;
 	} else if ((tsbuck3_cnt != 0)
 		   && (((pre_tsbuck3_temp1 - temp1) > 30000) || ((temp1 - pre_tsbuck3_temp1) > 30000))) {
-		mtktspmic_info("%s delta temp too large, drop it!\n", __func__);
+		mtktspmic_dprintk("%s delta temp too large, drop it!\n", __func__);
 		temp1 = pre_tsbuck3_temp1;
 	} else {
 		/* update previous temp */

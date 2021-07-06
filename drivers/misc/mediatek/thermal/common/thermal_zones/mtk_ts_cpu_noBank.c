@@ -234,7 +234,7 @@ static void temp_valid_unlock(unsigned long *flags);
 unsigned int  __attribute__((weak))
 mt_gpufreq_get_max_power(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_debug("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
