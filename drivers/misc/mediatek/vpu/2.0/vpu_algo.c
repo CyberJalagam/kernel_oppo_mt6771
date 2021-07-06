@@ -161,7 +161,7 @@ int vpu_get_algo_id_by_name(int core, char *name)
 	LOG_DBG("ret:%d\n", ret);
 	CHECK_RET("vpu_find_algo_by_name fail, name=%s\n", name);
 	algo_id = algo->id[core];
-	LOG_INF("vpu(%d)_get algo_id:%d\n", core, algo_id);
+	LOG_DBG("vpu(%d)_get algo_id:%d\n", core, algo_id);
 	return algo_id;
 
 out:
@@ -237,13 +237,13 @@ int vpu_create_algo(int core, char *name, struct vpu_algo **ralgo, bool needload
 		LOG_DBG("[vpu_%d] vpu_hw_load_algo done\n", core);
 		ret = vpu_hw_get_algo_info(core, algo);
 		CHECK_RET("vpu_hw_get_algo_info failed!\n");
-		LOG_INF("[vpu_%d] vpu_hw_get_algo_info done\n", core);
+		LOG_DBG("[vpu_%d] vpu_hw_get_algo_info done\n", core);
 		ret = vpu_calc_prop_offset(algo->info_descs, algo->info_desc_count, &algo->info_length);
 		CHECK_RET("vpu_calc_prop_offset[info] failed!\n");
-		LOG_INF("[vpu_%d] vpu_calc_prop_offset done,algo->info_length(0x%x)\n", core, algo->info_length);
+		LOG_DBG("[vpu_%d] vpu_calc_prop_offset done,algo->info_length(0x%x)\n", core, algo->info_length);
 		ret = vpu_calc_prop_offset(algo->sett_descs, algo->sett_desc_count, &algo->sett_length);
 		CHECK_RET("vpu_calc_prop_offset[sett] failed!\n");
-		LOG_INF("[vpu_%d] vpu_calc_prop_offset done,algo->sett_length(0x%x)\n", core, algo->sett_length);
+		LOG_DBG("[vpu_%d] vpu_calc_prop_offset done,algo->sett_length(0x%x)\n", core, algo->sett_length);
 	}
 	*ralgo = algo;
 	return 0;
