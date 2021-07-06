@@ -37,7 +37,7 @@ static int debug = DEBUG_OFF;
 				pr_debug(GPU_TUNER_TAG fmt, ##args); \
 		} while (0)
 #define GPU_TUNER_INFO(fmt, args...) pr_info(GPU_TUNER_TAG fmt, ##args)
-#define GPU_TUNER_ERROR(fmt, args...) pr_info(GPU_TUNER_TAG fmt, ##args)
+#define GPU_TUNER_ERROR(fmt, args...) pr_err(GPU_TUNER_TAG fmt, ##args)
 
 static void _tolower_s(
 		char *p)
@@ -373,7 +373,7 @@ static ssize_t _ged_debug_write_entry(
 	if (ret == NUM_TOKEN) {
 		val = acBuffer + index[0];
 		ret = kstrtoint(val, 0, &value);
-		GPU_TUNER_INFO("debug(%d)\n", value);
+		GPU_TUNER_DEBUG("debug(%d)\n", value);
 		debug = value;
 	} else {
 		GPU_TUNER_ERROR("[%s] invalid input\n", __func__);
