@@ -974,7 +974,7 @@ void mtkts_btsmdpa_prepare_table(int table_num)
 		break;
 	}
 
-	pr_notice("[Thermal/TZ/BTSMDPA] %s table_num=%d\n",
+	pr_debug("[Thermal/TZ/BTSMDPA] %s table_num=%d\n",
 						__func__, table_num);
 
 #if 0
@@ -983,10 +983,10 @@ void mtkts_btsmdpa_prepare_table(int table_num)
 		for (i = 0; i < (ntc_tbl_size
 					/ sizeof(struct BTSMDPA_TEMPERATURE));
 		     i++) {
-			pr_notice(
+			pr_debug(
 				"BTSMDPA_Temperature_Table[%d].APteryTemp =%d\n",
 				i, BTSMDPA_Temperature_Table[i].BTSMDPA_Temp);
-			pr_notice(
+			pr_debug(
 				"BTSMDPA_Temperature_Table[%d].TemperatureR=%d\n",
 				i, BTSMDPA_Temperature_Table[i].TemperatureR);
 		}

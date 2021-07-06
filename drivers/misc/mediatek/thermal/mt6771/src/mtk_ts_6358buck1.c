@@ -133,7 +133,7 @@ static int mt6358tsbuck1_bind(struct thermal_zone_device *thermal, struct therma
 	}
 
 	if (mtk_thermal_zone_bind_cooling_device(thermal, table_val, cdev)) {
-		mtktspmic_info("[mt6358tsbuck1_bind] error binding cooling dev\n");
+		mtktspmic_dprintk("[mt6358tsbuck1_bind] error binding cooling dev\n");
 		return -EINVAL;
 	}
 
@@ -180,7 +180,7 @@ static int mt6358tsbuck1_unbind(struct thermal_zone_device *thermal,
 		return 0;
 
 	if (thermal_zone_unbind_cooling_device(thermal, table_val, cdev)) {
-		mtktspmic_info("[mt6358tsbuck1_unbind] error unbinding cooling dev\n");
+		mtktspmic_dprintk("[mt6358tsbuck1_unbind] error unbinding cooling dev\n");
 		return -EINVAL;
 	}
 
@@ -248,10 +248,10 @@ static int mt6358tsbuck1_sysrst_set_cur_state(struct thermal_cooling_device *cde
 {
 	cl_dev_sysrst_state = state;
 	if (cl_dev_sysrst_state == 1) {
-		mtktspmic_info("MT6358TSBUCK1 OT: reset, reset, reset!!!");
-		mtktspmic_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-		mtktspmic_info("*****************************************");
-		mtktspmic_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+		mtktspmic_dprintk("MT6358TSBUCK1 OT: reset, reset, reset!!!");
+		mtktspmic_dprintk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+		mtktspmic_dprintk("*****************************************");
+		mtktspmic_dprintk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
 #if 0	/* temp marked off to check temperature correctness. */
 		BUG();
@@ -501,7 +501,7 @@ static int __init mt6358tsbuck1_init(void)
 	struct proc_dir_entry *entry = NULL;
 	struct proc_dir_entry *mt6358tsbuck1_dir = NULL;
 
-	mtktspmic_info("[mt6358tsbuck1_init]\n");
+	mtktspmic_dprintk("[mt6358tsbuck1_init]\n");
 
 	mtktspmic_cali_prepare();
 	mtktspmic_cali_prepare2();
@@ -515,7 +515,7 @@ static int __init mt6358tsbuck1_init(void)
 
 	mt6358tsbuck1_dir = mtk_thermal_get_proc_drv_therm_dir_entry();
 	if (!mt6358tsbuck1_dir) {
-		mtktspmic_info("[%s]: mkdir /proc/driver/thermal failed\n", __func__);
+		mtktspmic_dprintk("[%s]: mkdir /proc/driver/thermal failed\n", __func__);
 	} else {
 		entry =
 		    proc_create("tz6358buck1", S_IRUGO | S_IWUSR | S_IWGRP, mt6358tsbuck1_dir,
@@ -535,7 +535,7 @@ err_unreg:
 
 static void __exit mt6358tsbuck1_exit(void)
 {
-	mtktspmic_info("[mt6358tsbuck1_exit]\n");
+	mtktspmic_dprintk("[mt6358tsbuck1_exit]\n");
 	mt6358tsbuck1_unregister_thermal();
 	mt6358tsbuck1_unregister_cooler();
 	mtkTTimer_unregister("mt6358tsbuck1");

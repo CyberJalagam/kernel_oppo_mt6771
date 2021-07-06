@@ -128,7 +128,7 @@ static int mtktspmic_bind(struct thermal_zone_device *thermal, struct thermal_co
 	}
 
 	if (mtk_thermal_zone_bind_cooling_device(thermal, table_val, cdev)) {
-		mtktspmic_info("[mtktspmic_bind] error binding cooling dev\n");
+		mtktspmic_dprintk("[mtktspmic_bind] error binding cooling dev\n");
 		return -EINVAL;
 	}
 
@@ -175,7 +175,7 @@ static int mtktspmic_unbind(struct thermal_zone_device *thermal,
 		return 0;
 
 	if (thermal_zone_unbind_cooling_device(thermal, table_val, cdev)) {
-		mtktspmic_info("[mtktspmic_unbind] error unbinding cooling dev\n");
+		mtktspmic_dprintk("[mtktspmic_unbind] error unbinding cooling dev\n");
 		return -EINVAL;
 	}
 
@@ -243,10 +243,10 @@ static int tspmic1_sysrst_set_cur_state(struct thermal_cooling_device *cdev, uns
 {
 	cl_dev_sysrst_state = state;
 	if (cl_dev_sysrst_state == 1) {
-		mtktspmic_info("Power/PMIC_Thermal: reset, reset, reset!!!");
-		mtktspmic_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-		mtktspmic_info("*****************************************");
-		mtktspmic_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+		mtktspmic_dprintk("Power/PMIC_Thermal: reset, reset, reset!!!");
+		mtktspmic_dprintk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+		mtktspmic_dprintk("*****************************************");
+		mtktspmic_dprintk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
 		BUG();
 
@@ -519,7 +519,7 @@ static ssize_t mtktspmic_write_log(struct file *file, const char __user *buffer,
 
 		return count;
 	}
-	mtktspmic_info("mtktspmic_write_log bad argument\n");
+	mtktspmic_dprintk("mtktspmic_write_log bad argument\n");
 	return -EINVAL;
 
 }
@@ -546,7 +546,7 @@ static int __init mtktspmic_init(void)
 	struct proc_dir_entry *entry = NULL;
 	struct proc_dir_entry *mtktspmic_dir = NULL;
 
-	mtktspmic_info("[mtktspmic_init]\n");
+	mtktspmic_dprintk("[mtktspmic_init]\n");
 
 /*
 *	bit4	RG_VBUF_EN	1: turn on Vbuf.
@@ -558,7 +558,7 @@ static int __init mtktspmic_init(void)
 *
 *	pmic_data = ts_pmic_read(0x0E9E);
 *    if((pmic_data>>4&0x1)!=1 || (pmic_data>>2&0x1)!=0)
-*	mtktspmic_info("[mtktspmic_init]: Warrning !!! Need to checking this !!!!!\n");
+*	mtktspmic_dprintk("[mtktspmic_init]: Warrning !!! Need to checking this !!!!!\n");
 */
 	mtktspmic_cali_prepare_1();
 	mtktspmic_cali_prepare2_1();
@@ -572,7 +572,7 @@ static int __init mtktspmic_init(void)
 
 	mtktspmic_dir = mtk_thermal_get_proc_drv_therm_dir_entry();
 	if (!mtktspmic_dir) {
-		mtktspmic_info("[%s]: mkdir /proc/driver/thermal failed\n", __func__);
+		mtktspmic_dprintk("[%s]: mkdir /proc/driver/thermal failed\n", __func__);
 	} else {
 		entry =
 		    proc_create("tzpmic1", S_IRUGO | S_IWUSR | S_IWGRP, mtktspmic_dir,
@@ -596,7 +596,7 @@ err_unreg:
 
 static void __exit mtktspmic_exit(void)
 {
-	mtktspmic_info("[mtktspmic_exit]\n");
+	mtktspmic_dprintk("[mtktspmic_exit]\n");
 	mtktspmic_unregister_thermal();
 	mtktspmic_unregister_cooler();
 	mtkTTimer_unregister("mtktspmic");
