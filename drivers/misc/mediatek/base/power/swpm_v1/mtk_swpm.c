@@ -281,7 +281,7 @@ static void get_rec_addr(void)
 	rec_virt_addr = sspm_reserve_mem_get_virt(SWPM_MEM_ID);
 	rec_size = sspm_reserve_mem_get_size(SWPM_MEM_ID);
 
-	swpm_info("phy_addr = 0x%llx, virt_addr=0x%llx, size = %llu\n",
+	swpm_dbg("phy_addr = 0x%llx, virt_addr=0x%llx, size = %llu\n",
 		(unsigned long long)rec_phys_addr,
 		(unsigned long long)rec_virt_addr,
 		rec_size);
@@ -321,7 +321,7 @@ static int __init swpm_init(void)
 #endif
 #endif
 
-	swpm_info("SWPM init done!\n");
+	swpm_dbg("SWPM init done!\n");
 
 	return 0;
 }

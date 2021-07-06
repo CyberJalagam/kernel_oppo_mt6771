@@ -454,7 +454,7 @@ int get_spm_last_wakeup_src(struct seq_file *s, void *unused)
 
 void spm_output_sleep_option(void)
 {
-	spm_notice("PWAKE_EN:%d, PCMWDT_EN:%d, BYPASS_SYSPWREQ:%d\n",
+	spm_debug("PWAKE_EN:%d, PCMWDT_EN:%d, BYPASS_SYSPWREQ:%d\n",
 		   SPM_PWAKE_EN, SPM_PCMWDT_EN, SPM_BYPASS_SYSPWREQ);
 }
 

@@ -416,19 +416,19 @@ static ssize_t udi_reg_proc_write(struct file *file, const char __user *buffer, 
 	if (sscanf(buf, "%1s %x %d %d %x", udi_rw, &udi_addr_phy, &udi_reg_msb, &udi_reg_lsb, &udi_value) == 5) {
 		/* f format or 'f', addr, MSB, LSB, value */
 		udi_reg_field(udi_addr_phy, udi_reg_msb : udi_reg_lsb, udi_value);
-		udi_info("Read back, Reg[%x] = 0x%zx.\n",
+		udi_debug("Read back, Reg[%x] = 0x%zx.\n",
 				udi_addr_phy, udi_reg_read(udi_addr_phy));
 	} else if (sscanf(buf, "%1s %x %x", udi_rw, &udi_addr_phy, &udi_value) == 3) {
 		/* w format or 'w', addr, value */
 		udi_reg_write(udi_addr_phy, udi_value);
-		udi_info("Read back, Reg[%x] = 0x%zx.\n",
+		udi_debug("Read back, Reg[%x] = 0x%zx.\n",
 				udi_addr_phy, udi_reg_read(udi_addr_phy));
 	} else if (sscanf(buf, "%1s %x", udi_rw, &udi_addr_phy) == 2) {
 		/* r format or 'r', addr */
-		udi_info("Read back, aReg[%x] = 0x%zx.\n",
+		udi_debug("Read back, aReg[%x] = 0x%zx.\n",
 				udi_addr_phy, udi_reg_read(udi_addr_phy));
 	} else {
-		udi_info("echo dbg_lv (dec) > /proc/udi/udi_debug\n");
+		udi_debug("echo dbg_lv (dec) > /proc/udi/udi_debug\n");
 		memset(udi_rw, 0, sizeof(udi_rw));
 	}
 
@@ -768,7 +768,7 @@ static ssize_t udi_bit_ctrl_proc_write(struct file *file, const char __user *buf
 		tms_bit = recv[2];
 		ntrst_bit = recv[3];
 		tdo_bit = udi_bit_ctrl(recv[0], recv[1], recv[2], recv[3]);
-		udi_info("Olympus SW UDI: TCK=%x, TDI=%x, TMS=%x, nTRST=%x, TDO=%x\n",
+		udi_debug("Olympus SW UDI: TCK=%x, TDI=%x, TMS=%x, nTRST=%x, TDO=%x\n",
 				tck_bit, tdi_bit, tms_bit, ntrst_bit, tdo_bit);
 	}
 
@@ -807,7 +807,7 @@ static ssize_t udi_bit_ctrl_big_proc_write(struct file *file, const char __user 
 		tms_bit_big = recv[2];
 		ntrst_bit_big = recv[3];
 		tdo_bit_big = udi_bit_ctrl_big(recv[0], recv[1], recv[2], recv[3]);
-		udi_info("BIG SW UDI: TCK=%x, TDI=%x, TMS=%x, nTRST=%x, TDO=%x\n",
+		udi_debug("BIG SW UDI: TCK=%x, TDI=%x, TMS=%x, nTRST=%x, TDO=%x\n",
 				tck_bit_big, tdi_bit_big, tms_bit_big, ntrst_bit_big, tdo_bit_big);
 	}
 
@@ -947,7 +947,7 @@ out2:
 
 static void __exit udi_exit(void)
 {
-	udi_info("UDI de-initialization\n");
+	udi_debug("UDI de-initialization\n");
 	platform_driver_unregister(&udi_pdrv);
 	platform_device_unregister(&udi_pdev);
 }

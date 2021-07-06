@@ -87,7 +87,7 @@ static ssize_t cpufreq_debug_proc_write(struct file *file, const char __user *bu
 
 	rc = kstrtoint(buf, 10, &dbg_lv);
 	if (rc < 0)
-		tag_pr_info("echo dbg_lv (dec) > /proc/cpufreq/cpufreq_debug\n");
+		tag_pr_debug("echo dbg_lv (dec) > /proc/cpufreq/cpufreq_debug\n");
 	else
 		func_lv_mask = dbg_lv;
 
@@ -117,7 +117,7 @@ static ssize_t cpufreq_power_mode_proc_write(struct file *file, const char __use
 		dvfs_power_mode = mode;
 		tag_pr_debug("%s start\n", power_mode_str[mode]);
 	} else {
-		tag_pr_info("echo 0/1/2/3 > /proc/cpufreq/cpufreq_power_mode\n");
+		tag_pr_debug("echo 0/1/2/3 > /proc/cpufreq/cpufreq_power_mode\n");
 	}
 
 	free_page((unsigned long)buf);
@@ -142,7 +142,7 @@ static ssize_t cpufreq_stress_test_proc_write(struct file *file, const char __us
 		return -EINVAL;
 	rc = kstrtoint(buf, 10, &do_stress);
 	if (rc < 0)
-		tag_pr_info("echo 0/1 > /proc/cpufreq/cpufreq_stress_test\n");
+		tag_pr_debug("echo 0/1 > /proc/cpufreq/cpufreq_stress_test\n");
 	else {
 		do_dvfs_stress_test = do_stress;
 #ifdef CONFIG_HYBRID_CPU_DVFS
@@ -190,7 +190,7 @@ static ssize_t cpufreq_oppidx_proc_write(struct file *file, const char __user *b
 	rc = kstrtoint(buf, 10, &oppidx);
 	if (rc < 0) {
 		p->dvfs_disable_by_procfs = false;
-		tag_pr_info("echo oppidx > /proc/cpufreq/%s/cpufreq_oppidx\n", p->name);
+		tag_pr_debug("echo oppidx > /proc/cpufreq/%s/cpufreq_oppidx\n", p->name);
 	} else {
 		if (oppidx >= 0 && oppidx < p->nr_opp_tbl) {
 			p->dvfs_disable_by_procfs = true;
@@ -203,7 +203,7 @@ static ssize_t cpufreq_oppidx_proc_write(struct file *file, const char __user *b
 #endif
 		} else {
 			p->dvfs_disable_by_procfs = false;
-			tag_pr_info("echo oppidx > /proc/cpufreq/%s/cpufreq_oppidx\n", p->name);
+			tag_pr_debug("echo oppidx > /proc/cpufreq/%s/cpufreq_oppidx\n", p->name);
 		}
 	}
 
@@ -237,11 +237,11 @@ static ssize_t cpufreq_freq_proc_write(struct file *file, const char __user *buf
 	rc = kstrtoint(buf, 10, &freq);
 	if (rc < 0) {
 		p->dvfs_disable_by_procfs = false;
-		tag_pr_info("echo khz > /proc/cpufreq/%s/cpufreq_freq\n", p->name);
+		tag_pr_debug("echo khz > /proc/cpufreq/%s/cpufreq_freq\n", p->name);
 	} else {
 		if (freq < p->opp_tbl[p->nr_opp_tbl - 1].cpufreq_khz) {
 			if (freq != 0)
-				tag_pr_info("frequency should higher than %dKHz!\n",
+				tag_pr_debug("frequency should higher than %dKHz!\n",
 					    p->opp_tbl[p->nr_opp_tbl - 1].cpufreq_khz);
 
 			p->dvfs_disable_by_procfs = false;
@@ -264,7 +264,7 @@ static ssize_t cpufreq_freq_proc_write(struct file *file, const char __user *buf
 #endif
 			} else {
 				p->dvfs_disable_by_procfs = false;
-				tag_pr_info("frequency %dKHz! is not found in CPU opp table\n",
+				tag_pr_debug("frequency %dKHz! is not found in CPU opp table\n",
 					    freq);
 			}
 		}
@@ -308,7 +308,7 @@ static ssize_t cpufreq_volt_proc_write(struct file *file, const char __user *buf
 	rc = kstrtoint(buf, 10, &uv);
 	if (rc < 0) {
 		p->dvfs_disable_by_procfs = false;
-		tag_pr_info("echo uv > /proc/cpufreq/%s/cpufreq_volt\n", p->name);
+		tag_pr_debug("echo uv > /proc/cpufreq/%s/cpufreq_volt\n", p->name);
 	} else {
 		p->dvfs_disable_by_procfs = true;
 		cpufreq_lock(flags);
@@ -351,7 +351,7 @@ static ssize_t cpufreq_turbo_mode_proc_write(struct file *file, const char __use
 		return -EINVAL;
 	rc = kstrtoint(buf, 10, &turbo_mode);
 	if (rc < 0)
-		tag_pr_info("echo 0/1 > /proc/cpufreq/%s/cpufreq_turbo_mode\n", p->name);
+		tag_pr_debug("echo 0/1 > /proc/cpufreq/%s/cpufreq_turbo_mode\n", p->name);
 	else {
 		p->turbo_mode = turbo_mode;
 #ifdef CONFIG_HYBRID_CPU_DVFS
@@ -392,7 +392,7 @@ static ssize_t cpufreq_sched_disable_proc_write(struct file *file, const char __
 		return -EINVAL;
 	rc = kstrtoint(buf, 10, &sched_disable);
 	if (rc < 0)
-		tag_pr_info("echo 0/1 > /proc/cpufreq/cpufreq_sched_disable\n");
+		tag_pr_debug("echo 0/1 > /proc/cpufreq/cpufreq_sched_disable\n");
 	else {
 #ifdef CONFIG_HYBRID_CPU_DVFS
 		cpuhvfs_set_sched_dvfs_disable(sched_disable);
@@ -437,7 +437,7 @@ static ssize_t cpufreq_dvfs_time_profile_proc_write(struct file *file, const cha
 
 	rc = kstrtoint(buf, 10, &temp);
 	if (rc < 0)
-		tag_pr_info("echo 1 > /proc/cpufreq/cpufreq_dvfs_time_profile\n");
+		tag_pr_debug("echo 1 > /proc/cpufreq/cpufreq_dvfs_time_profile\n");
 	else {
 		if (temp == 1) {
 			for (i = 0; i < NR_SET_V_F; i++)
@@ -490,14 +490,14 @@ int cpufreq_procfs_init(void)
 	dir = proc_mkdir("cpufreq", NULL);
 
 	if (!dir) {
-		tag_pr_notice("fail to create /proc/cpufreq @ %s()\n", __func__);
+		tag_pr_debug("fail to create /proc/cpufreq @ %s()\n", __func__);
 		return -ENOMEM;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		if (!proc_create
 		    (entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, dir, entries[i].fops))
-			tag_pr_notice("%s(), create /proc/cpufreq/%s failed\n", __func__,
+			tag_pr_debug("%s(), create /proc/cpufreq/%s failed\n", __func__,
 				      entries[i].name);
 	}
 
@@ -505,7 +505,7 @@ int cpufreq_procfs_init(void)
 		cpu_dir = proc_mkdir(p->name, dir);
 
 		if (!cpu_dir) {
-			tag_pr_notice("fail to create /proc/cpufreq/%s @ %s()\n", p->name, __func__);
+			tag_pr_debug("fail to create /proc/cpufreq/%s @ %s()\n", p->name, __func__);
 			return -ENOMEM;
 		}
 
@@ -513,7 +513,7 @@ int cpufreq_procfs_init(void)
 			if (!proc_create_data
 			    (cpu_entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, cpu_dir,
 			     cpu_entries[i].fops, p))
-				tag_pr_notice("%s(), create /proc/cpufreq/%s/%s failed\n", __func__,
+				tag_pr_debug("%s(), create /proc/cpufreq/%s/%s failed\n", __func__,
 					      p->name, entries[i].name);
 		}
 	}

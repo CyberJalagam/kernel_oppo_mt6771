@@ -511,7 +511,7 @@ static ssize_t mcdi_profile_write(struct file *filp,
 		if (!(param >= 0 && param < MCDI_SYSRAM_SIZE && (param % 4) == 0))
 			return -EINVAL;
 
-		pr_info("mcdi_reg: 0x%lx=0x%x(%d)\n",
+		pr_debug("mcdi_reg: 0x%lx=0x%x(%d)\n",
 			param, mcdi_read(mcdi_sysram_base + param), mcdi_read(mcdi_sysram_base + param));
 	} else if (!strncmp(cmd_str, "enable", sizeof("enable"))) {
 		if (param == MCDI_PROF_FLAG_STOP

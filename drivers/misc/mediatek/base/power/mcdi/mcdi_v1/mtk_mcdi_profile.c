@@ -49,10 +49,10 @@ void set_mcdi_profile_sampling(int en)
 	spin_unlock_irqrestore(&mcdi_prof_spin_lock, flags);
 
 	if (!en) {
-		pr_info("cpu = %d, sample cnt = %u\n", mcdi_prof_target_cpu, mcdi_profile_count);
+		pr_debug("cpu = %d, sample cnt = %u\n", mcdi_prof_target_cpu, mcdi_profile_count);
 
 		for (i = 0; i < (NF_MCDI_PROFILE - 1); i++)
-			pr_info("%d: %u\n", i, mcdi_profile_sum_us[i]);
+			pr_debug("%d: %u\n", i, mcdi_profile_sum_us[i]);
 	}
 }
 

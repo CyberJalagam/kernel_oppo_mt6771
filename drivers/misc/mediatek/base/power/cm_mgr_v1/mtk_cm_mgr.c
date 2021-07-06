@@ -509,7 +509,7 @@ void check_cm_mgr_status_internal(void)
 				if (vcore_dram_opp != CM_MGR_EMI_OPP) {
 					vcore_dram_opp = CM_MGR_EMI_OPP;
 #ifdef DEBUG_CM_MGR
-					pr_info("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
+					pr_debug("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
 							vcore_dram_opp_cur, vcore_dram_opp);
 #endif /* DEBUG_CM_MGR */
 					dvfsrc_set_power_model_ddr_request(CM_MGR_EMI_OPP - vcore_dram_opp);
@@ -521,7 +521,7 @@ void check_cm_mgr_status_internal(void)
 			idx = level;
 			vcore_power_up = vcore_power_gain(vcore_power_gain, total_bw, idx);
 #ifdef DEBUG_CM_MGR
-			pr_info("#@# %s(%d) vcore_power_up 0x%x cpu_power_total 0x%x\n", __func__, __LINE__,
+			pr_debug("#@# %s(%d) vcore_power_up 0x%x cpu_power_total 0x%x\n", __func__, __LINE__,
 					vcore_power_up, cpu_power_total);
 #endif /* DEBUG_CM_MGR */
 			if ((vcore_power_up * vcore_power_ratio_up[idx]) <
@@ -532,7 +532,7 @@ void check_cm_mgr_status_internal(void)
 						debounce_times_up = 0;
 					vcore_dram_opp = vcore_dram_opp_cur - 1;
 #ifdef DEBUG_CM_MGR
-					pr_info("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
+					pr_debug("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
 							vcore_dram_opp_cur, vcore_dram_opp);
 #endif /* DEBUG_CM_MGR */
 					dvfsrc_set_power_model_ddr_request(CM_MGR_EMI_OPP - vcore_dram_opp);
@@ -582,7 +582,7 @@ void check_cm_mgr_status_internal(void)
 				if (vcore_dram_opp != CM_MGR_EMI_OPP) {
 					vcore_dram_opp = CM_MGR_EMI_OPP;
 #ifdef DEBUG_CM_MGR
-					pr_info("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
+					pr_debug("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
 							vcore_dram_opp_cur, vcore_dram_opp);
 #endif /* DEBUG_CM_MGR */
 					dvfsrc_set_power_model_ddr_request(CM_MGR_EMI_OPP - vcore_dram_opp);
@@ -594,7 +594,7 @@ void check_cm_mgr_status_internal(void)
 			idx = level - 1;
 			vcore_power_down = vcore_power_gain(vcore_power_gain, total_bw, idx);
 #ifdef DEBUG_CM_MGR
-			pr_info("#@# %s(%d) vcore_power_down 0x%x cpu_power_total 0x%x\n", __func__, __LINE__,
+			pr_debug("#@# %s(%d) vcore_power_down 0x%x cpu_power_total 0x%x\n", __func__, __LINE__,
 					vcore_power_down, cpu_power_total);
 #endif /* DEBUG_CM_MGR */
 			if ((vcore_power_down * vcore_power_ratio_down[idx]) >
@@ -605,7 +605,7 @@ void check_cm_mgr_status_internal(void)
 						debounce_times_down = 0;
 					vcore_dram_opp = vcore_dram_opp_cur + 1;
 #ifdef DEBUG_CM_MGR
-					pr_info("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
+					pr_debug("#@# %s(%d) vcore_dram_opp %d->%d\n", __func__, __LINE__,
 							vcore_dram_opp_cur, vcore_dram_opp);
 #endif /* DEBUG_CM_MGR */
 					dvfsrc_set_power_model_ddr_request(CM_MGR_EMI_OPP - vcore_dram_opp);
@@ -854,20 +854,20 @@ static void cm_mgr_update_fw(void)
 		pr_debug("try to request_firmware() %s - %d\n", CPU_FW_FILE, j);
 		err = request_firmware(&fw, CPU_FW_FILE, &cm_mgr_device);
 		if (err)
-			pr_info("Failed to load %s, err = %d.\n", CPU_FW_FILE, err);
+			pr_debug("Failed to load %s, err = %d.\n", CPU_FW_FILE, err);
 	} while (err == -EAGAIN && j < 5);
 	if (err)
-		pr_info("Failed to load %s, err = %d.\n", CPU_FW_FILE, err);
+		pr_debug("Failed to load %s, err = %d.\n", CPU_FW_FILE, err);
 
 	if (!err) {
-		pr_info("request_firmware() %s, size 0x%x\n", CPU_FW_FILE, (int)fw->size);
+		pr_debug("request_firmware() %s, size 0x%x\n", CPU_FW_FILE, (int)fw->size);
 		update++;
 
 		for (count = 0; count < CM_MGR_MAX; count++) {
 			copy_size = vcore_power_array_size(count) * VCORE_ARRAY_SIZE * sizeof(unsigned int);
-			pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+			pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 			if (fw->size < (copy_size + offset)) {
-				pr_info("oversize vcore_power_gain_%d 0x%x, 0x%x",
+				pr_debug("oversize vcore_power_gain_%d 0x%x, 0x%x",
 						count, (int)fw->size, copy_size + offset);
 				goto out_fw;
 			}
@@ -879,9 +879,9 @@ static void cm_mgr_update_fw(void)
 		for (count = 0; count < CM_MGR_MAX; count++) {
 			offset += copy_size;
 			copy_size = sizeof(cpu_power_gain_UpLow0);
-			pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+			pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 			if (fw->size < (copy_size + offset)) {
-				pr_info("oversize cpu_power_gain_UpLow1 0x%x, 0x%x",
+				pr_debug("oversize cpu_power_gain_UpLow1 0x%x, 0x%x",
 						(int)fw->size, copy_size + offset);
 				goto out_fw;
 			}
@@ -889,9 +889,9 @@ static void cm_mgr_update_fw(void)
 
 			offset += copy_size;
 			copy_size = sizeof(cpu_power_gain_DownLow0);
-			pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+			pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 			if (fw->size < (copy_size + offset)) {
-				pr_info("oversize cpu_power_gain_DownLow1 0x%x, 0x%x",
+				pr_debug("oversize cpu_power_gain_DownLow1 0x%x, 0x%x",
 						(int)fw->size, copy_size + offset);
 				goto out_fw;
 			}
@@ -899,9 +899,9 @@ static void cm_mgr_update_fw(void)
 
 			offset += copy_size;
 			copy_size = sizeof(cpu_power_gain_UpHigh0);
-			pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+			pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 			if (fw->size < (copy_size + offset)) {
-				pr_info("oversize cpu_power_gain_UpHigh1 0x%x, 0x%x",
+				pr_debug("oversize cpu_power_gain_UpHigh1 0x%x, 0x%x",
 						(int)fw->size, copy_size + offset);
 				goto out_fw;
 			}
@@ -909,9 +909,9 @@ static void cm_mgr_update_fw(void)
 
 			offset += copy_size;
 			copy_size = sizeof(cpu_power_gain_DownHigh0);
-			pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+			pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 			if (fw->size < (copy_size + offset)) {
-				pr_info("oversize cpu_power_gain_DownHigh1 0x%x, 0x%x",
+				pr_debug("oversize cpu_power_gain_DownHigh1 0x%x, 0x%x",
 						(int)fw->size, copy_size + offset);
 				goto out_fw;
 			}
@@ -922,9 +922,9 @@ static void cm_mgr_update_fw(void)
 
 		offset += copy_size;
 		copy_size = sizeof(_v2f_all);
-		pr_info("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
+		pr_debug("offset 0x%x, copy_size 0x%x\n", offset, copy_size);
 		if (fw->size < (copy_size + offset)) {
-			pr_info("oversize _v2f_all 0x%x, 0x%x",
+			pr_debug("oversize _v2f_all 0x%x, 0x%x",
 					(int)fw->size, copy_size + offset);
 			goto out_fw;
 		}
@@ -1068,14 +1068,14 @@ static int create_cm_mgr_debug_fs(void)
 	/* create /proc/cm_mgr */
 	dir = proc_mkdir("cm_mgr", NULL);
 	if (!dir) {
-		pr_info("fail to create /proc/cm_mgr @ %s()\n", __func__);
+		pr_debug("fail to create /proc/cm_mgr @ %s()\n", __func__);
 		return -ENOMEM;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		if (!proc_create_data
 		    (entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, dir, entries[i].fops, entries[i].data))
-			pr_info("%s(), create /proc/cm_mgr/%s failed\n", __func__,
+			pr_debug("%s(), create /proc/cm_mgr/%s failed\n", __func__,
 				    entries[i].name);
 	}
 
@@ -1094,13 +1094,13 @@ int __init cm_mgr_module_init(void)
 
 	r = create_cm_mgr_debug_fs();
 	if (r) {
-		pr_info("FAILED TO CREATE DEBUG FILESYSTEM (%d)\n", r);
+		pr_debug("FAILED TO CREATE DEBUG FILESYSTEM (%d)\n", r);
 		return r;
 	}
 
 	r = device_register(&cm_mgr_device);
 	if (r) {
-		pr_info("FAILED TO CREATE DEVICE(%d)\n", r);
+		pr_debug("FAILED TO CREATE DEVICE(%d)\n", r);
 		return r;
 	}
 
@@ -1109,7 +1109,7 @@ int __init cm_mgr_module_init(void)
 
 	r = cm_mgr_platform_init();
 	if (r) {
-		pr_info("FAILED TO INIT PLATFORM(%d)\n", r);
+		pr_debug("FAILED TO INIT PLATFORM(%d)\n", r);
 		return r;
 	}
 
@@ -1126,9 +1126,9 @@ int __init cm_mgr_module_init(void)
 #endif /* USE_TIMER_CHECK */
 
 #ifdef ATF_SECURE_SMC
-	pr_info("ATF_SECURE_SMC\n");
+	pr_debug("ATF_SECURE_SMC\n");
 #else
-	pr_info("!ATF_SECURE_SMC\n");
+	pr_debug("!ATF_SECURE_SMC\n");
 #endif
 	return 0;
 }
