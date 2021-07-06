@@ -338,7 +338,7 @@ bool teec_notify_event(uint32_t event_type)
 	bool ret = false;
 
 	/* Currently we only support TUI cancel event type */
-	pr_info("TUI teec_notify_event: event_type is %d\n", event_type);
+	pr_debug("TUI teec_notify_event: event_type is %d\n", event_type);
 
 	/* Cancel the TUI session if exists */
 	if (g_tui_obj.status)
