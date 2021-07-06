@@ -293,7 +293,7 @@ static int vpu_profile_start(int core)
 
 static int vpu_profile_stop(int type)
 {
-	LOG_INF("vpu_profile_stop (%d)+\n", type);
+	LOG_DBG("vpu_profile_stop (%d)+\n", type);
 	if (type)
 		stop_result = vpu_profile_timer_try_stop();
 	else
@@ -311,7 +311,7 @@ int vpu_profile_state_set(int core, int val)
 		mutex_lock(&profile_mutex);
 		profiling_counter--;
 		vpu_on[core] = false;
-		LOG_INF("[vpu_profile_%d->%d] (stop) counter(%d, %d)\n",
+		LOG_DBG("[vpu_profile_%d->%d] (stop) counter(%d, %d)\n",
 			core, vpu_on[core], m_vpu_profile_state, profiling_counter);
 		if (profiling_counter == 0) {
 			m_vpu_profile_state = val;
@@ -325,7 +325,7 @@ int vpu_profile_state_set(int core, int val)
 		mutex_lock(&profile_mutex);
 		profiling_counter++;
 		vpu_on[core] = true;
-		LOG_INF("[vpu_profile_%d->%d] (start) counter(%d, %d)\n",
+		LOG_DBG("[vpu_profile_%d->%d] (start) counter(%d, %d)\n",
 			core, vpu_on[core], m_vpu_profile_state, profiling_counter);
 		m_vpu_profile_state = val;
 		mutex_unlock(&profile_mutex);

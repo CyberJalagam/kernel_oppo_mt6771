@@ -245,7 +245,7 @@ struct ion_handle *vpu_hw_ion_import_handle(struct ion_client *client, int fd)
 	}
 
 	if (g_vpu_log_level > VpuLogThre_STATE_MACHINE)
-		LOG_INF("[vpu] ion_import_handle(0x%p)\n", handle);
+		LOG_DBG("[vpu] ion_import_handle(0x%p)\n", handle);
 
 	return handle;
 }
@@ -298,7 +298,7 @@ int vpu_put_request_to_pool(struct vpu_user *user, struct vpu_request *req)
 				return -EINVAL;
 			} else {
 				if (g_vpu_log_level > VpuLogThre_STATE_MACHINE)
-					LOG_INF("[vpu_drv] (cnt_%d) ion_import_dma_buf handle(0x%p)!\n", cnt, handle);
+					LOG_DBG("[vpu_drv] (cnt_%d) ion_import_dma_buf handle(0x%p)!\n", cnt, handle);
 				/* import fd to handle for buffer ref count + 1 */
 				req->buf_ion_infos[cnt] = (uint64_t)(uintptr_t)handle;
 			}
@@ -492,7 +492,7 @@ int vpu_get_request_from_queue(struct vpu_user *user, uint64_t request_id, struc
 		}
 
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] vpu_get_request_from_queue (%d)\n", get);
+			LOG_DBG("[vpu] vpu_get_request_from_queue (%d)\n", get);
 		if (get)
 			list_del_init(vlist_link(req, struct vpu_request));
 
@@ -570,7 +570,7 @@ int vpu_delete_user(struct vpu_user *user)
 		vpu_hw_unlock(user);
 
 	mutex_lock(&vpu_device->user_mutex);
-	LOG_INF("deleted user[0x%lx]\n", (unsigned long)(user->id));
+	LOG_DBG("deleted user[0x%lx]\n", (unsigned long)(user->id));
 	list_del(vlist_link(user, struct vpu_user));
 	mutex_unlock(&vpu_device->user_mutex);
 
@@ -691,7 +691,7 @@ static int vpu_open(struct inode *inode, struct file *flip)
 		return -ENODEV;
 	}
 
-	LOG_INF("vpu_support core : 0x%x\n", efuse_data);
+	LOG_DBG("vpu_support core : 0x%x\n", efuse_data);
 
 	vpu_create_user(&user);
 	if (IS_ERR_OR_NULL(user)) {
@@ -700,7 +700,7 @@ static int vpu_open(struct inode *inode, struct file *flip)
 	}
 
 	user->id = (unsigned long *)user;
-	LOG_INF("vpu_open cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", vpu_num_users,
+	LOG_DBG("vpu_open cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", vpu_num_users,
 		(unsigned long)(user->id),
 		user->open_pid, user->open_tgid);
 	flip->private_data = user;
@@ -760,7 +760,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		struct vpu_request *u_req;
 
 		/*if (g_vpu_log_level > VpuLogThre_PERFORMANCE)*/
-		LOG_INF("[vpu] VPU_IOCTL_ENQUE_REQUEST +\n");
+		LOG_DBG("[vpu] VPU_IOCTL_ENQUE_REQUEST +\n");
 
 		ret = vpu_alloc_request(&req);
 		CHECK_RET("[ENQUE alloc request failed, ret=%d\n", ret);
@@ -813,7 +813,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		/* free the request, error happened here*/
 		vpu_free_request(req);
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] .VPU_IOCTL_ENQUE_REQUEST - ");
+			LOG_DBG("[vpu] .VPU_IOCTL_ENQUE_REQUEST - ");
 		ret = -EFAULT;
 		break;
 	}
@@ -824,7 +824,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		struct vpu_request *u_req;
 
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] VPU_IOCTL_DEQUE_REQUEST + ");
+			LOG_DBG("[vpu] VPU_IOCTL_DEQUE_REQUEST + ");
 
 		u_req = (struct vpu_request *) arg;
 		#if 1
@@ -852,7 +852,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		ret = vpu_free_request(req);
 		CHECK_RET("[DEQUE] free request, ret=%d\n", ret);
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] VPU_IOCTL_DEQUE_REQUEST - ");
+			LOG_DBG("[vpu] VPU_IOCTL_DEQUE_REQUEST - ");
 		break;
 	}
 	case VPU_IOCTL_FLUSH_REQUEST:
@@ -871,7 +871,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		uint64_t u_info_ptr;
 		uint32_t u_info_length;
 
-		LOG_INF("[vpu] VPU_IOCTL_GET_ALGO_INFO");
+		LOG_DBG("[vpu] VPU_IOCTL_GET_ALGO_INFO");
 		u_algo = (struct vpu_algo *) arg;
 		ret = copy_from_user(name, u_algo->name, sizeof(vpu_name_t));
 		CHECK_RET("[GET_ALGO] copy 'name' failed, ret=%d\n", ret);
@@ -884,26 +884,26 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 
 		/* 2. write data to user */
 		/* 2-1. write port */
-		LOG_INF("algo->port_count (%d)\n", algo->port_count);
+		LOG_DBG("algo->port_count (%d)\n", algo->port_count);
 		ret = put_user(algo->port_count, &u_algo->port_count);
 		ret |= copy_to_user(u_algo->ports, algo->ports,
 				sizeof(struct vpu_port) * algo->port_count);
 		CHECK_RET("[GET_ALGO] update ports failed, ret=%d\n", ret);
 
 		/* 2-2. write id */
-		LOG_INF("algo->id (%d)\n", algo->id);
+		LOG_DBG("algo->id (%d)\n", algo->id);
 		ret = put_user(algo->id, &u_algo->id);
 		CHECK_RET("[GET_ALGO] update id failed, ret=%d\n", ret);
 
 		/* 2-3. write setting desc */
-		LOG_INF("sett_desc_count (%d)\n", algo->sett_desc_count);
+		LOG_DBG("sett_desc_count (%d)\n", algo->sett_desc_count);
 		ret = put_user(algo->sett_desc_count, &u_algo->sett_desc_count);
 		ret |= copy_to_user(u_algo->sett_descs, algo->sett_descs,
 				algo->sett_desc_count * sizeof(struct vpu_prop_desc));
 		CHECK_RET("[GET_ALGO] update setting desc failed, ret=%d\n", ret);
 
 		/* 2-4. write info desc */
-		LOG_INF("algo->info_desc_count (%d)\n", algo->info_desc_count);
+		LOG_DBG("algo->info_desc_count (%d)\n", algo->info_desc_count);
 		ret = put_user(algo->info_desc_count, &u_algo->info_desc_count);
 		ret |= copy_to_user(u_algo->info_descs, algo->info_descs,
 				algo->info_desc_count * sizeof(struct vpu_prop_desc));
@@ -911,16 +911,16 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 
 		/* 2-5. write info data */
 		ret = get_user(u_info_ptr, &u_algo->info_ptr);
-		LOG_INF("u_info_ptr (0x%lx)\n", (unsigned long)u_info_ptr);
+		LOG_DBG("u_info_ptr (0x%lx)\n", (unsigned long)u_info_ptr);
 		ret |= get_user(u_info_length, &u_algo->info_length);
-		LOG_INF("u_info_length (0x%x)/0x%x, 0x%x\n", u_info_length, u_algo->info_length, algo->info_length);
+		LOG_DBG("u_info_length (0x%x)/0x%x, 0x%x\n", u_info_length, u_algo->info_length, algo->info_length);
 		CHECK_RET("[GET_ALGO] get info ptr/length failed, ret=%d\n", ret);
 		ret = (u_info_length < algo->info_length) ? -EINVAL : 0;
 		CHECK_RET("[GET_ALGO] the size of info data is not enough!");
 		ret = copy_to_user((void *) (u_info_ptr), (void *) algo->info_ptr, algo->info_length);
 		CHECK_RET("[GET_ALGO] update info data failed, ret=%d\n", ret);
 
-		LOG_INF("[vpu] VPU_IOCTL_GET_ALGO_INFO -");
+		LOG_DBG("[vpu] VPU_IOCTL_GET_ALGO_INFO -");
 		#endif
 		LOG_WRN("DO NOT SUPPORT VPU_IOCTL_GET_ALGO_INFO");
 		break;
@@ -1026,7 +1026,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		dev_debug_info->open_tgid = user->open_tgid;
 
 		if (g_vpu_log_level > VpuLogThre_ALGO_OPP_INFO)
-			LOG_INF("[VPU_IOCTL_OPEN_DEV_NOTICE] user:%s/%d. pid(%d/%d)\n",
+			LOG_DBG("[VPU_IOCTL_OPEN_DEV_NOTICE] user:%s/%d. pid(%d/%d)\n",
 				dev_debug_info->callername, dev_debug_info->dev_fd,
 				dev_debug_info->open_pid, dev_debug_info->open_tgid);
 
@@ -1056,7 +1056,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		{
 			dbg_info = vlist_node_of(head, struct vpu_dev_debug_info);
 			if (g_vpu_log_level > VpuLogThre_ALGO_OPP_INFO)
-				LOG_INF("[VPU_IOCTL_CLOSE_DEV_NOTICE] req_user-> = %s/%d, %d/%d\n",
+				LOG_DBG("[VPU_IOCTL_CLOSE_DEV_NOTICE] req_user-> = %s/%d, %d/%d\n",
 					dbg_info->callername,
 					dbg_info->dev_fd, dbg_info->open_pid, dbg_info->open_tgid);
 			if (dbg_info->dev_fd == dev_fd) {
@@ -1067,7 +1067,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		}
 
 		if (g_vpu_log_level > VpuLogThre_ALGO_OPP_INFO)
-			LOG_INF("[VPU_IOCTL_CLOSE_DEV_NOTICE] user:%d. pid(%d/%d), get(%d)\n",
+			LOG_DBG("[VPU_IOCTL_CLOSE_DEV_NOTICE] user:%d. pid(%d/%d), get(%d)\n",
 				dev_fd, user->open_pid, user->open_tgid, get);
 
 		if (get) {
@@ -1104,7 +1104,7 @@ static int vpu_release(struct inode *inode, struct file *flip)
 {
 	struct vpu_user *user = flip->private_data;
 
-	LOG_INF("vpu_release cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", vpu_num_users,
+	LOG_DBG("vpu_release cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", vpu_num_users,
 		(unsigned long)(user->id),
 		user->open_pid, user->open_tgid);
 
@@ -1132,7 +1132,7 @@ static int vpu_mmap(struct file *flip, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	pfn = vma->vm_pgoff << PAGE_SHIFT;
 
-	LOG_INF("vpu_mmap: vm_pgoff(0x%lx),pfn(0x%x),phy(0x%lx),vm_start(0x%lx),vm_end(0x%lx),length(0x%lx)\n",
+	LOG_DBG("vpu_mmap: vm_pgoff(0x%lx),pfn(0x%x),phy(0x%lx),vm_start(0x%lx),vm_end(0x%lx),length(0x%lx)\n",
 			vma->vm_pgoff, pfn, vma->vm_pgoff << PAGE_SHIFT, vma->vm_start, vma->vm_end, length);
 
 	switch (pfn) {
@@ -1219,18 +1219,18 @@ static int vpu_probe(struct platform_device *pdev)
 #endif
 	smi_node = NULL;
 	if (core == MTK_VPU_CORE) {
-		LOG_INF("vpu_num_devs(%d), core(%d) = core(%d)+2 in FPGA, return\n", vpu_num_devs, core, MTK_VPU_CORE);
+		LOG_DBG("vpu_num_devs(%d), core(%d) = core(%d)+2 in FPGA, return\n", vpu_num_devs, core, MTK_VPU_CORE);
 		return ret;
 	}
 	node = pdev->dev.of_node;
 	vpu_device->dev[vpu_num_devs] = &pdev->dev;
-	LOG_INF("probe 0, pdev id = %d name = %s, name = %s\n", pdev->id, pdev->name, pdev->dev.of_node->name);
+	LOG_DBG("probe 0, pdev id = %d name = %s, name = %s\n", pdev->id, pdev->name, pdev->dev.of_node->name);
 
 #ifdef MTK_VPU_EMULATOR
 	/* emulator will fill vpu_base and bin_base */
 	vpu_init_emulator(vpu_device);
 #else
-	LOG_INF("[vpu] core/total : %d/%d\n", core, MTK_VPU_CORE);
+	LOG_DBG("[vpu] core/total : %d/%d\n", core, MTK_VPU_CORE);
 	switch (vpu_num_devs) {
 #ifdef MTK_VPU_FPGA_PORTING
 	/* get register address */
@@ -1265,7 +1265,7 @@ static int vpu_probe(struct platform_device *pdev)
 			vpu_device->bin_base = (unsigned long)ioremap_wc(phy_addr, phy_size);
 			vpu_device->bin_pa = phy_addr;
 			vpu_device->bin_size = phy_size;
-			LOG_INF("probe core:%d, bin_base:0x%lx phy_addr: 0x%x, phy_size: 0x%x\n",
+			LOG_DBG("probe core:%d, bin_base:0x%lx phy_addr: 0x%x, phy_size: 0x%x\n",
 				core, (unsigned long)vpu_device->bin_base, phy_addr, phy_size);
 
 			/* get smi common register */
@@ -1276,7 +1276,7 @@ static int vpu_probe(struct platform_device *pdev)
 
 			ipu_conn_node = of_find_compatible_node(NULL, NULL, "mediatek,ipu_conn");
 			vpu_device->vpu_syscfg_base = (unsigned long) of_iomap(ipu_conn_node, 0);
-			LOG_INF("probe, smi_common_base: 0x%lx, ipu_conn:0x%lx\n",
+			LOG_DBG("probe, smi_common_base: 0x%lx, ipu_conn:0x%lx\n",
 				vpu_device->smi_common_base, vpu_device->vpu_syscfg_base);
 		}
 		break;
