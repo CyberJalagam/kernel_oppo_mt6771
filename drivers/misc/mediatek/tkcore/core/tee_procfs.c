@@ -1005,7 +1005,7 @@ int tee_init_procfs(struct tee *tee)
 	tee_version_major = param.a0;
 	tee_version_minor = param.a1;
 
-	pr_info("tkcoreos-rev: 0.%d.%d-gp\n",
+	pr_debug("tkcoreos-rev: 0.%d.%d-gp\n",
 		tee_version_major, tee_version_minor);
 
 	/* map control header */
