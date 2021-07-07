@@ -185,9 +185,9 @@ static unsigned int is_entering_suspend;
 /* #define VCODEC_DEBUG */
 #ifdef VCODEC_DEBUG
 #undef VCODEC_DEBUG
-#define VCODEC_DEBUG pr_info
+#define VCODEC_DEBUG pr_debug
 #undef MODULE_MFV_LOGD
-#define MODULE_MFV_LOGD  pr_info
+#define MODULE_MFV_LOGD  pr_debug
 #else
 #define VCODEC_DEBUG(...)
 #undef MODULE_MFV_LOGD
@@ -497,13 +497,13 @@ EXPORT_SYMBOL(mt_vdec_base_get);
 *	for (i = 45; i < 72; i++) {
 *		if (i == 45 || i == 46 || i == 52 || i == 58 || i == 59 || i == 61 || i == 62 || i == 63 || i == 71) {
 *			u4DataStatusMain = VDO_HW_READ(KVA_VDEC_VLD_BASE+(i*4));
-*			MODULE_MFV_PR_INFO("[VCODEC][DUMP] VLD_%d = %x\n", i, u4DataStatusMain);
+*			MODULE_MFV_PR_DEBUG("[VCODEC][DUMP] VLD_%d = %x\n", i, u4DataStatusMain);
 *		}
 *	}
 *
 *	for (i = 66; i < 80; i++) {
 *		u4DataStatusMain = VDO_HW_READ(KVA_VDEC_MISC_BASE+(i*4));
-*		MODULE_MFV_PR_INFO("[VCODEC][DUMP] MISC_%d = %x\n", i, u4DataStatusMain);
+*		MODULE_MFV_PR_DEBUG("[VCODEC][DUMP] MISC_%d = %x\n", i, u4DataStatusMain);
 *	}
 *
 *}
@@ -527,18 +527,18 @@ void vdec_polling_status(void)
 			VAL_UINT32_T u4IntStatus = 0;
 			VAL_UINT32_T i = 0;
 
-			MODULE_MFV_PR_INFO("[VCODEC][POTENTIAL ERROR] Leftover data access before powering down\n");
+			MODULE_MFV_PR_DEBUG("[VCODEC][POTENTIAL ERROR] Leftover data access before powering down\n");
 			for (i = 45; i < 72; i++) {
 				if (i == 45 || i == 46 || i == 52 || i == 58 || i == 59 || i == 61 ||
 					i == 62 || i == 63 || i == 71){
 					u4IntStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(i*4));
-					MODULE_MFV_PR_INFO("[VCODEC][DUMP] VLD_%d = %x\n", i, u4IntStatus);
+					MODULE_MFV_PR_DEBUG("[VCODEC][DUMP] VLD_%d = %x\n", i, u4IntStatus);
 				}
 			}
 
 			for (i = 66; i < 80; i++) {
 				u4DataStatus = VDO_HW_READ(KVA_VDEC_MISC_BASE+(i*4));
-				MODULE_MFV_PR_INFO("[VCODEC][DUMP] MISC_%d = %x\n", i, u4DataStatus);
+				MODULE_MFV_PR_DEBUG("[VCODEC][DUMP] MISC_%d = %x\n", i, u4DataStatus);
 			}
 
 			smi_debug_bus_hanging_detect_ext2(0x1FF, 1, 0, 1);
@@ -549,7 +549,7 @@ void vdec_polling_status(void)
 		}
 	}
 	gi4DecWaitEMI = 0;
-	/* MODULE_MFV_PR_INFO("u4Counter %d\n", u4Counter); */
+	/* MODULE_MFV_PR_DEBUG("u4Counter %d\n", u4Counter); */
 
 }
 
@@ -737,32 +737,32 @@ void vdec_break(void)
 		unsigned int j;
 		VAL_UINT32_T u4DataStatus = 0;
 
-		pr_info("[VCODEC][POTENTIAL ERROR] Leftover data access before powering down\n");
+		pr_debug("[VCODEC][POTENTIAL ERROR] Leftover data access before powering down\n");
 
 		for (j = 68; j < 80; j++) {
 			u4DataStatus = VDO_HW_READ(KVA_VDEC_MISC_BASE+(j*4));
-			pr_info("[VCODEC][DUMP] MISC_%d = 0x%08x", j, u4DataStatus);
+			pr_debug("[VCODEC][DUMP] MISC_%d = 0x%08x", j, u4DataStatus);
 		}
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(45*4));
-		pr_info("[VCODEC][DUMP] VLD_45 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_45 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(46*4));
-		pr_info("[VCODEC][DUMP] VLD_46 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_46 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(52*4));
-		pr_info("[VCODEC][DUMP] VLD_52 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_52 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(58*4));
-		pr_info("[VCODEC][DUMP] VLD_58 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_58 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(59*4));
-		pr_info("[VCODEC][DUMP] VLD_59 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_59 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(61*4));
-		pr_info("[VCODEC][DUMP] VLD_61 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_61 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(62*4));
-		pr_info("[VCODEC][DUMP] VLD_62 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_62 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(63*4));
-		pr_info("[VCODEC][DUMP] VLD_63 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_63 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_VLD_BASE+(71*4));
-		pr_info("[VCODEC][DUMP] VLD_71 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] VLD_71 = 0x%08x", u4DataStatus);
 		u4DataStatus = VDO_HW_READ(KVA_VDEC_MISC_BASE+(66*4));
-		pr_info("[VCODEC][DUMP] MISC_66 = 0x%08x", u4DataStatus);
+		pr_debug("[VCODEC][DUMP] MISC_66 = 0x%08x", u4DataStatus);
 	}
 
 	/* Step 3: software reset */
@@ -1512,7 +1512,7 @@ static long vcodec_unlockhw(unsigned long arg)
 				dec_jobs = dec_jobs->next;
 				kfree(dec_cur_job);
 			} else {
-				pr_info("VCODEC wrong job at dec done %p, %p",
+				pr_debug("VCODEC wrong job at dec done %p, %p",
 					dec_cur_job->handle,
 					grVcodecDecHWLock.pvHandle);
 			}
@@ -1565,7 +1565,7 @@ static long vcodec_unlockhw(unsigned long arg)
 				enc_jobs = enc_jobs->next;
 				kfree(enc_cur_job);
 			} else {
-				pr_info("VCODEC wrong job at dec done %p, %p",
+				pr_debug("VCODEC wrong job at dec done %p, %p",
 					enc_cur_job->handle,
 					grVcodecEncHWLock.pvHandle);
 			}
@@ -2780,7 +2780,7 @@ static int vcodec_release(struct inode *inode, struct file *file)
 
 		/* check if someone didn't unlockHW */
 		if (grVcodecDecHWLock.pvHandle != 0) {
-			pr_info("[ERROR] someone didn't unlockHW vcodec_release pid = %d, grVcodecDecHWLock.eDriverType %d grVcodecDecHWLock.pvHandle 0x%lx\n",
+			pr_debug("[ERROR] someone didn't unlockHW vcodec_release pid = %d, grVcodecDecHWLock.eDriverType %d grVcodecDecHWLock.pvHandle 0x%lx\n",
 				current->pid, grVcodecDecHWLock.eDriverType, (VAL_ULONG_T)grVcodecDecHWLock.pvHandle);
 
 			/* power off */
@@ -2812,7 +2812,7 @@ static int vcodec_release(struct inode *inode, struct file *file)
 		mutex_lock(&VencHWLock);
 		pvCheckHandle = grVcodecEncHWLock.pvHandle;
 		if (grVcodecEncHWLock.pvHandle != 0) {
-			pr_info("[ERROR] someone didn't unlockHW vcodec_release pid = %d, grVcodecEncHWLock.eDriverType %d grVcodecEncHWLock.pvHandle 0x%lx\n",
+			pr_debug("[ERROR] someone didn't unlockHW vcodec_release pid = %d, grVcodecEncHWLock.eDriverType %d grVcodecEncHWLock.pvHandle 0x%lx\n",
 				current->pid, grVcodecEncHWLock.eDriverType, (VAL_ULONG_T)grVcodecEncHWLock.pvHandle);
 			if (grVcodecEncHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
 				venc_break();
