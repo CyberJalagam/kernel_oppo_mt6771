@@ -73,6 +73,7 @@ ifeq ($(ALIEN_DEBUG),true)
  export OPPO_KASAN_CONFIG=1
  export OPPO_KMEMLEAK_CONFIG=1
  TARGET_BUILD_VARIANT=eng
+ export OPPO_BUILD_TYPE=eng
 else
  export OPPO_BUILD_TYPE=release
 endif
@@ -455,7 +456,7 @@ endif
 
 ifeq ($(OPPO_BUILD_TYPE),release)
     $(info  wendebug kernel release)
-    ifneq ($(SPECIAL_OPPO_CONFIG),1)
+    ifeq ($(SPECIAL_OPPO_CONFIG),1)
         OPPO_SLUB_TEST :=
         OPPO_KASAN_TEST :=
         OPPO_KMEMLEAK_TEST :=
