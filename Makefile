@@ -485,6 +485,15 @@ KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
 endif
 #endif /* VENDOR_EDIT */
 
+#ifdef VENDOR_EDIT
+#//Liang.Zhang@PSW.TECH.Bootup, 2018/10/19, Add for kernel monitor whole bootup
+#ifdef HANG_OPPO_ALL
+KBUILD_CFLAGS +=   -DHANG_OPPO_ALL
+KBUILD_CPPFLAGS += -DHANG_OPPO_ALL
+CFLAGS_KERNEL +=   -DHANG_OPPO_ALL
+CFLAGS_MODULE +=   -DHANG_OPPO_ALL
+#ifdef VENDOR_EDIT
+
 #endif//VENDOR_EDIT
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
