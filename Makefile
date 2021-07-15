@@ -416,16 +416,8 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 TARGET_BUILD_VARIANT := user
+TARGET_PRODUCT := full_oppo6771
 VENDOR_EDIT := 1
-
-# OPPO BUILD PRODUCT
-ifeq ($(ALIEN_RM1),true)
-TARGET_PRODUCT := full_oppo6771_17065
-endif
-
-ifeq ($(ALIEN_RMU1),true)
-TARGET_PRODUCT := full_oppo6771_18611
-endif
 
 #ifdef  VENDOR_EDIT
 #LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
@@ -434,10 +426,6 @@ KBUILD_CPPFLAGS += -DVENDOR_EDIT
 CFLAGS_KERNEL +=   -DVENDOR_EDIT
 CFLAGS_MODULE +=   -DVENDOR_EDIT
 #endif /* VENDOR_EDIT */
-
-
-
-
 
 #ifdef VENDOR_EDIT
 #Wen.Luo@Bsp.Kernel.Stability, 2018/12/05, Add for Debug Config, slub/kmemleak/kasan config
