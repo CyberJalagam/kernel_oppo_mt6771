@@ -17,7 +17,7 @@
 /**************************************************
  * MT6771 segment_1 : GPU DVFS OPP table Setting
  **************************************************/
-#define SEG1_GPU_DVFS_FREQ0					(900000)	/* KHz */
+#define SEG1_GPU_DVFS_FREQ0					(860000)	/* KHz */
 #define SEG1_GPU_DVFS_FREQ1					(850000)	/* KHz */
 #define SEG1_GPU_DVFS_FREQ2					(800000)	/* KHz */
 #define SEG1_GPU_DVFS_FREQ3					(743000)	/* KHz */
