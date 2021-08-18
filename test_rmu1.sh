@@ -8,12 +8,7 @@ RED='\033[01;31m'
 RST='\033[0m'
 echo "Cloning dependencies if they don't exist...."
 
-if [ ! -d out ]
-then
-echo "clean"
-else
 rm -rf AnyKernel
-fi 
 
 if [ ! -d clang ]
 then
@@ -32,7 +27,7 @@ fi
 
 if [ ! -d AnyKernel ]
 then
-git clone https://gitlab.com/CyberJalagam/AnyKernel3 -b rm1 --depth=1 AnyKernel
+git clone https://gitlab.com/CyberJalagam/AnyKernel3 -b rmu1 --depth=1 AnyKernel
 fi
 
 echo "Done"
@@ -47,13 +42,13 @@ export KBUILD_COMPILER_STRING="$(${KERNEL_DIR}/clang/bin/clang --version | head 
 export ARCH=arm64
 export KBUILD_BUILD_USER=jaishnav
 export KBUILD_BUILD_HOST=rbinternational
-export ALIEN_RM1=true
+export ALIEN_RMU1=true
 
 # Compile plox
 function compile() {
 
     echo -e "${CYAN}"
-    make -j$(nproc) O=out ARCH=arm64 oppo6771_17065_defconfig
+    make -j$(nproc) O=out ARCH=arm64 oppo6771_18611_defconfig
     make -j$(nproc) O=out \
                     ARCH=arm64 \
                     CC=clang \
@@ -85,9 +80,9 @@ function zipping() {
     echo -e "${YELLOW}"
     echo "Alien invasion in progress... "
     cd AnyKernel || exit 1
-    zip -r9 AlienKernel™️-v3.0-CPH1859-${TANGGAL}.zip * > /dev/null 2>&1
+    zip -r9 AlienKernel™️-test-RMX1831-${TANGGAL}.zip * > /dev/null 2>&1
     cd ..
-    echo "Aliens stored at AnyKernel/AlienKernel™️-v3.0-CPH1859-${TANGGAL}.zip"
+    echo "Aliens stored at AnyKernel/AlienKernel™️-test-RMX1831-${TANGGAL}.zip"
     echo -e "${RST}"
 }
 compile
