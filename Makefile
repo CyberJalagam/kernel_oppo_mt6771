@@ -66,19 +66,6 @@ unexport GREP_OPTIONS
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
 
-# OPPO DEBUG
-# Make OPPO debug build easier by just using a single flag
-ifeq ($(ALIEN_DEBUG),true)
- export OPPO_SLUB_CONFIG=1
- export OPPO_KASAN_CONFIG=1
- export OPPO_KMEMLEAK_CONFIG=1
- TARGET_BUILD_VARIANT=eng
- export OPPO_BUILD_TYPE=eng
-else
- export OPPO_BUILD_TYPE=release
-endif
-
-
 ifeq ("$(origin V)", "command line")
   KBUILD_VERBOSE = $(V)
 endif
@@ -417,6 +404,7 @@ KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 TARGET_BUILD_VARIANT := user
 TARGET_PRODUCT := full_oppo6771
+OPPO_BUILD_TYPE := release
 VENDOR_EDIT := 1
 
 #ifdef  VENDOR_EDIT
@@ -472,15 +460,6 @@ KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
 KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
 endif
 #endif /* VENDOR_EDIT */
-
-#ifdef VENDOR_EDIT
-#//Liang.Zhang@PSW.TECH.Bootup, 2018/10/19, Add for kernel monitor whole bootup
-#ifdef HANG_OPPO_ALL
-KBUILD_CFLAGS +=   -DHANG_OPPO_ALL
-KBUILD_CPPFLAGS += -DHANG_OPPO_ALL
-CFLAGS_KERNEL +=   -DHANG_OPPO_ALL
-CFLAGS_MODULE +=   -DHANG_OPPO_ALL
-#ifdef VENDOR_EDIT
 
 #endif//VENDOR_EDIT
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
