@@ -15,6 +15,17 @@ NAME = Blurry Fish Butt
 # o Look for make include files relative to root of kernel src
 MAKEFLAGS += -rR --include-dir=$(CURDIR)
 
+
+# OPPO PROJECT
+ifeq ($(ALIEN_RM1),true)
+ export OPPO_17065=1
+ export OPPO_17061=1
+endif
+
+ifeq ($(ALIEN_RMU1),true)
+ export OPPO_18611=1
+endif
+
 # Avoid funny character set dependencies
 unexport LC_ALL
 LC_COLLATE=C
