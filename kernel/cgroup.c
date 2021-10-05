@@ -5949,16 +5949,13 @@ void cgroup_exit(struct task_struct *tsk)
 	do_each_subsys_mask(ss, i, have_exit_callback) {
 		ss->exit(tsk);
 
-		
-<<<<<<< HEAD
+	} while_each_subsys_mask();		
 
 #if defined(CONFIG_CPUSETS) && !defined(CONFIG_MTK_ACAO)
 	if (excl_task_count > 0)
 		remove_set_exclusive_task(tsk->pid, 1);
 #endif
-=======
-	} while_each_subsys_mask();
->>>>>>> 845f8e265aee (cgroup: convert for_each_subsys_which() to do-while style)
+
 }
 
 void cgroup_free(struct task_struct *task)
