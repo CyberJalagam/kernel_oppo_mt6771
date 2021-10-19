@@ -210,7 +210,7 @@ static struct platform_driver g_gpufreq_pdrv = {
 static bool g_parking;
 static bool g_DVFS_is_paused_by_ptpod;
 static bool g_volt_enable_state;
-static bool g_keep_opp_freq_state;
+static bool g_keep_opp_freq_state = true;
 static bool g_opp_stress_test_state;
 static bool g_fixed_freq_volt_state;
 static bool g_pbm_limited_ignore_state;
