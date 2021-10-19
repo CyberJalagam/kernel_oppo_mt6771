@@ -42,7 +42,7 @@ export KBUILD_COMPILER_STRING="$(${KERNEL_DIR}/clang/bin/clang --version | head 
 export ARCH=arm64
 export KBUILD_BUILD_USER=jaishnav
 export KBUILD_BUILD_HOST=rbinternational
-export ALIEN_RMU1=true
+export OPPO_18611=1
 
 # Compile plox
 function compile() {

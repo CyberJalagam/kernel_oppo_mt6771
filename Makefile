@@ -16,16 +16,6 @@ NAME = Blurry Fish Butt
 MAKEFLAGS += -rR --include-dir=$(CURDIR)
 
 
-# OPPO PROJECT
-ifeq ($(ALIEN_RM1),true)
- export OPPO_17065=1
- export OPPO_17061=1
-endif
-
-ifeq ($(ALIEN_RMU1),true)
- export OPPO_18611=1
-endif
-
 # Avoid funny character set dependencies
 unexport LC_ALL
 LC_COLLATE=C
@@ -417,6 +407,8 @@ TARGET_BUILD_VARIANT := user
 TARGET_PRODUCT := full_oppo6771
 OPPO_BUILD_TYPE := release
 VENDOR_EDIT := 1
+OPPO_17065 := 1
+OPPO_17061 := 1
 
 #ifdef  VENDOR_EDIT
 #LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
@@ -499,6 +491,8 @@ export KBUILD_ARFLAGS
 export TARGET_BUILD_VARIANT
 export TARGET_PRODUCT
 export VENDOR_EDIT
+export OPPO_17065
+export OPPO_17061
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might

@@ -70,7 +70,6 @@ export KBUILD_BUILD_HOST=rbinternational
 #
 
 # Start configs for Realme 1
-export ALIEN_RM1=true
 
 function compile() {
 
@@ -156,7 +155,7 @@ rm -rf out
 #
 # BEGIN REALME U1
 #
-export ALIEN_RMU1=true
+export OPPO_18611=1
 
 # Compile plox
 function compile-u1() {
